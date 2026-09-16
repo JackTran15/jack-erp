@@ -157,6 +157,22 @@ import { CheckoutSagaModule } from './checkout-saga/checkout-saga.module';
     InvoiceService,
     InvoiceDebtService,
     ReturnEligibilityService,
+    // Mobile thu ngân (T-16-01): thu tiền trên hoá đơn nháp đi đúng đường checkout của POS.
+    CheckoutInvoiceService,
+    // Mobile đổi trả (T-18-01) đi đúng hai bước tạo phiếu + checkout-return của POS.
+    CreateReturnInvoiceService,
+    // Mobile đổi trả (T-18-01) đi đúng hai bước tạo phiếu + checkout-return của POS.
+    CreateExchangeInvoiceService,
+    // Mobile đổi trả (T-18-01) đi đúng hai bước tạo phiếu + checkout-return của POS.
+    CheckoutReturnService,
+    // Mobile *Sử dụng điểm* và `SalesOrderService.approve` cùng gọi service này —
+    // một luật đổi điểm cho cả ba mặt tiền (POS web, app thu ngân, duyệt đơn).
+    PointsRedemptionService,
+    // Mobile *Huỷ hoá đơn* đi đúng hai service của POS. Huỷ một chứng từ là
+    // hoàn tiền, trả kho, đảo điểm và đóng công nợ — một bản thứ hai dưới
+    // `/mobile` là một bộ tác dụng phụ thứ hai sẽ phân kỳ mà không ai thấy.
+    CancelInvoiceService,
+    CancelReturnService,
   ],
 })
 export class PosModule {}

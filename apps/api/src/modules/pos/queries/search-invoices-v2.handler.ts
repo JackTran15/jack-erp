@@ -198,7 +198,21 @@ export class SearchInvoicesV2Handler
     // InvoiceEntity.salespersonId. The mobile endpoint resolves the profile
     // from the caller and sets this; the web grid may pass it as a filter.
     if (dto.salespersonId) {
-      qb.andWhere('inv.salespersonId = :spid', { spid: dto.salespersonId });
+      // OR chứ không AND khi có `createdByUserId`: hai vế là hai cách một người
+      // sở hữu một hoá đơn — bán nó (`salesperson_id`) hoặc lập nó
+      // (`created_by`). Xem doc của `InvoiceSearchV2Dto.createdByUserId`.
+      //
+      // Ngoặc là BẮT BUỘC: thiếu nó thì `OR` trèo lên mọi mệnh đề `andWhere`
+      // phía trước (chi nhánh, trạng thái, khoảng ngày) và câu truy vấn phơi
+      // hoá đơn của chi nhánh khác.
+      if (dto.createdByUserId) {
+        qb.andWhere('(inv.salespersonId = :spid OR inv.createdBy = :cbid)', {
+          spid: dto.salespersonId,
+          cbid: dto.createdByUserId,
+        });
+      } else {
+        qb.andWhere('inv.salespersonId = :spid', { spid: dto.salespersonId });
+      }
     }
 
     return qb;

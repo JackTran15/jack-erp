@@ -126,6 +126,23 @@ export class InvoiceSearchV2Dto {
   @IsUUID()
   salespersonId?: string;
 
+  /**
+   * Người TẠO hoá đơn (`users.id`), ghép với [salespersonId] bằng **OR**.
+   *
+   * Không phải một bộ lọc thứ hai mà là vế còn lại của CÙNG một câu hỏi: *"hoá
+   * đơn nào là của tôi"*. Vai tư vấn nhận diện bằng `salesperson_id`; vai thu
+   * ngân thì không — hoá đơn họ lập tại quầy, phiếu trả hàng và phiếu đổi hàng
+   * đều để `salesperson_id` TRỐNG (đo trên dev 2026-09-15: 23/23 phiếu trả và
+   * 2/2 phiếu đổi đều trống). Chỉ lọc theo vế đầu thì mọi chứng từ của thu ngân
+   * biến mất khỏi danh sách của chính họ — Loc rà 2026-09-15.
+   *
+   * **Chỉ có tác dụng khi đi CÙNG [salespersonId]**; đứng một mình thì bị bỏ
+   * qua, để đường web không vô tình đổi phạm vi vì một tham số lạ.
+   */
+  @IsOptional()
+  @IsUUID()
+  createdByUserId?: string;
+
   /** Ghi chú */
   @IsOptional()
   @ValidateNested()

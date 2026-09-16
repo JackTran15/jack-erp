@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, EntityManager } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import { SessionStatus, WsEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -90,6 +90,43 @@ export class PosSessionService {
       `Opened POS session ${saved.id} (branch=${dto.branchId}, cash_account=${dto.cashAccountId}, org=${actor.organizationId})`,
     );
     return saved;
+  }
+
+  /**
+   * Phiên đang bán của một chi nhánh, cho các đường `/mobile/cashier/*` và
+   * `approve` của đơn tư vấn (erp_sales, ADR-31): app KHÔNG gửi `sessionId`,
+   * server tự tra. Ưu tiên phiên do CHÍNH người gọi mở; không có thì phiên mở
+   * gần nhất của chi nhánh. Không có phiên → `ConflictException` mang mã
+   * `NO_OPEN_SESSION` — app đọc MÃ để đưa người dùng sang màn Mở ca, không đọc câu.
+   */
+  async findOpenForBranch(
+    branchId: string,
+    actor: ActorContext,
+    manager?: EntityManager,
+  ): Promise<PosSessionEntity> {
+    const repo = manager ? manager.getRepository(PosSessionEntity) : this.sessionRepo;
+    const open = await repo.find({
+      where: {
+        organizationId: actor.organizationId,
+        branchId,
+        status: In([SessionStatus.OPEN, SessionStatus.ACTIVE_SALES]),
+      },
+      order: { openedAt: 'DESC' },
+    });
+    const mine = open.find((s) => s.openedBy === actor.userId);
+    const session = mine ?? open[0];
+    if (!session) {
+      throw new ConflictException({
+        code: 'NO_OPEN_SESSION',
+        message: 'Chi nhánh chưa mở ca. Mở ca trước khi thu tiền.',
+      });
+    }
+    if (!mine && open.length > 1) {
+      this.logger.warn(
+        `Branch ${branchId} has ${open.length} open sessions; using latest ${session.id} for user ${actor.userId}`,
+      );
+    }
+    return session;
   }
 
   async startSales(
@@ -304,6 +341,31 @@ export class PosSessionService {
     return saved;
   }
 
+  /**
+   * Mở LẠI một phiên đang đóng dở (`CLOSING → ACTIVE_SALES`) — nút HỦY BỎ của
+   * màn Đóng ca trên mobile (A-68): màn đó gọi `startClose` ngay lúc mở để có
+   * "Tiền thu trong ca", nên bấm HỦY BỎ mà không có đường này là ca kẹt ở
+   * CLOSING, không bán tiếp được.
+   *
+   * Idempotent: phiên đang bán → trả về nguyên (bấm HỦY BỎ hai lần vẫn an toàn).
+   * Đã `CLOSED` → 409. Bản kiểm kê đã nộp (nếu có) bị xoá — nó là của lượt
+   * đóng vừa bỏ.
+   */
+  async reopen(sessionId: string, actor: ActorContext): Promise<PosSessionEntity> {
+    const session = await this.findOrFail(sessionId, actor);
+    if (session.status === SessionStatus.OPEN || session.status === SessionStatus.ACTIVE_SALES) {
+      return session;
+    }
+    if (session.status !== SessionStatus.CLOSING) {
+      throw new ConflictException('Ca đã đóng, không mở lại được');
+    }
+    await this.reconciliationRepo.delete({ sessionId, organizationId: actor.organizationId });
+    session.status = SessionStatus.ACTIVE_SALES;
+    const saved = await this.sessionRepo.save(session);
+    this.logger.log(`Session ${sessionId} reopened by ${actor.userId} (org=${actor.organizationId})`);
+    return saved;
+  }
+
   async findOrFail(
     sessionId: string,
     actor: ActorContext,
@@ -328,6 +390,11 @@ export class PosSessionService {
    *   + sum(TRANSFER where to_account_id = session.cash_account_id     // inflow,
    *                       AND created_at between session open/close)
    */
+  /** Bản public của [calculateExpectedCash] cho `/mobile/cashier/session` khi phiên đang CLOSING. */
+  expectedCashOf(session: PosSessionEntity): Promise<number> {
+    return this.calculateExpectedCash(session);
+  }
+
   private async calculateExpectedCash(
     session: PosSessionEntity,
   ): Promise<number> {

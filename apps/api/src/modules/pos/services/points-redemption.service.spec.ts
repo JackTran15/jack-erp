@@ -34,15 +34,34 @@ const invoiceStub = (overrides: Partial<InvoiceEntity> = {}): InvoiceEntity =>
 
 describe('PointsRedemptionService', () => {
   let service: PointsRedemptionService;
-  let invoiceRepo: { findOne: jest.Mock; save: jest.Mock };
-  let membershipCardService: { findActiveCard: jest.Mock };
+  let invoiceRepo: {
+    findOne: jest.Mock;
+    save: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
+  let manager: { findOne: jest.Mock; save: jest.Mock };
+  let membershipCardService: {
+    findActiveCard: jest.Mock;
+    getPointBalanceForUpdate: jest.Mock;
+  };
 
   beforeEach(async () => {
+    // Manager GIẢ đứng thay transaction: `applyRedemption` nay chỉ là lớp mỏng
+    // mở một transaction rồi gọi `applyRedemptionIn`, nên mọi ca cũ vẫn chạy
+    // qua đúng một đường — đó là điểm của lần tách này.
+    manager = {
+      findOne: jest.fn(),
+      save: jest.fn((_entity, e) => Promise.resolve(e)),
+    };
     invoiceRepo = {
       findOne: jest.fn(),
       save: jest.fn((e) => Promise.resolve(e)),
+      manager: { transaction: jest.fn((cb) => cb(manager)) },
     };
-    membershipCardService = { findActiveCard: jest.fn() };
+    membershipCardService = {
+      findActiveCard: jest.fn(),
+      getPointBalanceForUpdate: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,29 +76,29 @@ describe('PointsRedemptionService', () => {
 
   describe('applyRedemption', () => {
     it('throws NotFoundException when invoice not found', async () => {
-      invoiceRepo.findOne.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(null);
       await expect(
         service.applyRedemption('missing', 10, actor),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('throws BadRequestException on a non-draft invoice', async () => {
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ isDraft: false }));
+      manager.findOne.mockResolvedValue(invoiceStub({ isDraft: false }));
       await expect(
         service.applyRedemption('invoice-1', 10, actor),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws when the invoice has no customer', async () => {
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ customerId: undefined }));
+      manager.findOne.mockResolvedValue(invoiceStub({ customerId: undefined }));
       await expect(
         service.applyRedemption('invoice-1', 10, actor),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('rejects non-integer or non-positive points', async () => {
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub());
-      membershipCardService.findActiveCard.mockResolvedValue({ points: 100 });
+      manager.findOne.mockResolvedValue(invoiceStub());
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(100);
       await expect(
         service.applyRedemption('invoice-1', 0, actor),
       ).rejects.toThrow(BadRequestException);
@@ -89,16 +108,16 @@ describe('PointsRedemptionService', () => {
     });
 
     it('throws when customer has no active card', async () => {
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub());
-      membershipCardService.findActiveCard.mockResolvedValue(null);
+      manager.findOne.mockResolvedValue(invoiceStub());
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(null);
       await expect(
         service.applyRedemption('invoice-1', 10, actor),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('throws when requested points exceed the balance', async () => {
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub());
-      membershipCardService.findActiveCard.mockResolvedValue({ points: 5 });
+      manager.findOne.mockResolvedValue(invoiceStub());
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(5);
       await expect(
         service.applyRedemption('invoice-1', 10, actor),
       ).rejects.toThrow(BadRequestException);
@@ -106,8 +125,8 @@ describe('PointsRedemptionService', () => {
 
     it('throws when the point discount exceeds the redeemable amount', async () => {
       // subtotal 4.000đ → maxDiscount 4.000đ; 10 points = 5.000đ > max.
-      invoiceRepo.findOne.mockResolvedValue(invoiceStub({ subtotal: 4000 }));
-      membershipCardService.findActiveCard.mockResolvedValue({ points: 100 });
+      manager.findOne.mockResolvedValue(invoiceStub({ subtotal: 4000 }));
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(100);
       await expect(
         service.applyRedemption('invoice-1', 10, actor),
       ).rejects.toThrow(BadRequestException);
@@ -115,8 +134,8 @@ describe('PointsRedemptionService', () => {
 
     it('sets pointsRedeemed, pointsDiscountAmount and recomputes amountDue', async () => {
       const invoice = invoiceStub({ subtotal: 100000 });
-      invoiceRepo.findOne.mockResolvedValue(invoice);
-      membershipCardService.findActiveCard.mockResolvedValue({ points: 100 });
+      manager.findOne.mockResolvedValue(invoice);
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(100);
 
       const result = await service.applyRedemption('invoice-1', 30, actor);
 
@@ -124,7 +143,7 @@ describe('PointsRedemptionService', () => {
       expect(result.pointsRedeemed).toBe(30);
       expect(result.pointsDiscountAmount).toBe(15000);
       expect(result.amountDue).toBe(85000);
-      expect(invoiceRepo.save).toHaveBeenCalled();
+      expect(manager.save).toHaveBeenCalled();
     });
   });
 

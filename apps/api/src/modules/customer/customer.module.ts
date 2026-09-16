@@ -77,6 +77,9 @@ import { LoyaltyPointsReverseConsumer } from './consumers/loyalty-points-reverse
     LoyaltyPointsPublisher,
     LoyaltyPointsReversePublisher,
     CustomerCreditService,
+    // App mobile mở `GET /mobile/customers/:id/summary` bằng chính service này
+    // — hạng thẻ và số dư điểm cho màn *Sử dụng điểm*.
+    CustomerSummaryService,
   ],
 })
 export class CustomerModule implements OnModuleInit {

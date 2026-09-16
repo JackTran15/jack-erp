@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { SalesOrderService } from './sales-order.service';
 import { SalesOrderStatus } from './entities/sales-order.entity';
 
@@ -10,7 +10,18 @@ import { SalesOrderStatus } from './entities/sales-order.entity';
 describe('SalesOrderService', () => {
   const actor = { userId: 'u-1', organizationId: 'org-1', branchId: 'br-1', roles: [] as string[] };
 
-  function build({ canApprove = false, current }: { canApprove?: boolean; current?: Partial<Record<string, unknown>> } = {}) {
+  function build({
+    canApprove = false,
+    current,
+    openSession = true,
+    pointBalance = 1000,
+  }: {
+    canApprove?: boolean;
+    current?: Partial<Record<string, unknown>>;
+    openSession?: boolean;
+    /** Số dư điểm của khách — dùng để dựng ca "tư vấn ghi nhiều hơn khách còn". */
+    pointBalance?: number;
+  } = {}) {
     const saved: Record<string, unknown>[] = [];
     const updates: Record<string, unknown>[] = [];
     const manager = {
@@ -24,6 +35,7 @@ describe('SalesOrderService', () => {
         updates.push(patch);
       }),
       delete: jest.fn(async () => undefined),
+      find: jest.fn(async () => [{ ...lineA, salesOrderId: 'so-1', lineNo: 1 }]),
       createQueryBuilder: jest.fn(() => ({
         setLock: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
@@ -57,6 +69,8 @@ describe('SalesOrderService', () => {
         note: null,
         rejectReason: null,
         ...(current ?? {}),
+        // `getById` sau `approve` phải thấy `invoiceId` vừa ghi — gộp mọi patch đã update.
+        ...Object.assign({}, ...updates),
       })),
     };
     const lines = { find: jest.fn(async () => []) };
@@ -69,17 +83,39 @@ describe('SalesOrderService', () => {
     const numbering = { generate: jest.fn(async () => 'DT000001') };
     const rbac = { hasPermission: jest.fn(async () => canApprove) };
 
+    const invoices = { findOne: jest.fn(async () => ({ id: 'inv-1', code: '2609060002' })) };
+    const invoiceService = { createDraftIn: jest.fn(async (..._args: unknown[]) => ({ id: 'inv-1' })) };
+    // Trừ điểm GIẢ: ném khi số điểm vượt `pointBalance`, đúng như bản thật.
+    // Dùng bản `...In` vì `approve` phải trừ trong CÙNG transaction.
+    const points = {
+      applyRedemptionIn: jest.fn(async (_m: unknown, _inv: string, requested: number, _actor?: unknown) => {
+        if (requested > pointBalance) {
+          throw new BadRequestException(`Insufficient points: balance=${pointBalance}, requested=${requested}`);
+        }
+        return { id: 'inv-1', pointsRedeemed: requested };
+      }),
+    };
+    const posSessions = {
+      findOpenForBranch: jest.fn(async () => {
+        if (!openSession) throw new ConflictException({ code: 'NO_OPEN_SESSION', message: 'Chi nhánh chưa mở ca' });
+        return { id: 'ses-1' };
+      }),
+    };
     const service = new SalesOrderService(
       orders as never,
       lines as never,
       profiles as never,
       customers as never,
       items as never,
+      invoices as never,
       dataSource as never,
       numbering as never,
       rbac as never,
+      invoiceService as never,
+      posSessions as never,
+      points as never,
     );
-    return { service, saved, updates, manager, listQb, numbering };
+    return { service, saved, updates, manager, listQb, numbering, invoiceService, posSessions, points };
   }
 
   const lineA = { itemId: 'i-1', itemCode: 'A', itemName: 'A', unit: 'Cái', quantity: 2, unitPrice: 800000, manualDiscount: 160000, promotionDiscount: 432000, promotionName: 'Giảm giá 30%' };
@@ -101,6 +137,81 @@ describe('SalesOrderService', () => {
       service.create({ lines: [{ ...lineB, manualDiscount: 500000 }] }, actor),
     ).rejects.toThrow('vượt thành tiền');
     expect(saved).toHaveLength(0);
+  });
+
+  it('approve: tạo hoá đơn NHÁP từ đơn trong cùng giao dịch, ghi liên kết hai chiều, rồi PROCESSED', async () => {
+    const { service, updates, manager, invoiceService, posSessions } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1', customerId: 'c-1' } });
+    const view = await service.approve('so-1', actor);
+
+    expect(posSessions.findOpenForBranch).toHaveBeenCalledWith('br-1', actor, manager);
+    const [mgr, dto, draftActor] = invoiceService.createDraftIn.mock.calls[0] as [unknown, { sessionId: string; customerId?: string; salespersonId: string; items: Array<Record<string, unknown>> }, { branchId?: string }];
+    expect(mgr).toBe(manager);
+    expect(dto).toMatchObject({ sessionId: 'ses-1', customerId: 'c-1', salespersonId: 'sp-1' });
+    // Giảm tay + KM của dòng gộp thành MỘT khoản giảm dòng của hoá đơn.
+    expect(dto.items[0]).toMatchObject({ itemId: 'i-1', quantity: 2, unitPrice: 800000, lineDiscount: 592000 });
+    // Hoá đơn thuộc chi nhánh của ĐƠN.
+    expect(draftActor.branchId).toBe('br-1');
+    expect(updates.some((u) => u.salesOrderId === 'so-1')).toBe(true);
+    expect(updates.some((u) => u.status === SalesOrderStatus.PROCESSED && u.invoiceId === 'inv-1')).toBe(true);
+    expect(view.invoiceCode).toBe('2609060002');
+  });
+
+  it('approve khi chi nhánh CHƯA mở ca → 409 NO_OPEN_SESSION, đơn KHÔNG đổi trạng thái, không tạo nháp', async () => {
+    const { service, updates, invoiceService } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' }, openSession: false });
+    await expect(service.approve('so-1', actor)).rejects.toMatchObject({ response: { code: 'NO_OPEN_SESSION' } });
+    expect(invoiceService.createDraftIn).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+  });
+
+  it('approve với điểm dự kiến: trừ ĐÚNG số điểm, trong CÙNG transaction, trên hoá đơn vừa tạo', async () => {
+    const { service, points, manager } = build({
+      current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1', customerId: 'c-1', pointsRedeemed: 20 },
+    });
+
+    await service.approve('so-1', actor);
+
+    const [mgr, invoiceId, requested, pointActor] = points.applyRedemptionIn.mock.calls[0] as [
+      unknown,
+      string,
+      number,
+      { branchId?: string },
+    ];
+    // `manager` của CHÍNH transaction này — bản repo sẽ chặn trên hàng transaction đang khoá.
+    expect(mgr).toBe(manager);
+    expect(invoiceId).toBe('inv-1');
+    expect(requested).toBe(20);
+    // Chi nhánh của ĐƠN, không phải header của người bấm — như lượt tạo nháp.
+    expect(pointActor.branchId).toBe('br-1');
+  });
+
+  it('đơn KHÔNG ghi điểm thì KHÔNG gọi đường trừ điểm', async () => {
+    const { service, points } = build({
+      current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1', customerId: 'c-1' },
+    });
+
+    await service.approve('so-1', actor);
+
+    expect(points.applyRedemptionIn).not.toHaveBeenCalled();
+  });
+
+  it('điểm dự kiến VƯỢT số dư → ném, và đơn KHÔNG bao giờ tới PROCESSED', async () => {
+    // Luật "chặn" mà Loc chốt 2026-09-15. Thứ test này chứng minh được: lượt trừ
+    // điểm chạy TRƯỚC khi đơn được đánh dấu xử lý, nên không có đường nào để một
+    // đơn PROCESSED tồn tại cạnh một hoá đơn chưa được giảm.
+    //
+    // Thứ nó KHÔNG chứng minh được, và phải nói ra: bản ghi hoá đơn nháp đã
+    // được `createDraftIn` ghi trước đó *có* nằm trong `updates` của manager
+    // giả. Ở thật, cả hai cùng một transaction nên chúng cuộn lại với nhau —
+    // đó là việc của Postgres, không phải của một `jest.fn()`. Kiểm vế ấy cần
+    // một lượt gọi API thật (ghi trong `07-verification.md`).
+    const { service, updates } = build({
+      current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1', customerId: 'c-1', pointsRedeemed: 500 },
+      pointBalance: 100,
+    });
+
+    await expect(service.approve('so-1', actor)).rejects.toThrow(/Insufficient points/);
+    expect(updates.some((u) => u.status === SalesOrderStatus.PROCESSED)).toBe(false);
+    expect(updates.some((u) => u.invoiceId === 'inv-1')).toBe(false);
   });
 
   it('approve một đơn KHÔNG còn SENT → 409, không ghi đè', async () => {

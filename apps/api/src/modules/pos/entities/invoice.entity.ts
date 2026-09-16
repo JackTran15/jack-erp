@@ -129,6 +129,18 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'session_id', comment: 'POS session that originated this invoice' })
   sessionId: string;
 
+  @Column({
+    name: 'sales_order_id',
+    type: 'uuid',
+    nullable: true,
+    comment: 'Mobile sales order this draft was created from on approve (erp_sales cashier); no FK, cleared on draft delete',
+  })
+  salesOrderId?: string | null;
+
+  /** Kênh bán (nhãn tự do như trên đơn tư vấn); NULL = tại cửa hàng. Mobile thu ngân, T-16-01. */
+  @Column({ name: 'sales_channel', type: 'varchar', length: 64, nullable: true })
+  salesChannel?: string | null;
+
   @Column({ name: 'draft_label', nullable: true, comment: 'User-visible label for in-progress draft (e.g. "Table 3")' })
   draftLabel?: string;
 

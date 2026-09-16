@@ -80,6 +80,17 @@ export class CreateSalesOrderDto {
   salespersonId?: string;
 
   /**
+   * Điểm tích luỹ khách DỰ KIẾN dùng. `0` hoặc vắng = không dùng.
+   *
+   * Chỉ được GHI LẠI ở bước này, KHÔNG trừ: đơn chưa có hoá đơn. Thu ngân chốt
+   * lúc *Nhận xử lý* — xem `SalesOrderEntity.pointsRedeemed`.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  pointsRedeemed?: number;
+
+  /**
    * `true` = LƯU TẠM: đơn ở `DRAFT`, chỉ người gửi thấy, thu ngân không thấy.
    * `PATCH` một đơn `DRAFT` với `isDraft: false` (hoặc vắng) là GỬI nó.
    */

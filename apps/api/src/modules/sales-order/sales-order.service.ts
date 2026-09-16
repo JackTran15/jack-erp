@@ -13,8 +13,13 @@ import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.ent
 import { CustomerEntity } from '../customer/customer.entity';
 import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { ItemEntity } from '../inventory/location/item.entity';
+import type { CreateInvoiceDto } from '../pos/dto/create-invoice.dto';
+import { InvoiceEntity } from '../pos/entities/invoice.entity';
+import { InvoiceService } from '../pos/services/invoice.service';
+import { PosSessionService } from '../pos/services/pos-session.service';
 import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity';
 import { RbacService } from '../rbac/rbac.service';
+import { PointsRedemptionService } from '../pos/services/points-redemption.service';
 import { CreateSalesOrderDto, SalesOrderLineDto } from './dto/create-sales-order.dto';
 import { SalesOrderListQueryDto } from './dto/sales-order-list.query.dto';
 import { SalesOrderLineEntity } from './entities/sales-order-line.entity';
@@ -73,6 +78,11 @@ export interface SalesOrderView {
   note: string | null;
   rejectReason: string | null;
   cancelReason: string | null;
+  /** Điểm tích luỹ DỰ KIẾN dùng — chưa trừ; thu ngân chốt lúc *Nhận xử lý*. */
+  pointsRedeemed: number;
+  /** Hoá đơn nháp do `approve` tạo (ADR-32); null khi chưa nhận xử lý. */
+  invoiceId: string | null;
+  invoiceCode: string | null;
   lines: SalesOrderLineView[];
 }
 
@@ -91,9 +101,14 @@ export class SalesOrderService {
     private readonly customers: Repository<CustomerEntity>,
     @InjectRepository(ItemEntity)
     private readonly items: Repository<ItemEntity>,
+    @InjectRepository(InvoiceEntity)
+    private readonly invoices: Repository<InvoiceEntity>,
     private readonly dataSource: DataSource,
     private readonly numbering: DocumentNumberingService,
     private readonly rbac: RbacService,
+    private readonly invoiceService: InvoiceService,
+    private readonly posSessions: PosSessionService,
+    private readonly points: PointsRedemptionService,
   ) {}
 
   async create(dto: CreateSalesOrderDto, actor: ActorContext): Promise<SalesOrderView> {
@@ -122,6 +137,11 @@ export class SalesOrderService {
         customerName: customer?.name ?? null,
         customerPhone: customer?.phone ?? null,
         note: dto.note ?? null,
+        // Điểm DỰ KIẾN — chỉ GHI LẠI, không trừ và không đụng `amountDue`.
+        // Vắng khoá nghĩa là không dùng điểm, nên `?? 0` chứ không giữ giá trị cũ:
+        // `update` thay TRỌN đơn, và một con số điểm sống sót qua một lượt sửa
+        // không nhắc tới nó là một ưu đãi không ai còn nhớ đã đặt.
+        pointsRedeemed: dto.pointsRedeemed ?? 0,
         ...prepared.totals,
       });
       const persisted = await manager.save(SalesOrderEntity, order);
@@ -173,6 +193,11 @@ export class SalesOrderService {
         customerName: customer?.name ?? null,
         customerPhone: customer?.phone ?? null,
         note: dto.note ?? null,
+        // Điểm DỰ KIẾN — chỉ GHI LẠI, không trừ và không đụng `amountDue`.
+        // Vắng khoá nghĩa là không dùng điểm, nên `?? 0` chứ không giữ giá trị cũ:
+        // `update` thay TRỌN đơn, và một con số điểm sống sót qua một lượt sửa
+        // không nhắc tới nó là một ưu đãi không ai còn nhớ đã đặt.
+        pointsRedeemed: dto.pointsRedeemed ?? 0,
         ...prepared.totals,
       });
     });
@@ -305,14 +330,107 @@ export class SalesOrderService {
     }
 
     const lines = await this.lines.find({ where: { salesOrderId: id }, order: { lineNo: 'ASC' } });
-    return this.toView(order, lines);
+    // Chỉ ở đường CHI TIẾT mới tra mã hoá đơn — danh sách không N+1.
+    const invoice = order.invoiceId
+      ? await this.invoices.findOne({ where: { id: order.invoiceId, organizationId: actor.organizationId }, select: ['id', 'code'] })
+      : null;
+    return this.toView(order, lines, invoice?.code ?? null);
   }
 
-  approve(id: string, actor: ActorContext): Promise<SalesOrderView> {
-    return this.transition(id, actor, SalesOrderStatus.PROCESSED, {
-      approvedBy: actor.userId,
-      approvedAt: new Date(),
+  /**
+   * *Nhận xử lý* (thu ngân). Trong CÙNG một giao dịch, đọc có khoá (ADR-32):
+   * 1. đơn phải còn `SENT`;
+   * 2. chi nhánh của đơn phải có phiên POS đang mở — không có thì 409 mã
+   *    `NO_OPEN_SESSION`, đơn KHÔNG đổi trạng thái, app đưa sang màn Mở ca (ADR-31);
+   * 3. tạo hoá đơn NHÁP từ dòng đơn (giá, giảm tay + KM đã chốt, khách, NVBH);
+   * 4. ghi liên kết hai chiều và `PROCESSED`.
+   *
+   * Không FK giữa hai bảng: huỷ nháp sau đó chỉ dọn `invoice_id` về null (A-55).
+   */
+  /// Sửa số điểm DỰ KIẾN của một đơn còn `SENT`.
+  ///
+  /// Không đi qua {@link update}: đường kia đòi quyền TẠO đơn (của vai tư vấn),
+  /// mà thu ngân cũng phải sửa được con số này — khi *Nhận xử lý* bị chặn vì
+  /// khách đã tiêu bớt điểm ở nơi khác, sửa tay ngay tại chỗ là lối ra. Nới
+  /// quyền của cả đường sửa đơn để phục vụ một trường là cho thu ngân sửa luôn
+  /// dòng hàng và giá.
+  ///
+  /// Không kiểm số dư ở đây: số dư đổi được bất cứ lúc nào giữa bây giờ và lúc
+  /// duyệt, nên một phép kiểm tại đây chỉ là một lời hứa hết hạn ngay. Nơi kiểm
+  /// THẬT là {@link approve}, dưới khoá hàng thẻ.
+  async setPoints(id: string, points: number, actor: ActorContext): Promise<SalesOrderView> {
+    await this.dataSource.transaction(async (manager) => {
+      const current = await this.lockedOrder(manager, id, actor);
+      if (current.status !== SalesOrderStatus.SENT && current.status !== SalesOrderStatus.DRAFT) {
+        throw new ConflictException(`Đơn hàng đã được xử lý (${current.status})`);
+      }
+
+      await manager.update(SalesOrderEntity, id, { pointsRedeemed: points });
     });
+
+    return this.getById(id, actor);
+  }
+
+  async approve(id: string, actor: ActorContext): Promise<SalesOrderView> {
+    await this.dataSource.transaction(async (manager) => {
+      const current = await this.lockedOrder(manager, id, actor);
+      if (!VALID_TRANSITIONS[current.status].includes(SalesOrderStatus.PROCESSED)) {
+        throw new ConflictException(`Đơn hàng đã được xử lý (${current.status})`);
+      }
+
+      if (!current.branchId) throw new BadRequestException(`Sales order ${id} has no branch`);
+      const session = await this.posSessions.findOpenForBranch(current.branchId, actor, manager);
+      const lines = await manager.find(SalesOrderLineEntity, { where: { salesOrderId: id }, order: { lineNo: 'ASC' } });
+
+      const dto: CreateInvoiceDto = {
+        sessionId: session.id,
+        customerId: current.customerId ?? undefined,
+        salespersonId: current.salespersonId,
+        note: current.note ?? undefined,
+        items: lines.map((line, index) => ({
+          itemId: line.itemId,
+          itemCode: line.itemCode,
+          itemName: line.itemName,
+          unit: line.unit,
+          quantity: Number(line.quantity),
+          unitPrice: Number(line.unitPrice),
+          // Giảm tay + khuyến mại đã chốt trên đơn → một khoản giảm dòng của hoá đơn.
+          lineDiscount: Number(line.manualDiscount) + Number(line.promotionDiscount),
+          lineDiscountReason: [line.promotionName, line.manualDiscountReason].filter(Boolean).join(' · ') || undefined,
+          note: line.note ?? undefined,
+          sortOrder: index,
+        })),
+      };
+      // Hoá đơn thuộc chi nhánh của ĐƠN, không phải chi nhánh trong header của người bấm.
+      const draft = await this.invoiceService.createDraftIn(manager, dto, { ...actor, branchId: current.branchId });
+      // Kênh bán chép sang hoá đơn (T-16-01) — màn Thu tiền đọc/đổi ngay trên hoá đơn.
+      await manager.update(InvoiceEntity, draft.id, { salesOrderId: id, salesChannel: current.salesChannel });
+      // Điểm DỰ KIẾN của tư vấn → trừ THẬT, ngay tại đây và trong CÙNG
+      // transaction với lượt tạo hoá đơn nháp.
+      //
+      // Thiếu điểm thì ném, và cả lượt duyệt cuộn lại: đơn ở nguyên `SENT`,
+      // KHÔNG có hoá đơn nháp nào sinh ra. Đó là nghĩa của "chặn" mà Loc chốt —
+      // một lượt duyệt nửa vời để lại đơn đã PROCESSED cạnh một hoá đơn chưa
+      // được giảm, và không ai dọn được trạng thái đó.
+      //
+      // `applyRedemptionIn` chứ không `applyRedemption`: bản kia đọc ghi qua
+      // repository, tức một kết nối khác, và nó sẽ chặn trên chính hàng mà
+      // transaction này đang khoá.
+      const points = Number(current.pointsRedeemed ?? 0);
+      if (points > 0) {
+        await this.points.applyRedemptionIn(manager, draft.id, points, { ...actor, branchId: current.branchId });
+      }
+
+      await manager.update(SalesOrderEntity, id, {
+        status: SalesOrderStatus.PROCESSED,
+        approvedBy: actor.userId,
+        approvedAt: new Date(),
+        invoiceId: draft.id,
+      });
+      this.logger.log(`Sales order ${id} approved → draft invoice ${draft.id} (session=${session.id}, org=${actor.organizationId})`);
+    });
+
+    return this.getById(id, actor);
   }
 
   reject(id: string, reason: string, actor: ActorContext): Promise<SalesOrderView> {
@@ -492,7 +610,7 @@ export class SalesOrderService {
     };
   }
 
-  private toView(order: SalesOrderEntity, lines: SalesOrderLineEntity[]): SalesOrderView {
+  private toView(order: SalesOrderEntity, lines: SalesOrderLineEntity[], invoiceCode: string | null = null): SalesOrderView {
     return {
       id: order.id,
       code: order.documentNumber,
@@ -507,9 +625,12 @@ export class SalesOrderService {
       subtotal: Number(order.subtotal),
       discount: Number(order.discount),
       amountDue: Number(order.amountDue),
+      pointsRedeemed: Number(order.pointsRedeemed ?? 0),
       note: order.note,
       rejectReason: order.rejectReason,
       cancelReason: order.cancelReason,
+      invoiceId: order.invoiceId ?? null,
+      invoiceCode,
       lines: lines.map((line) => ({
         id: line.id,
         itemId: line.itemId,

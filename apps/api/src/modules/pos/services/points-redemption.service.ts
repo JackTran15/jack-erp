@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InvoiceEntity } from '../entities/invoice.entity';
 import { MembershipCardService } from '../../customer/services/membership-card.service';
@@ -34,7 +34,33 @@ export class PointsRedemptionService {
     points: number,
     actor: ActorContext,
   ): Promise<InvoiceEntity> {
-    const invoice = await this.loadDraft(invoiceId, actor);
+    return this.invoiceRepo.manager.transaction((manager) =>
+      this.applyRedemptionIn(manager, invoiceId, points, actor),
+    );
+  }
+
+  /**
+   * Same rules as {@link applyRedemption}, run inside a caller's transaction.
+   *
+   * This exists so a caller that creates the draft and redeems against it can do
+   * BOTH or NEITHER. `SalesOrderService.approve` is that caller: it creates the
+   * draft invoice from the order and then spends the points the consultant
+   * pencilled in. Calling the repo-backed version from inside that transaction
+   * would block on the very row the transaction holds; committing first and
+   * redeeming after would leave the order PROCESSED with a draft that never got
+   * its discount — a state nobody can clean up.
+   *
+   * The balance is read with `getPointBalanceForUpdate`, which locks the card
+   * row. That lock is what makes the check meaningful: two cashiers spending the
+   * same customer's points at once queue instead of both passing.
+   */
+  async applyRedemptionIn(
+    manager: EntityManager,
+    invoiceId: string,
+    points: number,
+    actor: ActorContext,
+  ): Promise<InvoiceEntity> {
+    const invoice = await this.loadDraft(invoiceId, actor, manager);
 
     if (!invoice.customerId) {
       throw new BadRequestException(
@@ -45,16 +71,17 @@ export class PointsRedemptionService {
       throw new BadRequestException('points must be a positive integer');
     }
 
-    const card = await this.membershipCardService.findActiveCard(
+    const balance = await this.membershipCardService.getPointBalanceForUpdate(
       invoice.customerId,
+      manager,
       actor,
     );
-    if (!card) {
+    if (balance === null) {
       throw new BadRequestException('Customer has no active membership card');
     }
-    if (points > card.points) {
+    if (points > balance) {
       throw new BadRequestException(
-        `Insufficient points: balance=${card.points}, requested=${points}`,
+        `Insufficient points: balance=${balance}, requested=${points}`,
       );
     }
 
@@ -73,7 +100,7 @@ export class PointsRedemptionService {
     invoice.pointsDiscountAmount = pointsDiscountAmount;
     invoice.amountDue = computeAmountDue(invoice);
 
-    const saved = await this.invoiceRepo.save(invoice);
+    const saved = await manager.save(InvoiceEntity, invoice);
     this.logger.log(
       `Applied ${points} point redemption (−${pointsDiscountAmount}) to invoice ${invoiceId}`,
     );
@@ -96,10 +123,12 @@ export class PointsRedemptionService {
   private async loadDraft(
     invoiceId: string,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<InvoiceEntity> {
-    const invoice = await this.invoiceRepo.findOne({
-      where: { id: invoiceId, organizationId: actor.organizationId },
-    });
+    const where = { id: invoiceId, organizationId: actor.organizationId };
+    const invoice = manager
+      ? await manager.findOne(InvoiceEntity, { where })
+      : await this.invoiceRepo.findOne({ where });
     if (!invoice) {
       throw new NotFoundException(`Invoice "${invoiceId}" not found`);
     }

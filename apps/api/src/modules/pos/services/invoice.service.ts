@@ -84,9 +84,28 @@ export class InvoiceService {
   }
 
   async create(dto: CreateInvoiceDto, actor: ActorContext): Promise<InvoiceEntity> {
-    const tempCode = `DRAFT-${Date.now()}`;
+    const invoice = await this.dataSource.transaction((manager) => this.createDraftIn(manager, dto, actor));
 
-    const invoice = await this.dataSource.transaction(async (manager) => {
+    this.logger.log(
+      `Created draft invoice ${invoice.id} (session=${dto.sessionId}, org=${actor.organizationId})`,
+    );
+
+    return this.findOneWithItems(invoice.id, actor);
+  }
+
+  /**
+   * Thân của [create], chạy trên MỘT `manager` do caller cầm — để `approve` của
+   * đơn tư vấn (`SalesOrderService`) tạo hoá đơn nháp TRONG cùng giao dịch với
+   * việc đổi trạng thái đơn (ADR-32). Mở giao dịch thứ hai lồng trong giao dịch
+   * của caller là mượn connection thứ hai của pool — cùng cái bẫy mà
+   * `DocumentNumberingService.generate` đã ghi.
+   *
+   * Trả về entity vừa lưu (chưa nạp `items`); caller cần bản đầy đủ thì gọi
+   * [findOneWithItems] sau khi commit.
+   */
+  async createDraftIn(manager: EntityManager, dto: CreateInvoiceDto, actor: ActorContext): Promise<InvoiceEntity> {
+    const tempCode = `DRAFT-${Date.now()}`;
+    {
       const items = dto.items ?? [];
       const lineDiscounts = items.map((i) => this.computeLineDiscount(i));
       const subtotal = lineDiscounts.reduce((sum, d) => sum + d.lineTotal, 0);
@@ -173,13 +192,8 @@ export class InvoiceService {
       }
 
       return savedInvoice;
-    });
+    }
 
-    this.logger.log(
-      `Created draft invoice ${invoice.id} (session=${dto.sessionId}, org=${actor.organizationId})`,
-    );
-
-    return this.findOneWithItems(invoice.id, actor);
   }
 
   async findAll(
