@@ -161,9 +161,10 @@ export class MobileProductUnitInputDto {
  * form của app không có ô nào cho chúng. Đừng nới "cho rộng": mỗi trường mở
  * thêm là một đường ghi mà không màn hình nào kiểm được.
  *
- * **Ảnh KHÔNG có ở đây** vì backend chưa có chỗ lưu — `imageUrl` trả `null` ở
- * mọi endpoint, và web cũng đang giữ ảnh trong trình duyệt. Nút chọn ảnh của
- * app vẫn báo "sắp có".
+ * **Ảnh đi qua [imageIds]** — id của những file đã upload xong qua
+ * `/media/uploads` (CÙNG endpoint mà web gọi, app không có bản `/mobile/*`
+ * riêng cho upload), đúng hợp đồng `imageIds` mà form web gửi cho
+ * `InventoryItemCrudService`.
  *
  * ### Hai đường ghi, quyết bởi `colors`/`sizes`
  *
@@ -335,6 +336,33 @@ export class MobileProductCreateDto {
   @ValidateNested({ each: true })
   @Type(() => MobileProductUnitInputDto)
   units?: MobileProductUnitInputDto[];
+
+  /**
+   * Danh sách ĐẦY ĐỦ ảnh của hàng hoá, theo thứ tự hiển thị — ảnh đầu là ảnh
+   * bìa. Chuyển nguyên cho `InventoryItemCrudService`, nơi giữ trọn hợp đồng:
+   *
+   * - **vắng** = giữ nguyên ảnh;
+   * - **có** = THAY THẾ toàn bộ — id nào không có mặt thì ảnh đó bị gỡ và xoá;
+   * - `[]` = xoá sạch ảnh.
+   *
+   * Mỗi id phải là file đã `complete` (trạng thái `UPLOADED`) với đúng
+   * `ownerType` của bản ghi được lưu (`PRODUCT` cho mẫu mã, `ITEM` cho item
+   * lẻ); sai thì service kia ném `MEDIA_STATE_CONFLICT`/`MEDIA_NOT_FOUND`.
+   *
+   * `ArrayMaxSize(10)` khớp `GOODS_POLICY.maxPerOwner` — chặn ở đây để message
+   * là tiếng Việt, service kia vẫn kiểm lại.
+   */
+  @ApiPropertyOptional({
+    type: [String],
+    maxItems: 10,
+    description:
+      'Id ảnh đã upload, theo thứ tự (ảnh đầu là ảnh bìa). Vắng = giữ nguyên; `[]` = xoá hết',
+  })
+  @IsOptional()
+  @IsArray({ message: 'Danh sách ảnh phải là mảng.' })
+  @ArrayMaxSize(10, { message: 'Tối đa 10 ảnh cho một hàng hoá.' })
+  @IsUUID('all', { each: true, message: 'Ảnh không hợp lệ.' })
+  imageIds?: string[];
 }
 
 /**

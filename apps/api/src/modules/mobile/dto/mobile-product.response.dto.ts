@@ -44,6 +44,13 @@ export class MobileProductResponseDto {
       'Giá bán. Với mẫu mã có nhiều biến thể thì là giá trung bình của các biến thể',
   })
   sellingPrice!: number;
+
+  @ApiProperty({
+    nullable: true,
+    description:
+      'URL ảnh bìa (ảnh đầu tiên). `null` khi chưa có ảnh hoặc kho lưu trữ chưa cấu hình',
+  })
+  thumbnailUrl!: string | null;
 }
 
 /** Một trang hàng hoá. `limit` chứ không phải `pageSize` — gương theo `/mobile/suppliers`. */

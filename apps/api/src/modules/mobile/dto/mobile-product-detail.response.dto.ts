@@ -51,6 +51,18 @@ export class MobileProductVariantDto {
   size!: string | null;
 }
 
+/** Một ảnh của hàng hoá — hình dạng `PublicMedia` của `MediaQueryService`. */
+export class MobileProductImageDto {
+  @ApiProperty({ format: 'uuid', description: 'Id media — thứ gửi lại trong `imageIds`' })
+  id!: string;
+
+  @ApiProperty({ description: 'URL công khai, tuyệt đối, không hết hạn' })
+  url!: string;
+
+  @ApiProperty({ description: 'Tên file gốc' })
+  fileName!: string;
+}
+
 /**
  * Chi tiết một hàng hoá cho màn chi tiết của app mobile.
  *
@@ -186,4 +198,14 @@ export class MobileProductDetailResponseDto {
       'Các biến thể, xếp theo mã. RỖNG với item lẻ — app ẩn bảng thuộc tính',
   })
   variants!: MobileProductVariantDto[];
+
+  /**
+   * Ảnh của hàng hoá, theo thứ tự hiển thị — ảnh đầu là ảnh bìa.
+   *
+   * Chủ sở hữu là CHÍNH `id` của dòng: mẫu mã giữ ảnh ở `products.id`, item lẻ
+   * ở `items.id`. Biến thể KHÔNG có ảnh riêng — cùng luật với web (A-08).
+   * Rỗng khi chưa có ảnh HOẶC khi kho lưu trữ chưa được cấu hình.
+   */
+  @ApiProperty({ type: [MobileProductImageDto] })
+  images!: MobileProductImageDto[];
 }
