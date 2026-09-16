@@ -68,13 +68,16 @@ describe('MobileBranchService', () => {
     expect(module_list_not_called(service)).toBe(true);
   });
 
-  it('trả ĐÚNG bốn trường — không rò địa chỉ, điện thoại, email', async () => {
+  it('trả ĐÚNG sáu trường — email và mọi khoá nội bộ vẫn không rò', async () => {
     const [row] = await service.listMine(actor);
 
-    expect(Object.keys(row).sort()).toEqual(['code', 'id', 'isMain', 'name']);
+    expect(Object.keys(row).sort()).toEqual(['address', 'code', 'id', 'isMain', 'name', 'phone']);
 
+    // `address`/`phone` mở 2026-09-14 cho PHIẾU THU — chúng là địa chỉ cửa hàng
+    // in trên tờ phiếu đưa khách. `email` thì không có nơi dùng nào, nên nó ở
+    // lại trong danh sách này và phép kiểm vẫn có nghĩa.
     const serialized = JSON.stringify(row);
-    for (const leak of ['address', 'phone', 'email', 'parentBranchId', 'organizationId']) {
+    for (const leak of ['email', 'parentBranchId', 'organizationId', 'createdAt']) {
       expect(serialized).not.toContain(leak);
     }
   });
@@ -87,7 +90,21 @@ describe('MobileBranchService', () => {
       name: 'Chi nhánh Cà Mau',
       code: 'CM',
       isMain: true,
+      address: '123 Nguyễn Trãi',
+      phone: '02838000000',
     });
+  });
+
+  it('chi nhánh trống địa chỉ / điện thoại trả `null`, không phải `undefined`', async () => {
+    listMyBranches.mockResolvedValue([branch({ address: undefined, phone: undefined })]);
+
+    const [row] = await service.listMine(actor);
+
+    // `undefined` biến mất khỏi JSON, nên app không phân biệt được "chi nhánh
+    // không có địa chỉ" với "đường API chưa trả trường này".
+    expect(row.address).toBeNull();
+    expect(row.phone).toBeNull();
+    expect(JSON.parse(JSON.stringify(row))).toHaveProperty('address', null);
   });
 
   it('chi nhánh KHÔNG có mã trả `null`, không phải chuỗi rỗng', async () => {

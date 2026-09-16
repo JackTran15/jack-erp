@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   Actor,
@@ -6,6 +6,7 @@ import {
 } from '../../../common/decorators/actor-context.decorator';
 import { RequirePermission } from '../../auth/decorators';
 import { PermissionGuard } from '../../rbac/permission.guard';
+import { CancelInvoiceDto } from '../../pos/dto/cancel-invoice.dto';
 import { MobileInvoiceListQueryDto } from '../dto/mobile-invoice-list.query.dto';
 import { MobileInvoiceService } from '../services/mobile-invoice.service';
 
@@ -61,5 +62,29 @@ export class MobileInvoiceController {
     @Actor() actor: ActorContext,
   ) {
     return this.service.getById(id, actor);
+  }
+
+  /**
+   * Huỷ một chứng từ đã phát hành.
+   *
+   * Quyền là `pos.invoice.cancel`, **đúng khoá mà POS gác** — app bày mục này
+   * theo cùng khoá đó (`InvoicePermissionHelper`), nên nút và máy chủ không thể
+   * lệch nhau. Đo trên seed 2026-09-15: chỉ *Quản lý tổng* và *Quản trị hệ
+   * thống* cầm khoá này; thu ngân và nhân viên bán hàng thì không, và ở app họ
+   * KHÔNG thấy mục này thay vì bấm vào để nhận 403.
+   *
+   * `CancelInvoiceDto` đòi lý do ≥5 ký tự — dùng lại DTO của POS chứ không khai
+   * bản thứ hai, vì đây là cùng một hành động nghiệp vụ nhìn từ mặt tiền khác.
+   */
+  @Post(':id/cancel')
+  @RequirePermission('pos.invoice.cancel')
+  @ApiOperation({ summary: 'Huỷ hoá đơn bán, hoặc phiếu trả/đổi' })
+  @ApiOkResponse({ description: 'Tờ chứng từ sau khi huỷ, cùng hình dạng với GET :id' })
+  cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelInvoiceDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.cancel(id, dto, actor);
   }
 }

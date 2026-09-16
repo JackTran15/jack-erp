@@ -67,8 +67,11 @@ export class MobileEvaluateCartLineDto {
  * - **`at`** — bản web cho client chọn MỐC THỜI GIAN định giá. Với một token vai
  *   bán hàng thì đó là một cửa để định giá giỏ theo giá của tuần trước; app
  *   không có nhu cầu nào cần nó, nên bỏ hẳn thay vì tin là sẽ không ai dùng.
- * - **`excludedProgramIds`** — màn khuyến mại của app chỉ có thao tác TICK để
- *   CHỌN (`selectedProgramIds`); không có lối vào nào cho việc loại trừ.
+ * (`excludedProgramIds` từng nằm trong danh sách này với lý do "màn khuyến mại
+ * của app chỉ có thao tác TICK để CHỌN". Đã MỞ ngày 2026-09-14: BỎ tick một
+ * chương trình `auto_apply=true` là thao tác có thật trên màn đó, và
+ * `selectedProgramIds` không diễn tả được nó — nó chỉ biết THÊM vào. Loc rà:
+ * *"Bỏ chọn, vẫn còn lưu khuyến mãi"*.)
  * (`manualLineDiscount` từng nằm trong danh sách này với lý do "giảm giá tay là
  * việc của thu ngân ở màn thanh toán". Đã MỞ ngày 2026-09-11: vai tư vấn cũng
  * cần nó ngay trên dòng đơn — xem chú thích tại chính trường đó.)
@@ -93,6 +96,21 @@ export class MobileEvaluateCartDto {
   @IsArray()
   @IsUUID('4', { each: true })
   selectedProgramIds?: string[];
+
+  /**
+   * Id các chương trình phải bị LOẠI khỏi cuộc đua, kể cả `auto_apply=true`
+   * (ADR-07 bên web). Nghịch đảo của `selectedProgramIds`: cái kia chỉ THÊM,
+   * cái này chỉ BỎ, và bỏ thắng khi một id có mặt ở cả hai.
+   *
+   * Đây là thứ DUY NHẤT diễn tả được thao tác bỏ tick trên màn *Chương trình
+   * khuyến mại* của app: chương trình `auto_apply=true` luôn tự chạy, nên không
+   * gửi id của nó xuống thì lượt định giá kế tiếp lại áp nó vào.
+   */
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  excludedProgramIds?: string[];
 
   /**
    * RỖNG là hợp lệ, có chủ ý: màn *Chương trình khuyến mại* của app bày danh

@@ -28,9 +28,13 @@ export class MobileBranchService {
 }
 
 /**
- * Chép TƯỜNG MINH bốn trường — cùng lý do đã ghi ở các mapper khác của module
+ * Chép TƯỜNG MINH sáu trường — cùng lý do đã ghi ở các mapper khác của module
  * này: đây là thứ duy nhất chặn các trường mới thêm vào entity tự động rò ra
  * ngoài, và nó phải giữ được tính chất đó mà không cần ai nhớ.
+ *
+ * `?? null` chứ không để `undefined` lọt qua: `undefined` biến mất khỏi JSON,
+ * nên app không phân biệt được "chi nhánh này không có địa chỉ" với "đường API
+ * không trả trường đó" — và hai ca ấy cần xử khác nhau.
  */
 function toMobileBranch(row: BranchEntity): MobileBranchResponseDto {
   return {
@@ -38,5 +42,7 @@ function toMobileBranch(row: BranchEntity): MobileBranchResponseDto {
     name: row.name,
     code: row.code ?? null,
     isMain: row.isMainBranch,
+    address: row.address ?? null,
+    phone: row.phone ?? null,
   };
 }
