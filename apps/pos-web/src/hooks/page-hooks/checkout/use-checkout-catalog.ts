@@ -145,6 +145,7 @@ export function useCheckoutCatalog(): UseCheckoutCatalogResult {
         name: c.name,
         price: c.minPrice ?? 0,
         kind: c.kind,
+        imageUrl: c.imageUrl,
       })),
     [productCards],
   );
