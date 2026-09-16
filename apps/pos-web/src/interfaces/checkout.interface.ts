@@ -83,6 +83,8 @@ export interface CatalogProduct {
   price: number;
   /** Loại card → dùng mở dialog chọn biến thể đúng kind. */
   kind: PosProductKind;
+  /** URL ảnh đầu tiên (public), null khi chưa có ảnh — mirror `PosProductCard.imageUrl`. */
+  imageUrl: string | null;
 }
 
 export interface PaymentMethodOption {
