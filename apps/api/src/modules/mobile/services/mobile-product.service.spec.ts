@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { InventoryItemCrudService } from '../../inventory/location/item-crud.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileProductSort } from '../dto/mobile-product-list.query.dto';
 import { MobileProductService } from './mobile-product.service';
 
@@ -26,6 +27,7 @@ describe('MobileProductService', () => {
   let itemCrudCreate: jest.Mock;
   let itemCrudUpdate: jest.Mock;
   let itemCrudRemove: jest.Mock;
+  let resolvePublicUrls: jest.Mock;
 
   const stubRows = [
     { id: 'p-1', code: 'GELLI', name: 'Giày Gelli', sellingPrice: 600000 },
@@ -44,6 +46,9 @@ describe('MobileProductService', () => {
     itemCrudCreate = jest.fn();
     itemCrudUpdate = jest.fn();
     itemCrudRemove = jest.fn().mockResolvedValue(undefined);
+    // Mặc định "chưa có ảnh nào" — đúng thứ `MediaQueryService` trả khi kho
+    // chưa cấu hình.
+    resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -63,6 +68,7 @@ describe('MobileProductService', () => {
             remove: itemCrudRemove,
           },
         },
+        { provide: MediaQueryService, useValue: { resolvePublicUrls } },
       ],
     }).compile();
 
@@ -104,10 +110,47 @@ describe('MobileProductService', () => {
     const result = await run(MobileProductSort.NAME, 2, 5);
 
     expect(result).toEqual({
-      data: stubRows,
+      data: stubRows.map((row) => ({ ...row, thumbnailUrl: null })),
       total: 7,
       page: 2,
       limit: 5,
+    });
+  });
+
+  describe('ảnh bìa', () => {
+    it('tra ảnh MỘT lần cho cả trang, theo `id` của từng dòng và org của actor', async () => {
+      await run(MobileProductSort.NAME);
+
+      expect(resolvePublicUrls).toHaveBeenCalledTimes(1);
+      expect(resolvePublicUrls).toHaveBeenCalledWith(['p-1'], 'org-1');
+    });
+
+    it('`thumbnailUrl` là url của ảnh ĐẦU, `null` khi dòng chưa có ảnh', async () => {
+      query.mockReset();
+      query
+        .mockResolvedValueOnce([
+          { id: 'p-1', code: 'A', name: 'A', sellingPrice: 1 },
+          { id: 'p-2', code: 'B', name: 'B', sellingPrice: 2 },
+        ])
+        .mockResolvedValueOnce(stubCount);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([
+          [
+            'p-1',
+            [
+              { id: 'm-1', url: 'https://cdn/a1.jpg', fileName: 'a1.jpg' },
+              { id: 'm-2', url: 'https://cdn/a2.jpg', fileName: 'a2.jpg' },
+            ],
+          ],
+        ]),
+      );
+
+      const result = await run(MobileProductSort.NAME);
+
+      expect(result.data.map((row) => row.thumbnailUrl)).toEqual([
+        'https://cdn/a1.jpg',
+        null,
+      ]);
     });
   });
 
@@ -455,10 +498,27 @@ describe('MobileProductService', () => {
       const result = await service.findById('i-9', actor);
 
       expect(result.variants).toEqual([]);
+      expect(result.images).toEqual([]);
       expect(result.isActive).toBe(false);
       expect(result.code).toBe('BELT-01');
       expect(itemSql()).toContain('i.id = $2');
       expect(itemSql()).not.toContain('product_id');
+    });
+
+    it('`images` tra theo CHÍNH `id` của dòng (mẫu mã hay item lẻ), giữ thứ tự', async () => {
+      query
+        .mockResolvedValueOnce([productHeader])
+        .mockResolvedValueOnce(items);
+      const images = [
+        { id: 'm-1', url: 'https://cdn/1.jpg', fileName: '1.jpg' },
+        { id: 'm-2', url: 'https://cdn/2.jpg', fileName: '2.jpg' },
+      ];
+      resolvePublicUrls.mockResolvedValue(new Map([[productId, images]]));
+
+      const result = await service.findById(productId, actor);
+
+      expect(resolvePublicUrls).toHaveBeenCalledWith([productId], 'org-1');
+      expect(result.images).toEqual(images);
     });
 
     it('bản ghi biến mất giữa hai câu -> vẫn 404, không TypeError', async () => {
@@ -754,6 +814,32 @@ describe('MobileProductService', () => {
         (itemCrudUpdate.mock.calls[0][1] as Record<string, unknown>),
       ).not.toHaveProperty('code');
       expect(repoExist).not.toHaveBeenCalled();
+    });
+
+    it('`imageIds` chuyển NGUYÊN cho InventoryItemCrudService — kể cả `[]`', async () => {
+      query.mockReset();
+      query
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item])
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item]);
+
+      await service.update(id, { imageIds: [] }, actor);
+
+      expect(itemCrudUpdate.mock.calls[0][1]).toEqual({ imageIds: [] });
+    });
+
+    it('`imageIds` vắng -> KHÔNG có khoá `imageIds` (giữ nguyên ảnh)', async () => {
+      query.mockReset();
+      query
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item])
+        .mockResolvedValueOnce([header])
+        .mockResolvedValueOnce([item]);
+
+      await service.update(id, { name: 'Giày' }, actor);
+
+      expect(itemCrudUpdate.mock.calls[0][1]).not.toHaveProperty('imageIds');
     });
 
     it('đọc lại theo CHÍNH `id` đã nhận, không theo kết quả của service kia', async () => {

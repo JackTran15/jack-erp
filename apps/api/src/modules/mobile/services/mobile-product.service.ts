@@ -6,6 +6,7 @@ import { escapeLikeTerm } from '../../../common/utils/like-escape.util';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { InventoryItemCrudService } from '../../inventory/location/item-crud.service';
 import { COMBINED_CTE } from '../../inventory/location/queries/search-inventory-items-v2.handler';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileProductSort } from '../dto/mobile-product-list.query.dto';
 import {
   MobileProductCreateDto,
@@ -136,6 +137,7 @@ export class MobileProductService {
   constructor(
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly itemCrud: InventoryItemCrudService,
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   async list(
@@ -260,10 +262,25 @@ export class MobileProductService {
       ${whereSql}
     `;
 
-    const [data, countResult] = await Promise.all([
-      this.dataSource.query<MobileProductResponseDto[]>(dataSql, params),
+    const [rows, countResult] = await Promise.all([
+      this.dataSource.query<Omit<MobileProductResponseDto, 'thumbnailUrl'>[]>(
+        dataSql,
+        params,
+      ),
       this.dataSource.query<CountRow[]>(countSql, countParams),
     ]);
+
+    // Ảnh bìa tra MỘT lần cho cả trang, không một truy vấn mỗi dòng. `id` của
+    // dòng chính là chủ sở hữu ảnh (mẫu mã hoặc item lẻ) — cùng luật với
+    // [findById]. Kho chưa cấu hình thì Map rỗng, mọi dòng ra `null`.
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      rows.map((row) => row.id),
+      actor.organizationId,
+    );
+    const data: MobileProductResponseDto[] = rows.map((row) => ({
+      ...row,
+      thumbnailUrl: imagesByOwner.get(row.id)?.[0]?.url ?? null,
+    }));
 
     return { data, total: countResult[0]?.total ?? 0, page, limit };
   }
@@ -403,6 +420,11 @@ export class MobileProductService {
           )
         : [];
 
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [header.id],
+      actor.organizationId,
+    );
+
     return {
       id: header.id,
       code: header.code,
@@ -421,6 +443,7 @@ export class MobileProductService {
       barcode: representative.barcode,
       description: representative.description,
       variants,
+      images: imagesByOwner.get(header.id) ?? [],
     };
   }
 
