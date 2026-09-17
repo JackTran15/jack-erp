@@ -5,6 +5,7 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { PosCatalogProductService } from '../../pos/services/pos-catalog-product.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileSalesItemService } from './mobile-sales-item.service';
 
 /**
@@ -64,6 +65,9 @@ describe('MobileSalesItemService.getModelStock', () => {
         MobileSalesItemService,
         { provide: getRepositoryToken(ItemEntity), useValue: {} },
         { provide: getDataSourceToken(), useValue: {} },
+        // Chỉ để dựng được service — mọi test ở file này nói về `getModelStock`,
+        // đường uỷ quyền trọn cho `PosCatalogProductService` và không chạm ảnh.
+        { provide: MediaQueryService, useValue: { resolvePublicUrls: jest.fn() } },
         { provide: PosCatalogProductService, useValue: { getProductDetail } },
       ],
     }).compile();

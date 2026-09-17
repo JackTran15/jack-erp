@@ -5,6 +5,7 @@ import { ActorContext } from '../../../common/decorators/actor-context.decorator
 import { ItemEntity } from '../../inventory/location/item.entity';
 import { MobileSalesItemViewBy } from '../dto/mobile-sales-item-list.query.dto';
 import { PosCatalogProductService } from '../../pos/services/pos-catalog-product.service';
+import { MediaQueryService } from '../../media/media-query.service';
 import { MobileSalesItemService } from './mobile-sales-item.service';
 
 const actor: ActorContext = {
@@ -39,6 +40,7 @@ describe('MobileSalesItemService', () => {
   let service: MobileSalesItemService;
   let qb: Record<string, jest.Mock>;
   let dataSource: { query: jest.Mock };
+  let resolvePublicUrls: jest.Mock;
 
   beforeEach(async () => {
     qb = {
@@ -53,6 +55,10 @@ describe('MobileSalesItemService', () => {
 
     dataSource = { query: jest.fn().mockResolvedValue([]) };
 
+    // Mặc định KHÔNG có ảnh — đó là ca thường gặp của danh mục, và để mặc định
+    // như vậy thì mọi test cũ giữ nguyên kỳ vọng `thumbnailUrl: null`.
+    resolvePublicUrls = jest.fn().mockResolvedValue(new Map());
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MobileSalesItemService,
@@ -65,6 +71,7 @@ describe('MobileSalesItemService', () => {
         // hai đường không chạm tới nó. Phần `getModelStock` uỷ quyền trọn cho service
         // thật, nên chỗ kiểm nó là spec của `PosCatalogProductService`.
         { provide: PosCatalogProductService, useValue: { getProductDetail: jest.fn() } },
+        { provide: MediaQueryService, useValue: { resolvePublicUrls } },
       ],
     }).compile();
 
@@ -101,8 +108,57 @@ describe('MobileSalesItemService', () => {
   /** Câu SQL thô đã gửi ở lượt gọi thứ [n] (0-based). */
   const sql = (n = 0) => String(dataSource.query.mock.calls[n][0]);
 
+  describe('ảnh hàng hoá', () => {
+    it('viewBy=item: biến thể mượn ảnh của MẪU MÃ CHA, không của chính nó', async () => {
+      qb.getManyAndCount.mockResolvedValue([[item({ id: 'it-1', productId: 'p-1' })], 1]);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([['p-1', [{ url: 'https://cdn.test/p-1.jpg' }]]]),
+      );
+
+      const { data } = await runItems();
+
+      expect(resolvePublicUrls).toHaveBeenCalledWith(['p-1'], 'org-1');
+      expect(data[0].thumbnailUrl).toBe('https://cdn.test/p-1.jpg');
+    });
+
+    it('viewBy=item: hàng lẻ (không có mẫu mã) gắn ảnh vào CHÍNH NÓ', async () => {
+      qb.getManyAndCount.mockResolvedValue([[item({ id: 'it-9', productId: undefined })], 1]);
+      resolvePublicUrls.mockResolvedValue(
+        new Map([['it-9', [{ url: 'https://cdn.test/it-9.jpg' }]]]),
+      );
+
+      const { data } = await runItems();
+
+      expect(resolvePublicUrls).toHaveBeenCalledWith(['it-9'], 'org-1');
+      expect(data[0].thumbnailUrl).toBe('https://cdn.test/it-9.jpg');
+    });
+
+    it('chưa có ảnh: `null`, không phải chuỗi rỗng — đó là ca THƯỜNG GẶP', async () => {
+      const { data } = await runItems();
+
+      expect(data[0].thumbnailUrl).toBeNull();
+    });
+
+    it('MỘT lượt tra cho cả trang, không phải mỗi dòng một lượt', async () => {
+      qb.getManyAndCount.mockResolvedValue([
+        [
+          item({ id: 'a', productId: 'p-1' }),
+          item({ id: 'b', productId: 'p-1' }),
+          item({ id: 'c', productId: 'p-2' }),
+        ],
+        3,
+      ]);
+
+      await runItems();
+
+      expect(resolvePublicUrls).toHaveBeenCalledTimes(1);
+      // Hai biến thể cùng mẫu mã gộp thành MỘT chủ sở hữu.
+      expect(resolvePublicUrls).toHaveBeenCalledWith(['p-1', 'p-2'], 'org-1');
+    });
+  });
+
   describe('viewBy=item (phải hỏi tường minh)', () => {
-    it('trả ĐÚNG tám trường — có giá BÁN, không rò giá VỐN', async () => {
+    it('trả ĐÚNG chín trường — có giá BÁN, không rò giá VỐN', async () => {
       const { data } = await runItems();
 
       expect(Object.keys(data[0]).sort()).toEqual([
@@ -110,6 +166,7 @@ describe('MobileSalesItemService', () => {
         'id',
         'name',
         'sellingPrice',
+        'thumbnailUrl',
         'type',
         'unit',
         'variantCount',

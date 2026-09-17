@@ -8,6 +8,7 @@ import { DataSource, Repository } from 'typeorm';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { escapeLikeTerm } from '../../../common/utils/like-escape.util';
 import { ItemEntity } from '../../inventory/location/item.entity';
+import { MediaQueryService } from '../../media/media-query.service';
 import { PosCatalogProductService } from '../../pos/services/pos-catalog-product.service';
 import { MobileSalesModelStockDto } from '../dto/mobile-sales-model-stock.response.dto';
 import { MobileSalesItemViewBy } from '../dto/mobile-sales-item-list.query.dto';
@@ -142,6 +143,9 @@ export class MobileSalesItemService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
     private readonly posCatalog: PosCatalogProductService,
+    // `MediaModule` là `@Global()` và export service này, nên không cần wiring
+    // thêm ở `MobileModule`.
+    private readonly mediaQuery: MediaQueryService,
   ) {}
 
   /**
@@ -322,7 +326,19 @@ export class MobileSalesItemService {
 
     const [rows, total] = await qb.getManyAndCount();
 
-    return { data: rows.map(toMobileSalesItem), total, page, limit };
+    // MỘT lượt tra ảnh cho cả trang, không phải mỗi dòng một lượt. Biến thể gắn
+    // ảnh vào mẫu mã cha (`product_id`), hàng lẻ gắn vào chính nó — cùng luật
+    // với `MobileItemService` và `PosCatalogProductService` (A-08).
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [...new Set(rows.map(imageOwnerOf))],
+      actor.organizationId,
+    );
+
+    const data = rows.map((row) =>
+      toMobileSalesItem(row, imagesByOwner.get(imageOwnerOf(row))?.[0]?.url ?? null),
+    );
+
+    return { data, total, page, limit };
   }
 
   /**
@@ -400,8 +416,19 @@ export class MobileSalesItemService {
       countParams,
     );
 
+    // KHÔNG cần thêm cột `imageOwnerId` vào CTE: ở nhánh mẫu mã `id` LÀ `p.id`,
+    // ở nhánh hàng lẻ `id` LÀ `i.id` của một item có `product_id IS NULL`. Hai
+    // vế đó đúng bằng `productId ?? id` — tức `row.id` đã là chủ sở hữu ảnh.
+    // Ai sửa CTE cho `id` mang nghĩa khác thì phải quay lại đây.
+    const imagesByOwner = await this.mediaQuery.resolvePublicUrls(
+      [...new Set(rows.map((row) => row.id))],
+      actor.organizationId,
+    );
+
     return {
-      data: rows.map(toMobileSalesModel),
+      data: rows.map((row) =>
+        toMobileSalesModel(row, imagesByOwner.get(row.id)?.[0]?.url ?? null),
+      ),
       total: counted[0]?.total ?? 0,
       page,
       limit,
@@ -539,10 +566,22 @@ export class MobileSalesItemService {
       }
     }
 
+    // Một lượt tra cho đúng MỘT chủ sở hữu — mọi biến thể dùng chung ảnh mẫu
+    // mã (A-08), nên không lặp URL xuống từng phần tử `variants`.
+    //
+    // Đặt SAU mọi `dataSource.query` của hàm này có chủ ý: spec mock
+    // `dataSource.query` theo THỨ TỰ gọi, và đây không đi qua `dataSource` nên
+    // không chen vào chuỗi đó.
+    const images = await this.mediaQuery.resolvePublicUrls(
+      [product.id],
+      actor.organizationId,
+    );
+
     return {
       id: product.id,
       code: product.code,
       name: product.name,
+      thumbnailUrl: images.get(product.id)?.[0]?.url ?? null,
       attributes: [...dimensions].map(([name, options]) => ({ name, options })),
       variants: variants.map((row) => ({
         id: row.id,
@@ -634,7 +673,10 @@ export const buildModelCte = (
  * `ItemEntity` có ~35 cột, và spread rồi xoá bớt sẽ lặng lẽ rò mọi cột thêm
  * sau này, trong đó có `purchasePrice`.
  */
-function toMobileSalesItem(row: ItemEntity): MobileSalesItemResponseDto {
+function toMobileSalesItem(
+  row: ItemEntity,
+  thumbnailUrl: string | null,
+): MobileSalesItemResponseDto {
   return {
     type: 'item',
     id: row.id,
@@ -647,11 +689,15 @@ function toMobileSalesItem(row: ItemEntity): MobileSalesItemResponseDto {
     // cộng thành nối chuỗi.
     sellingPrice: Number(row.sellingPrice) || 0,
     variantCount: 1,
+    thumbnailUrl,
   };
 }
 
 /** Cùng luật liệt kê tường minh, nhưng nguồn là raw row của CTE. */
-function toMobileSalesModel(row: ModelRow): MobileSalesItemResponseDto {
+function toMobileSalesModel(
+  row: ModelRow,
+  thumbnailUrl: string | null,
+): MobileSalesItemResponseDto {
   return {
     type: row.type,
     id: row.id,
@@ -661,5 +707,11 @@ function toMobileSalesModel(row: ModelRow): MobileSalesItemResponseDto {
     unit: row.unit,
     sellingPrice: Number(row.sellingPrice) || 0,
     variantCount: Number(row.variantCount) || 1,
+    thumbnailUrl,
   };
+}
+
+/** Biến thể mượn ảnh của mẫu mã cha; hàng lẻ gắn ảnh vào chính nó (A-08). */
+function imageOwnerOf(row: ItemEntity): string {
+  return row.productId ?? row.id;
 }

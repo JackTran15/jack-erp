@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Một hàng hoá để BÁN — **một BIẾN THỂ**, kèm GIÁ BÁN.
@@ -76,6 +76,17 @@ export class MobileSalesItemResponseDto {
       'biết có phải mở bảng chọn biến thể hay không.',
   })
   variantCount!: number;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'URL công khai của ảnh ĐẦU TIÊN, hoặc `null` khi hàng chưa có ảnh — và ' +
+      '`null` là ca THƯỜNG GẶP, phần lớn danh mục chưa gắn ảnh. Biến thể dùng ' +
+      'chung ảnh của mẫu mã cha (A-08 của `media-storage`), nên hai biến thể ' +
+      'của cùng một mẫu mã luôn trả cùng URL. URL là tuyệt đối, công khai và ' +
+      'KHÔNG hết hạn.',
+  })
+  thumbnailUrl!: string | null;
 }
 
 export class MobileSalesItemPageDto {
