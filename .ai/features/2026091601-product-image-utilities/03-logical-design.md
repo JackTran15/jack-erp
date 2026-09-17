@@ -20,9 +20,10 @@ trên server bằng cùng phép thử `products.exist` mà `item-crud.service.ts
   `POST /inventory/items/set-images` với một assignment (ADR-02).
 - **Cập nhật ảnh nhanh** = thả file → gửi **tên file** lên `resolve-image-names` (ADR-03) → server
   tách `SKU (NN)`, khớp mẫu mã / hàng lẻ / biến thể (A-03, A-08, A-09) và trả về owner cho từng
-  tên → FE gộp theo owner, sắp theo STT → khi bấm **Cập nhật**: theo từng owner, tải các file của
-  owner đó (đồng thời ≤ 3), gắn ngay bằng `set-images` (ADR-04), rồi sang owner tiếp theo. Gắn ngay
-  là điều giữ số dòng chưa `ATTACHED` luôn nhỏ, đúng ràng buộc hạn mức (A-04).
+  tên → FE gộp theo owner, sắp theo STT → khi bấm **Cập nhật**: 3 worker kéo chung một hàng đợi
+  file theo thứ tự owner (tổng `/media/uploads` đang bay ≤ 3 trên toàn lượt); owner nào đủ file thì
+  gắn ngay bằng `set-images` (ADR-04). Gắn ngay là điều giữ số dòng chưa `ATTACHED` luôn nhỏ, đúng
+  ràng buộc hạn mức (A-04).
 
 ## Alternatives rejected
 
@@ -196,10 +197,11 @@ Backend: mã lỗi tiếng Anh, thông điệp tiếng Anh; chuỗi tiếng Vi�
 **Consequences:** Một round-trip thêm sau mỗi lần thả file (≤ 500 tên/lượt, FE chia lô). Đổi quy tắc tên sau này là đổi một hàm có test, không phải regex rải trong component.
 **Status:** accepted
 
-### ADR-04 — Tải và gắn theo từng owner, đồng thời ≤ 3, không tải trước toàn bộ
-**Context:** Hạn mức 100 dòng chưa `ATTACHED`/người/24h đếm cả `DELETED` (A-04, giữ nguyên). Một lượt ảnh nhanh có thể là 1.500 file.
-**Decision:** Vòng lặp theo owner: tải các file của owner (≤ 3 đồng thời, ≤ 10 file), `completeUpload` xong tất cả ⇒ gọi `set-images` cho owner đó ngay, rồi sang owner kế. Một file của owner tải lỗi ⇒ owner đó **không** được gắn (tránh thay bộ ảnh bằng bộ thiếu), thẻ báo lỗi, các owner khác tiếp tục.
-**Consequences:** Số dòng chưa gắn tại một thời điểm ≤ 10. Thay lại > 100 ảnh trong ngày vẫn bị 429 (đã chấp nhận). Tổng thời gian ≈ tổng thời gian tải / 3.
+### ADR-04 — Gắn theo từng owner, tổng đồng thời ≤ 3 trên toàn lượt, không tải trước toàn bộ
+**Context:** Hạn mức 100 dòng chưa `ATTACHED`/người/24h đếm cả `DELETED` (A-04, giữ nguyên). Một lượt ảnh nhanh có thể là 1.500 file — và hầu hết mã chỉ có **một** file (hàng lẻ, biến thể, mẫu mã một ảnh).
+**Decision:** Một hàng đợi file phẳng theo thứ tự owner (trong owner: theo STT), 3 worker kéo chung — tức tổng `/media/uploads` đang bay ≤ 3 trên **toàn lượt**, không phải trong một owner. Worker tải xong file cuối của một owner (≤ 10 file) thì gọi `set-images` cho owner ấy ngay. Một file của owner tải lỗi ⇒ owner đó **không** được gắn (tránh thay bộ ảnh bằng bộ thiếu), thẻ báo lỗi, các owner khác tiếp tục.
+**Consequences:** Số dòng chưa gắn tại một thời điểm ≤ 3 owner đang dở × ≤ 10 = 30 (thực tế ≈ 3). Thay lại > 100 ảnh trong ngày vẫn bị 429 (đã chấp nhận). Tổng thời gian ≈ tổng thời gian tải / 3 kể cả khi mỗi mã một file.
+**Amended 2026-09-16 (T-02-05):** bản đầu (T-02-03) viết "tuần tự theo owner, trong owner ≤ 3 đồng thời", nên với N mã một file hiệu quả là 1 đồng thời — 4 round-trip nối tiếp cho mỗi file. Hệ quả "/ 3" chỉ đúng khi owner có ≥ 3 file. Quyết định gắn-ngay-theo-owner giữ nguyên; chỉ đổi đơn vị song song từ owner sang file.
 **Status:** accepted
 
 ### ADR-05 — Không đụng `modules/media`

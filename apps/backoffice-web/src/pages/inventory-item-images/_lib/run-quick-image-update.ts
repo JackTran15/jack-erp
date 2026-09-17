@@ -1,6 +1,8 @@
 import {
   GOODS_IMAGE_COUNT_MESSAGE,
   uploadGoodsImages,
+  type GoodsImageOwnerType,
+  type UploadedGoodsImage,
 } from "../../../lib/media/upload-goods-images";
 import {
   groupByOwner,
@@ -29,9 +31,24 @@ export interface RunQuickImageUpdateResult {
   failed: number;
 }
 
+/** Một owner trong lượt chạy: các file của nó trên hàng đợi chung và bộ đếm để biết khi nào đủ. */
+interface OwnerRun {
+  ownerId: string;
+  ownerType: GoodsImageOwnerType;
+  group: QuickImageFile[];
+  /** Kết quả theo đúng chỉ số của `group`. */
+  uploads: UploadedGoodsImage[];
+  /** Số file đã được worker nhận; `group.slice(0, started)` là các thẻ đang/đã tải. */
+  started: number;
+  /** Số file chưa xong; về 0 ⇒ gắn. */
+  remaining: number;
+}
+
 /**
- * ADR-04: đi tuần tự theo owner — tải các file của owner (≤ 3 đồng thời), đủ
- * thì `set-images` ngay, rồi owner kế. Một file lỗi ⇒ owner đó không được gắn
+ * ADR-04 (sửa T-02-05): hàng đợi file phẳng theo thứ tự owner, 3 worker kéo
+ * chung — tổng `/media/uploads` đang bay ≤ 3 trên toàn lượt, không phải trong
+ * một owner (hầu hết mã chỉ có một file). Worker tải xong file cuối của owner
+ * thì `set-images` cho owner ấy ngay. Một file lỗi ⇒ owner đó không được gắn
  * (tránh thay bộ ảnh bằng bộ thiếu), các owner khác vẫn chạy. Chỉ chạy các thẻ
  * `isUpdatable` (chưa `done`); huỷ qua `signal` ⇒ dừng sạch, thẻ đang tải về
  * `pending`, thẻ chưa tới lượt giữ nguyên.
@@ -49,44 +66,14 @@ export async function runQuickImageUpdate(
     result.failed += group.length;
   };
 
-  for (const [ownerId, group] of groups) {
-    if (signal.aborted) break;
-
-    if (group.length > MAX_IMAGES_PER_OWNER) {
-      failAll(group, GOODS_IMAGE_COUNT_MESSAGE);
-      onOwnerDone(ownerId, false);
-      continue;
-    }
-
-    // `groupByOwner` chỉ giữ thẻ có `resolved.match`, nên owner type luôn có.
-    const ownerType = ownerTypeFor(group[0].resolved!) ?? "PRODUCT";
-    for (const card of group) onCardStatus(card.key, "uploading");
-
-    let uploads;
-    try {
-      uploads = await uploadGoodsImages(
-        ownerType,
-        group.map((card) => card.file),
-        { concurrency: CONCURRENCY, signal },
-      );
-    } catch (err) {
-      if (signal.aborted) {
-        for (const card of group) onCardStatus(card.key, "pending");
-        break;
-      }
-      console.warn("quick image upload failed", err);
-      failAll(group, reasonMessage("UNKNOWN"));
-      onOwnerDone(ownerId, false);
-      continue;
-    }
-
+  const attach = async ({ ownerId, group, uploads }: OwnerRun) => {
     if (uploads.some((u) => u.error !== undefined)) {
       uploads.forEach((u, i) =>
         onCardStatus(group[i].key, "failed", u.error ?? SIBLING_FAILED_MESSAGE),
       );
       result.failed += group.length;
       onOwnerDone(ownerId, false);
-      continue;
+      return;
     }
 
     const imageIds = uploads.map((u) => u.mediaId as string);
@@ -96,7 +83,7 @@ export async function runQuickImageUpdate(
       if (failed) {
         failAll(group, reasonMessage(failed.reason));
         onOwnerDone(ownerId, false);
-        continue;
+        return;
       }
       for (const card of group) onCardStatus(card.key, "done");
       result.done += group.length;
@@ -105,6 +92,58 @@ export async function runQuickImageUpdate(
       console.warn("set item images failed", err);
       failAll(group, reasonMessage("UNKNOWN"));
       onOwnerDone(ownerId, false);
+    }
+  };
+
+  const runs: OwnerRun[] = [];
+  const queue: { run: OwnerRun; index: number }[] = [];
+  for (const [ownerId, group] of groups) {
+    if (group.length > MAX_IMAGES_PER_OWNER) {
+      failAll(group, GOODS_IMAGE_COUNT_MESSAGE);
+      onOwnerDone(ownerId, false);
+      continue;
+    }
+    const run: OwnerRun = {
+      ownerId,
+      // `groupByOwner` chỉ giữ thẻ có `resolved.match`, nên owner type luôn có.
+      ownerType: ownerTypeFor(group[0].resolved!) ?? "PRODUCT",
+      group,
+      uploads: new Array(group.length),
+      started: 0,
+      remaining: group.length,
+    };
+    runs.push(run);
+    group.forEach((_, index) => queue.push({ run, index }));
+  }
+
+  let next = 0;
+  const worker = async () => {
+    while (next < queue.length && !signal.aborted) {
+      const { run, index } = queue[next];
+      next += 1;
+      run.started += 1;
+      const card = run.group[index];
+      onCardStatus(card.key, "uploading");
+      try {
+        const [uploaded] = await uploadGoodsImages(run.ownerType, [card.file], { signal });
+        run.uploads[index] = uploaded;
+      } catch (err) {
+        if (signal.aborted) return;
+        console.warn("quick image upload failed", err);
+        run.uploads[index] = { file: card.file, error: reasonMessage("UNKNOWN") };
+      }
+      run.remaining -= 1;
+      if (run.remaining === 0) await attach(run);
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker),
+  );
+
+  if (signal.aborted) {
+    for (const run of runs) {
+      if (run.remaining === 0) continue;
+      for (const card of run.group.slice(0, run.started)) onCardStatus(card.key, "pending");
     }
   }
 

@@ -27,6 +27,7 @@ rollback: Revert các commit của UoW. Endpoint `resolve-image-names` biến m�
 ## In scope
 - `parseImageFileName` + `POST /v2/inventory-items/resolve-image-names` (ADR-03)
 - Trang `/admin/inventory-items/images/quick`: thả/chọn file, thẻ, Đổi ảnh, bỏ thẻ, bộ đếm, Cập nhật (ADR-04), chặn rời trang
+- Cập nhật chạy 3 file đồng thời trên toàn lượt, gắn theo owner (ADR-04 sửa 2026-09-16, T-02-05)
 - Mục menu "Cập nhật ảnh nhanh" trong Tiện ích
 - Sinh lại `schema.ts` + `openapi.snapshot.json` cho cả ba endpoint; `07-verification.md`
 
@@ -51,6 +52,8 @@ rollback: Revert các commit của UoW. Endpoint `resolve-image-names` biến m�
   - 2026-09-16: `parse-image-file-name.spec.ts` 19 ca, gồm cả `ABC (1) (2)` và `A B (03)`.
 - [x] Thả 200 file ảnh 100 KB trên Chrome: trang vẫn phản hồi, số request `/media/uploads` đồng thời ≤ 3 (tab Network)
   - 2026-09-16: 206 thẻ sau 0,23 s, cuộn 105 ms (`verify-t0202.py`); đỉnh đồng thời 3/3 trong lượt 5 file và lượt AC-13 (`verify-t0104.py`, `verify-t0203.py`).
+- [x] N mã một file: đỉnh `POST /media/uploads` đang bay = 3, không phải 1 (T-02-05)
+  - 2026-09-16: `verify-t0205.py` S1, 6 mã một file — runner cũ đỉnh 1, runner mới đỉnh 3 (chi tiết ở done-when T-02-05).
 - [ ] `pnpm openapi:generate` chạy với API dev; `schema.ts` + snapshot commit, `git diff --stat` chỉ gồm ba endpoint mới
   - 2026-09-16: đã sinh, diff chỉ 3 endpoint / 11 DTO, 0 dòng xoá (T-02-04). Chờ commit.
 - [x] `pnpm --filter @erp/api test` và `pnpm --filter @erp/backoffice-web build` xanh
