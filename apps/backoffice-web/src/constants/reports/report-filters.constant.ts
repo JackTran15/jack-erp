@@ -57,6 +57,12 @@ export enum REPORT_FILTERS_LINE {
     EMPLOYEE = 'employee',
     // Tiền mặt (cash_*) / Chuyển khoản (bank_*) — A-05; rỗng = Tất cả.
     PAYMENT_METHOD = 'payment_method',
+    // "Mục chi" (#5, #6): một mục chi (id) hoặc 'uncategorized' = dòng không có
+    // mục ("Chi khác"); rỗng = Tất cả. Options từ filter-options type=expenseCategory.
+    EXPENSE_CATEGORY = 'expense_category',
+    // "Thống kê theo" của #6 — bucket thời gian Ngày/Tuần/Tháng/Quý/Năm (A-13).
+    // Không dùng lại STATISTIC_BY: nó map `statBy` (nhóm hàng), không phải `timeBucket`.
+    TIME_BUCKET = 'time_bucket',
 }
 
 /**
@@ -231,5 +237,13 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.PAYMENT_METHOD]: {
         label: 'phương thức thanh toán',
         backendField: 'paymentMethod',
+    },
+    [REPORT_FILTERS_LINE.EXPENSE_CATEGORY]: {
+        label: 'mục chi',
+        backendField: 'categoryIds',
+    },
+    [REPORT_FILTERS_LINE.TIME_BUCKET]: {
+        label: 'thống kê theo',
+        backendField: 'timeBucket',
     },
 }

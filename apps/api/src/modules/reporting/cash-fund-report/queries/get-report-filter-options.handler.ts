@@ -1,13 +1,20 @@
 import { BadRequestException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { CASH_FUND_KIND_LABELS_VI, IDropdownOption } from '@erp/shared-interfaces';
+import {
+  CASH_FUND_KIND_LABELS_VI,
+  CASH_FUND_UNCATEGORIZED,
+  IDropdownOption,
+} from '@erp/shared-interfaces';
 import { FindOptionsWhere, ILike, In, Repository } from 'typeorm';
+import { CashVoucherCategoryEntity } from '../../../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.entity';
+import { CashVoucherCategoryDirection } from '../../../accounting/cash-vouchers/enums';
 import { UserEntity } from '../../../auth/user.entity';
 import { BranchEntity } from '../../../branch/branch.entity';
 import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
 import { RbacService } from '../../../rbac/rbac.service';
 import { CASH_CONSOLIDATED } from '../report-definition';
+import { UNCATEGORIZED_EXPENSE_LABEL } from '../reports/expenses-by-category.report';
 import {
   CashFundFilterOptionType,
   ReportFilterOptionsQueryDto,
@@ -54,6 +61,8 @@ export class GetReportFilterOptionsHandler
     private readonly branches: Repository<BranchEntity>,
     @InjectRepository(EmployeeProfileEntity)
     private readonly employees: Repository<EmployeeProfileEntity>,
+    @InjectRepository(CashVoucherCategoryEntity)
+    private readonly categories: Repository<CashVoucherCategoryEntity>,
     private readonly rbac: RbacService,
   ) {}
 
@@ -72,9 +81,8 @@ export class GetReportFilterOptionsHandler
         return (Object.keys(CASH_FUND_KIND_LABELS_VI) as (keyof typeof CASH_FUND_KIND_LABELS_VI)[]).map(
           (kind) => ({ value: kind, label: CASH_FUND_KIND_LABELS_VI[kind] }),
         );
-      // Wired by UOW-03.
       case CashFundFilterOptionType.EXPENSE_CATEGORY:
-        throw new BadRequestException(`Filter option type not available yet: ${dto.type}`);
+        return this.expenseCategories(dto, actor.organizationId);
       default:
         throw new BadRequestException(`Unknown filter option type: ${String(dto.type)}`);
     }
@@ -158,5 +166,35 @@ export class GetReportFilterOptionsHandler
         metadata: { name: name ?? r.code },
       };
     });
+  }
+
+  /**
+   * "Mục chi" — the active OUT categories of the organization, in their
+   * display order. A synthetic first option (`uncategorized` / "Chi khác")
+   * lets the reader pick the lines that carry no category, the same bucket
+   * "Chi tiền theo mục chi" reports under that label.
+   */
+  private async expenseCategories(
+    dto: ReportFilterOptionsQueryDto,
+    org: string,
+  ): Promise<IDropdownOption[]> {
+    const where: FindOptionsWhere<CashVoucherCategoryEntity> = {
+      organizationId: org,
+      direction: CashVoucherCategoryDirection.OUT,
+      isActive: true,
+    };
+    if (dto.search) where.name = ILike(`%${dto.search}%`);
+    const rows = await this.categories.find({
+      where,
+      order: { displayOrder: 'ASC', name: 'ASC' },
+      skip: this.skip(dto),
+      take: this.take(dto),
+    });
+    const options = rows.map((c) => ({ value: c.id, label: c.name }));
+    const uncategorized = { value: CASH_FUND_UNCATEGORIZED, label: UNCATEGORIZED_EXPENSE_LABEL };
+    const showUncategorized =
+      (dto.page ?? 1) === 1 &&
+      (!dto.search || uncategorized.label.toLowerCase().includes(dto.search.toLowerCase()));
+    return showUncategorized ? [uncategorized, ...options] : options;
   }
 }

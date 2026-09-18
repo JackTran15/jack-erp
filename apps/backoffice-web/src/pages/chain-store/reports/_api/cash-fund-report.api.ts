@@ -64,7 +64,8 @@ export async function fetchCashFundReportData(
  * không có filter cửa hàng nên lấy chi nhánh header (`activeBranchId`, null khi
  * xem theo Chuỗi → BE gộp theo quyền hợp nhất); #3/#5 gửi `store` từ filter
  * phụ. #3: EMPLOYEE → `employeeIds` (1 phần tử), PAYMENT_METHOD → `paymentMethod`;
- * rỗng = Tất cả → bỏ khỏi payload. EXPENSE_CATEGORY / bucket được UOW-03 bổ sung.
+ * rỗng = Tất cả → bỏ khỏi payload. #5/#6: EXPENSE_CATEGORY → `categoryIds` (1 phần
+ * tử, kể cả 'uncategorized'); #6: TIME_BUCKET → `timeBucket` (chưa set → BE mặc định day).
  */
 export function buildCashFundSearchFilters(
   filters: Partial<ReportFilterValues>,
@@ -74,6 +75,8 @@ export function buildCashFundSearchFilters(
   const store = filters[REPORT_FILTERS_LINE.STORE];
   const employee = filters[REPORT_FILTERS_LINE.EMPLOYEE];
   const paymentMethod = filters[REPORT_FILTERS_LINE.PAYMENT_METHOD];
+  const category = filters[REPORT_FILTERS_LINE.EXPENSE_CATEGORY];
+  const timeBucket = filters[REPORT_FILTERS_LINE.TIME_BUCKET];
 
   const notAll = (v: string | undefined): v is string => !!v && v !== "all";
 
@@ -90,6 +93,8 @@ export function buildCashFundSearchFilters(
   }
   if (notAll(employee)) payload.employeeIds = [employee];
   if (paymentMethod) payload.paymentMethod = paymentMethod;
+  if (category) payload.categoryIds = [category];
+  if (timeBucket) payload.timeBucket = timeBucket;
   return payload;
 }
 

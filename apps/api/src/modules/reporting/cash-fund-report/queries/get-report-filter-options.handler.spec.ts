@@ -46,17 +46,24 @@ const STAFF_ROWS = [
   { userId: 'usr-2', code: 'NV000005', firstName: undefined, lastName: undefined },
 ];
 
-function makeHandler(opts: { consolidated?: boolean; raw?: any[] } = {}) {
+const CATEGORY_ROWS = [
+  { id: 'cat-1', name: 'Tiền điện', direction: 'OUT', isActive: true, displayOrder: 1 },
+  { id: 'cat-2', name: 'Tiền nước', direction: 'OUT', isActive: true, displayOrder: 2 },
+];
+
+function makeHandler(opts: { consolidated?: boolean; raw?: any[]; categoryRows?: any[] } = {}) {
   const branches = { find: jest.fn(async () => [{ id: 'b1', name: 'Cần Thơ' }]) };
   const employeeQb = qbStub(opts.raw ?? STAFF_ROWS);
   const employees = { createQueryBuilder: jest.fn(() => employeeQb) };
+  const categories = { find: jest.fn(async () => opts.categoryRows ?? CATEGORY_ROWS) };
   const hasPermission = jest.fn(async () => opts.consolidated ?? false);
   const handler = new GetReportFilterOptionsHandler(
     branches as any,
     employees as any,
+    categories as any,
     { hasPermission } as any,
   );
-  return { handler, branches, employees, employeeQb, hasPermission };
+  return { handler, branches, employees, employeeQb, categories, hasPermission };
 }
 
 const run = (handler: GetReportFilterOptionsHandler, dto: any, who = actor) =>
@@ -178,11 +185,58 @@ describe('GetReportFilterOptionsHandler (cash)', () => {
     expect(out).toEqual([{ value: 'b1', label: 'Cần Thơ', metadata: { branchId: 'b1' } }]);
   });
 
-  it('expenseCategory: still 400 until UOW-03 wires it', async () => {
-    const { handler } = makeHandler();
-    await expect(
-      run(handler, { type: CashFundFilterOptionType.EXPENSE_CATEGORY }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+  describe('expenseCategory', () => {
+    it('lists the active OUT categories of the org by display order, "Chi khác" first', async () => {
+      const { handler, categories, hasPermission } = makeHandler();
+      const out = await run(handler, { type: CashFundFilterOptionType.EXPENSE_CATEGORY });
+
+      expect(categories.find).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1', direction: 'OUT', isActive: true },
+        order: { displayOrder: 'ASC', name: 'ASC' },
+        skip: 0,
+        take: 20,
+      });
+      // Org-wide, not branch-scoped: categories are an organization catalogue.
+      expect(hasPermission).not.toHaveBeenCalled();
+      expect(out).toEqual([
+        { value: 'uncategorized', label: 'Chi khác' },
+        { value: 'cat-1', label: 'Tiền điện' },
+        { value: 'cat-2', label: 'Tiền nước' },
+      ]);
+    });
+
+    it('search: ILIKE on name; "Chi khác" only when the search matches it', async () => {
+      const { handler, categories } = makeHandler({ categoryRows: [CATEGORY_ROWS[0]] });
+      const out = await run(handler, {
+        type: CashFundFilterOptionType.EXPENSE_CATEGORY,
+        search: 'điện',
+      });
+      const where = (categories.find as jest.Mock).mock.calls[0][0].where;
+      expect(where.name).toBeDefined();
+      expect(where.name._type).toBe('ilike');
+      expect(where.name._value).toBe('%điện%');
+      expect(out).toEqual([{ value: 'cat-1', label: 'Tiền điện' }]);
+
+      const other = makeHandler({ categoryRows: [] });
+      const khac = await run(other.handler, {
+        type: CashFundFilterOptionType.EXPENSE_CATEGORY,
+        search: 'khác',
+      });
+      expect(khac).toEqual([{ value: 'uncategorized', label: 'Chi khác' }]);
+    });
+
+    it('pages with the dto page/pageSize; "Chi khác" is only on the first page', async () => {
+      const { handler, categories } = makeHandler();
+      const out = await run(handler, {
+        type: CashFundFilterOptionType.EXPENSE_CATEGORY,
+        page: 2,
+        pageSize: 10,
+      });
+      const args = (categories.find as jest.Mock).mock.calls[0][0];
+      expect(args.skip).toBe(10);
+      expect(args.take).toBe(10);
+      expect(out.map((o) => o.value)).toEqual(['cat-1', 'cat-2']);
+    });
   });
 
   it('unknown type: 400', async () => {
