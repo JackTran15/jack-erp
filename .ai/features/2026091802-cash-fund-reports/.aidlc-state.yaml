@@ -1,0 +1,29 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: cash-fund-reports
+slug: 2026091802-cash-fund-reports
+profile: none
+created: 2026-09-18T08:43:12
+ruleset: 6
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-18T08:44:45
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-18T08:50:48
+    by: Akenzy
+    evidence: 20 assumptions, none blocking-and-pending; 21 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-18T08:52:52
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-18T09:03:57
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
