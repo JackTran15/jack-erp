@@ -275,7 +275,15 @@ export class InvoiceService {
       payments: InvoicePaymentEntity[];
       remainingDebt: number | null;
       staffName: string | null;
-      appliedPromotions: Array<{ type: PromotionProgramType; discountAmount: number }>;
+      appliedPromotions: Array<{
+        programId: string;
+        code: string;
+        name: string;
+        type: PromotionProgramType;
+        priority: number;
+        discountAmount: number;
+        lineDiscounts: Array<{ lineId: string; discountAmount: number; unitPriceAfter: number }>;
+      }>;
     }
   > {
     const invoice = await this.findOne(id, actor);
@@ -306,15 +314,29 @@ export class InvoiceService {
 
     // Snapshot of the promotion programs that ran at checkout (T-08-01) —
     // `invoice_checkout_promotions` was write-only until now (only written by
-    // persist-invoice.step.ts, never read back). Only `type`/`discountAmount`
-    // are returned — enough for the print breakdown (UOW-08); per-line detail
-    // already lives on `items[]`.
+    // persist-invoice.step.ts, never read back). `type`/`discountAmount` feed
+    // the print breakdown (UOW-08); `name`/`lineDiscounts` let the POS label
+    // each line on reprint and in the invoice detail (pos-line-promotion-
+    // breakdown, ADR-04). `lineDiscounts[].lineId` is `invoice_items.id`.
+    // Same order the engine applied them in: priority, then creation.
     const promotionSnapshots = await this.dataSource
       .getRepository(InvoiceCheckoutPromotionEntity)
-      .find({ where: { invoiceId: id, organizationId: actor.organizationId } });
+      .find({
+        where: { invoiceId: id, organizationId: actor.organizationId },
+        order: { priority: 'ASC', createdAt: 'ASC' },
+      });
     const appliedPromotions = promotionSnapshots.map((row) => ({
+      programId: row.programId,
+      code: row.code,
+      name: row.name,
       type: row.type as PromotionProgramType,
+      priority: row.priority,
       discountAmount: Number(row.discountAmount),
+      lineDiscounts: (row.lineDiscounts ?? []).map((ld) => ({
+        lineId: ld.lineId,
+        discountAmount: Number(ld.discountAmount),
+        unitPriceAfter: Number(ld.unitPriceAfter),
+      })),
     }));
 
     return Object.assign(invoiceWithCustomer, {

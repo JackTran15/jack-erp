@@ -6,19 +6,47 @@ import { InvoicePaymentEntity } from '../entities/invoice-payment.entity';
 import { LocationEntity } from '../../inventory/location/location.entity';
 import { CustomerEntity } from '../../customer/customer.entity';
 
-/**
- * One promotion program that actually ran at checkout, read back from the
- * `invoice_checkout_promotions` audit snapshot (T-08-01). Only `type` +
- * `discountAmount` — enough for the print breakdown (UOW-08) to bucket by
- * invoice-level vs item-level discount; per-line/gift detail already lives
- * on `items[]` and isn't duplicated here.
- */
-export class AppliedInvoicePromotionDto {
-  @ApiProperty({ enum: PromotionProgramType })
-  type: PromotionProgramType;
+/** One line's share of a program's discount, as the engine allocated it at checkout. */
+export class AppliedInvoicePromotionLineDto {
+  @ApiProperty({ description: '`invoice_items.id` of the line this share belongs to' })
+  lineId: string;
 
   @ApiProperty({ type: Number })
   discountAmount: number;
+
+  @ApiProperty({ type: Number })
+  unitPriceAfter: number;
+}
+
+/**
+ * One promotion program that actually ran at checkout, read back from the
+ * `invoice_checkout_promotions` audit snapshot (T-08-01). `type` +
+ * `discountAmount` feed the print breakdown (UOW-08); `name` + `lineDiscounts`
+ * let a reprint or the invoice detail label each line with the programme
+ * that discounted it (pos-line-promotion-breakdown, ADR-04) without
+ * re-running the engine — the snapshot is what the customer actually paid.
+ */
+export class AppliedInvoicePromotionDto {
+  @ApiProperty({ format: 'uuid' })
+  programId: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ enum: PromotionProgramType })
+  type: PromotionProgramType;
+
+  @ApiProperty({ type: Number, description: 'Lower ran first (BR-001)' })
+  priority: number;
+
+  @ApiProperty({ type: Number })
+  discountAmount: number;
+
+  @ApiProperty({ type: [AppliedInvoicePromotionLineDto] })
+  lineDiscounts: AppliedInvoicePromotionLineDto[];
 }
 
 /** Invoice line item enriched with its resolved storage location. */

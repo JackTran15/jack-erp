@@ -476,9 +476,19 @@ describe('InvoiceService', () => {
     it('inlines appliedPromotions from the invoice_checkout_promotions snapshot', async () => {
       invoiceRepo.findOne.mockResolvedValue(invoiceStub());
       itemRepo.find.mockResolvedValue([]);
+      // Numeric columns come back as strings from pg; `line_discounts` is the
+      // jsonb the saga wrote, `null` on invoices older than T-08-01.
       const promotionRepo = { find: jest.fn().mockResolvedValue([
-        { type: 'INVOICE_DISCOUNT', discountAmount: '100000' },
-        { type: 'ITEM_DISCOUNT', discountAmount: '50000' },
+        {
+          programId: 'prog-b', code: 'KM000004', name: 'CTKM-B', type: 'INVOICE_DISCOUNT', priority: 1,
+          discountAmount: '100000',
+          lineDiscounts: [{ lineId: 'line-100', discountAmount: 100000, unitPriceAfter: 900000 }],
+        },
+        {
+          programId: 'prog-a', code: 'KM000003', name: 'CTKM-A', type: 'ITEM_DISCOUNT', priority: 1,
+          discountAmount: '50000',
+          lineDiscounts: null,
+        },
       ]) };
       dataSource.getRepository.mockReturnValue(promotionRepo);
 
@@ -486,10 +496,21 @@ describe('InvoiceService', () => {
 
       expect(promotionRepo.find).toHaveBeenCalledWith({
         where: { invoiceId: 'inv-1', organizationId: 'org-1' },
+        order: { priority: 'ASC', createdAt: 'ASC' },
       });
+      // Name + per-line allocation ride along so the POS can label each line on
+      // reprint (pos-line-promotion-breakdown ADR-04); null jsonb → [].
       expect(result.appliedPromotions).toEqual([
-        { type: 'INVOICE_DISCOUNT', discountAmount: 100000 },
-        { type: 'ITEM_DISCOUNT', discountAmount: 50000 },
+        {
+          programId: 'prog-b', code: 'KM000004', name: 'CTKM-B', type: 'INVOICE_DISCOUNT', priority: 1,
+          discountAmount: 100000,
+          lineDiscounts: [{ lineId: 'line-100', discountAmount: 100000, unitPriceAfter: 900000 }],
+        },
+        {
+          programId: 'prog-a', code: 'KM000003', name: 'CTKM-A', type: 'ITEM_DISCOUNT', priority: 1,
+          discountAmount: 50000,
+          lineDiscounts: [],
+        },
       ]);
     });
 
