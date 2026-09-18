@@ -13,6 +13,14 @@ import { InlineNoteEditor } from "@erp/pos/components/page-components/Checkout/C
 import { InvoiceLineItemWarningCell } from "@erp/pos/components/page-components/Checkout/CheckoutLeftPane/InvoiceLineItemTable/InvoiceLineItemRow/InvoiceLineItemWarningCell/InvoiceLineItemWarningCell";
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
+import {
+  formatPromotionLabel,
+  itemDiscountOfLine,
+} from "@erp/pos/lib/page-libs/checkout/linePromotionIndex";
+import {
+  selectLinePromotionIndex,
+  usePosCheckoutSessionStore,
+} from "@erp/pos/stores/common/checkout-session.store";
 import { usePosCheckoutUiStore } from "@erp/pos/stores/page-stores/checkout/checkout-ui.store";
 
 export interface InvoiceLineItemRowProps {
@@ -29,7 +37,8 @@ export interface InvoiceLineItemRowProps {
  * do bảng tính sẵn theo variant + cart của dòng. Khi `locked`: SL/đơn giá
  * read-only, không có nút xóa (hàng trả theo hóa đơn không được sửa), không mở
  * context menu. Hiển thị KM/note inline khi có; cột Thành tiền chia 2 dòng
- * (giá gốc gạch ngang + giá sau KM) khi có khuyến mại.
+ * (giá gốc gạch ngang + giá sau KM) khi có khuyến mại — giảm giá tay lẫn CTKM
+ * engine áp cho dòng (nhãn "Tên CTKM (số giảm)" dưới tên, cùng kiểu nhãn tay).
  */
 export function InvoiceLineItemRow({
   index,
@@ -63,12 +72,26 @@ export function InvoiceLineItemRow({
   const autoFocusQty = pendingQtyFocusLineId === line.lineId;
   const editingNote = editingNoteLineId === line.lineId;
 
+  const promotionIndex = usePosCheckoutSessionStore(selectLinePromotionIndex);
+  // CTKM engine áp cho dòng này (preview `evaluate`). Dòng trả không có CTKM —
+  // preview chỉ đánh giá giỏ mua.
+  const linePromotions = isReturnLine
+    ? []
+    : (promotionIndex.byLine.get(line.lineId) ?? []);
+  // Chỉ nhóm `item` trừ vào Thành tiền; nhóm `invoice` chỉ là nhãn — số đó đã
+  // nằm ở dòng "Khuyến mại" của panel phải (ADR-02). Không sửa `lineTotal()`:
+  // nó là gốc của draft payload/settlement, server tự tính lại CTKM (ADR-03).
+  const promotionItemDiscount = isReturnLine
+    ? 0
+    : itemDiscountOfLine(promotionIndex, line.lineId);
   const rowTotal = lineTotal(line);
+  const displayLineTotal = Math.max(0, rowTotal - promotionItemDiscount);
   const grossTotal = line.unitPrice * line.qty;
   const isReturnQuantityUi = isReturnLine;
   const displayQty = isReturnQuantityUi ? -line.qty : line.qty;
   const oversell = !isReturnQuantityUi && lineExceedsOnHandSnapshot(line);
-  const hasDiscount = Boolean(line.lineDiscount);
+  const hasManualDiscount = Boolean(line.lineDiscount);
+  const hasDiscount = hasManualDiscount || promotionItemDiscount > 0;
 
   const qtyInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,11 +139,20 @@ export function InvoiceLineItemRow({
       <td className="px-2 py-2">
         <div className="flex flex-col gap-1">
           <span>{line.name}</span>
-          {hasDiscount ? (
+          {hasManualDiscount ? (
             <span className="text-[12px] italic text-[#E5403A]">
               {formatLineDiscountLabel(line)}
             </span>
           ) : null}
+          {linePromotions.map((p) => (
+            <span
+              key={p.programId}
+              className="text-[12px] italic text-[#E5403A]"
+              data-promotion-label={p.bucket}
+            >
+              {formatPromotionLabel(p)}
+            </span>
+          ))}
           {editingNote ? (
             <InlineNoteEditor lineId={line.lineId} initial={line.note ?? ""} />
           ) : line.note ? (
@@ -201,10 +233,10 @@ export function InvoiceLineItemRow({
             <span className="text-[12px] text-gray-500 line-through">
               {formatVnd(isReturnQuantityUi ? -grossTotal : grossTotal)}
             </span>
-            <span>{formatVnd(rowTotal)}</span>
+            <span>{formatVnd(displayLineTotal)}</span>
           </div>
         ) : (
-          formatVnd(rowTotal)
+          formatVnd(displayLineTotal)
         )}
       </td>
       <td className="w-10 px-2 py-2 text-right">

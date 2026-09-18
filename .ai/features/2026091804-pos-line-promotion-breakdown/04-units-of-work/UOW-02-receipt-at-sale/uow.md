@@ -16,7 +16,7 @@ rollback: revert 3 file in; hóa đơn đã in là giấy — không có gì đ�
 
 ## Demo script
 1. Giỏ SKU-685 + SKU-100, bấm **In tạm tính** → HTML in: dòng 1 dưới tên *CTKM-A … (68.500)*, ĐG 685.000, TT **616.500**; dòng 2 dưới tên *CTKM-B … (10.000)*, TT **100.000**; khối tổng: Tiền hàng 785.000, Khuyến mãi 78.500 (KM theo mặt hàng 68.500 / KM theo hóa đơn 10.000), Tổng thanh toán 706.500
-2. Thêm giảm tay 50.000 dòng 1 → In tạm tính: dòng 1 có 2 nhãn, TT **571.500**; khối tổng thêm *Giảm giá* 50.000, KM theo mặt hàng 63.500
+2. Thêm giảm tay 50.000 dòng 1 → In tạm tính: dòng 1 có 2 nhãn, TT **566.500**; khối tổng thêm *Giảm giá* 50.000, KM theo mặt hàng vẫn 68.500
 3. Bật *In hóa đơn*, **Thu tiền** → HTML hóa đơn in giống bước 1 từng nhãn, từng số
 
 ## In scope

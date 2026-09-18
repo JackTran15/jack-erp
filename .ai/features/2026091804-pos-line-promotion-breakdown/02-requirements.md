@@ -55,10 +55,10 @@ Then không có nhãn dưới tên, Thành tiền không gạch — y hệt hôm
 **AC-04** — Giảm tay + CTKM hàng hóa cộng dồn trên cùng dòng (A-09) [ẢNH]
 ```gherkin
 Given dòng SKU-685 có giảm tay 50.000 (lý do "test") và CTKM-A 10% đang áp
-When engine đánh giá lại (10% của 635.000 = 63.500)
-Then dưới tên có 2 nhãn, thứ tự: "KM 50.000 - test" rồi "CTKM-A … (63.500)"
-And Thành tiền gạch 685.000, ghi 571.500
-And Còn phải thu = Thành tiền các dòng − Khuyến mại hóa đơn, khớp amountAfterPromotion của evaluate
+When engine đánh giá lại (10% của đơn giá gốc 685.000 = 68.500 — engine không tính % trên phần sau giảm tay, A-09)
+Then dưới tên có 2 nhãn, thứ tự: "KM 50.000 - test" rồi "CTKM-A … (68.500)"
+And Thành tiền gạch 685.000, ghi 566.500 (685.000 − 50.000 − 68.500)
+And Còn phải thu = Σ Thành tiền − Khuyến mại hóa đơn = 566.500 + 100.000 − 10.000 = 656.500, khớp amountAfterPromotion của evaluate
 ```
 
 **AC-05** — Dòng bị CTKM chiếm hết thì không có nhãn CTKM hóa đơn
@@ -156,8 +156,8 @@ Then HTML hóa đơn in có cùng nhãn và cùng Thành tiền từng dòng nh�
 ```gherkin
 Given dòng SKU-685 có giảm tay 50.000 và CTKM-A
 When in tạm tính
-Then dưới tên có "KM 50.000 - test" và "CTKM-A … (63.500)", TT 571.500
-And dòng "Giảm giá" (tay) 50.000 và "KM theo mặt hàng" 63.500 đều có ở khối tổng
+Then dưới tên có "KM 50.000 - test" và "CTKM-A … (68.500)", TT 566.500
+And dòng "Giảm giá" (tay) 50.000 và "KM theo mặt hàng" 68.500 đều có ở khối tổng
 ```
 
 ---

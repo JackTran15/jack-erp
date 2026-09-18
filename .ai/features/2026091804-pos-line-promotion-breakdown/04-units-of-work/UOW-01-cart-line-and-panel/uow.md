@@ -17,7 +17,7 @@ rollback: revert 4 file pos-web; không có dữ liệu nào ghi xuống — pre
 ## Demo script
 1. Đăng nhập POS (Hồ Chí Minh), gõ `SKU-685` → dòng hiện nhãn đỏ *CTKM-A hang hoa 10% SKU-685 - claude (68.500)*, Thành tiền ~~685.000~~ **616.500**; panel: Tổng tiền **616.500**, **không** có dòng Khuyến mại, Còn phải thu 616.500
 2. Gõ `SKU-100` → dòng 2 có nhãn *CTKM-B … (10.000)*, Thành tiền **100.000** không gạch; panel: Tổng tiền **716.500**, *Khuyến mại (10%)* **−10.000**, Còn phải thu **706.500**
-3. Chuột phải dòng SKU-685 → giảm giá tay 50.000 lý do "test" → hai nhãn dưới tên, Thành tiền ~~685.000~~ **571.500**; Còn phải thu = 571.500 + 100.000 − 10.000 = **661.500**, khớp `evaluate`
+3. Chuột phải dòng SKU-685 → giảm giá tay 50.000 lý do "test" → hai nhãn dưới tên (CTKM-A vẫn 68.500 — engine tính % trên đơn giá gốc), Thành tiền ~~685.000~~ **566.500**; Còn phải thu = 566.500 + 100.000 − 10.000 = **656.500**, khớp `evaluate`
 4. Bấm ✕ cạnh *Khuyến mại* → hộp xác nhận chỉ nêu CTKM-B → đồng ý → dòng Khuyến mại biến mất, nhãn CTKM-A vẫn còn
 5. Mở modal *Chương trình khuyến mãi*, bỏ tick CTKM-A → nhãn trên SKU-685 biến mất, Thành tiền về không gạch
 
