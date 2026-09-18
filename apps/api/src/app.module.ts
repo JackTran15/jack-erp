@@ -32,6 +32,7 @@ import { ReportingModule } from './modules/reporting/reporting.module';
 import { InvoiceReportModule } from './modules/reporting/invoice-report/invoice-report.module';
 import { PosDailyReportModule } from './modules/reporting/pos-daily-report/pos-daily-report.module';
 import { DebtReportModule } from './modules/reporting/debt-report/debt-report.module';
+import { CashFundReportModule } from './modules/reporting/cash-fund-report/cash-fund-report.module';
 import { ProfitReportModule } from './modules/reporting/profit-report/profit-report.module';
 import { PurchaseOrderModule } from './modules/inventory/purchase-order/purchase-order.module';
 import { GoodsIssueModule } from './modules/inventory/goods-issue/goods-issue.module';
@@ -124,6 +125,7 @@ import { MediaModule } from './modules/media/media.module';
     InvoiceReportModule,
     PosDailyReportModule,
     DebtReportModule,
+    CashFundReportModule,
     ProfitReportModule,
     PurchaseOrderModule,
     GoodsIssueModule,
