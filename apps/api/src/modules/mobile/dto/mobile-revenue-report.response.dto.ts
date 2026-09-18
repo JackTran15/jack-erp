@@ -80,6 +80,13 @@ export class MobileRevenueCategoryDto {
 
   @ApiProperty({ description: 'Doanh thu ròng của nhóm trong kỳ, đơn vị đồng' })
   revenue!: number;
+
+  @ApiProperty({
+    description:
+      'Số lượng bán ròng của nhóm trong kỳ (trả hàng trừ ra, nên ÂM được). ' +
+      'Cùng phép cộng `SUM(qty)` mà `items` đang dùng, nên hai màn không lệch.',
+  })
+  quantity!: number;
 }
 
 /**
@@ -98,6 +105,9 @@ export class MobileRevenueCategoryListDto {
 
   @ApiProperty({ description: 'Tổng doanh thu của các nhóm trong `data`' })
   totalRevenue!: number;
+
+  @ApiProperty({ description: 'Tổng số lượng của các nhóm trong `data`' })
+  totalQuantity!: number;
 }
 
 /** Một CHI NHÁNH đã bán mặt hàng đang xem — khớp `BranchRevenueEntity` phía Dart. */

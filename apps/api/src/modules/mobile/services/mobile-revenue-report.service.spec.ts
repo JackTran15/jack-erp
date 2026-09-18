@@ -74,6 +74,30 @@ describe('MobileRevenueReportService', () => {
     });
   });
 
+  describe('số lượng của nhóm hàng', () => {
+    // Màn *Doanh thu theo mặt hàng* của app bán hàng bày CẢ số lượng lẫn doanh
+    // thu ở mọi mức gộp. Trước đây mức NHÓM phải đi một đường khác chỉ vì
+    // đường này thiếu `quantity`, tức hai màn cùng một câu hỏi đi hai nguồn.
+    it('trả `quantity` cho từng nhóm và tổng của cả tập', async () => {
+      query.mockResolvedValueOnce([
+        { id: 'c-1', name: 'Giày nam', revenue: 54750000, quantity: 73 },
+        { id: 'c-2', name: 'Ba lô', revenue: 650000, quantity: 1 },
+      ]);
+
+      const result = await service.listCategories(range, actor);
+
+      expect(result.data.map((r) => r.quantity)).toEqual([73, 1]);
+      expect(result.totalQuantity).toBe(74);
+      expect(result.totalRevenue).toBe(55400000);
+    });
+
+    it('cộng `SUM(qty)` trong CHÍNH câu lệnh, không cộng sau khi lấy về', async () => {
+      await service.listCategories(range, actor);
+
+      expect(query.mock.calls[0][0]).toContain('SUM(qty)');
+    });
+  });
+
   describe('phạm vi chi nhánh', () => {
     it('vắng branchIds → bind tập phân công ở $4', async () => {
       await service.listCategories(range, actor);
@@ -317,7 +341,8 @@ describe('MobileRevenueReportService', () => {
       expect(sql).toContain('it.category_id = $5::uuid');
       expect(sql).toContain('GROUP BY subject_id');
       expect(params[4]).toBe(CATEGORY_ID);
-      expect(result.category).toEqual({ id: CATEGORY_ID, name: 'Giày dép', revenue: 800 });
+      // `quantity` của header cộng từ chính `data` — xem service.
+      expect(result.category).toEqual({ id: CATEGORY_ID, name: 'Giày dép', revenue: 800, quantity: 4 });
       expect(result.data[0]).toMatchObject({ code: 'G1', quantity: 4 });
     });
 

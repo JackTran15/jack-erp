@@ -168,7 +168,8 @@ export class MobileRevenueReportService {
       SELECT
         category_id::text                 AS id,
         MAX(category_name)                AS name,
-        COALESCE(SUM(amount), 0)::float   AS revenue
+        COALESCE(SUM(amount), 0)::float   AS revenue,
+        COALESCE(SUM(qty), 0)::float      AS quantity
       FROM lines
       WHERE category_id IS NOT NULL
       GROUP BY category_id
@@ -178,7 +179,11 @@ export class MobileRevenueReportService {
     const rows = await this.dataSource.query<MobileRevenueCategoryDto[]>(sql, scope.params);
     const data = rows.map((r) => ({ ...r, revenue: round2(r.revenue) }));
 
-    return { data, totalRevenue: sumOf(data.map((r) => r.revenue)) };
+    return {
+      data,
+      totalRevenue: sumOf(data.map((r) => r.revenue)),
+      totalQuantity: sumOf(data.map((r) => r.quantity)),
+    };
   }
 
   /** Chế độ theo thời gian: doanh thu gộp theo mốc, đủ mốc của kỳ. */
@@ -316,7 +321,13 @@ export class MobileRevenueReportService {
     const data = await this.withThumbnails(rows.map(roundItem), actor.organizationId);
 
     return {
-      category: { ...header, revenue: sumOf(data.map((r) => r.revenue)) },
+      // `quantity` của header cộng từ CHÍNH `data` đang trả, không truy vấn
+      // lại: hai con số khác nguồn thì lệch nhau ngay khi một bên đổi bộ lọc.
+      category: {
+        ...header,
+        revenue: sumOf(data.map((r) => r.revenue)),
+        quantity: sumOf(data.map((r) => r.quantity)),
+      },
       data,
     };
   }

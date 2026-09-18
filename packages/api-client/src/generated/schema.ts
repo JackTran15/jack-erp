@@ -7689,6 +7689,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ghi nhận hoạt động người dùng của app mobile */
+        post: operations["MobileActivityController_record"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/auth/login": {
         parameters: {
             query?: never;
@@ -7931,6 +7948,23 @@ export interface paths {
         head?: never;
         /** Sửa một phần khách hàng theo id */
         patch: operations["MobileCustomerController_update"];
+        trace?: never;
+    };
+    "/mobile/customers/{id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tổng quan một khách: chi tiêu, công nợ, thẻ thành viên */
+        get: operations["MobileCustomerController_summaryOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/mobile/customers/{id}/invoices": {
@@ -8411,6 +8445,310 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/cashier/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phiên POS đang mở của chi nhánh (ưu tiên phiên do người gọi mở) */
+        get: operations["MobileCashierController_session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/cash-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Két quầy (REGISTER) của chi nhánh — ô Két tiền của màn Mở ca */
+        get: operations["MobileCashierController_cashAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/session/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở ca (open + start-sales) */
+        post: operations["MobileCashierController_openShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/session/start-close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mở màn Đóng ca: phiên sang CLOSING, trả Tiền thu trong ca */
+        post: operations["MobileCashierController_startClose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/session/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** HỦY BỎ màn Đóng ca: CLOSING → ACTIVE_SALES (A-68) */
+        post: operations["MobileCashierController_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/session/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** ĐỒNG Ý màn Đóng ca: kiểm kê + đóng; lệch → 409 VARIANCE_NEEDS_APPROVAL */
+        post: operations["MobileCashierController_closeShift"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/drafts/{invoiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hoá đơn nháp dưới hình dạng giỏ (T-15-01). Quyền lớp: `accounting.cash.create`. */
+        get: operations["MobileCashierController_draft"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["MobileCashierController_updateDraft"];
+        trace?: never;
+    };
+    "/mobile/cashier/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Giỏ thu ngân tự dựng → hoá đơn nháp (cần ca đang mở). */
+        post: operations["MobileCashierController_createDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/drafts/{invoiceId}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đổi điểm tích luỹ vào hoá đơn nháp */
+        post: operations["MobileCashierController_redeemPoints"];
+        /** Gỡ đổi điểm khỏi hoá đơn nháp */
+        delete: operations["MobileCashierController_removeRedeemedPoints"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/payment-accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tài khoản nhận chuyển khoản/thẻ cho màn Thu tiền (T-16-01). */
+        get: operations["MobileCashierController_paymentAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/drafts/{invoiceId}/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu tiền hoá đơn nháp — phát hành số hoá đơn, ghi sổ quỹ / công nợ. */
+        post: operations["MobileCashierController_checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/debtors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Khách còn nợ (T-17-01). */
+        get: operations["MobileCashierController_debtors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/debtors/{customerId}/debts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MobileCashierController_debtsOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/debts/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Thu nợ nhiều hoá đơn — tiền mặt (phiếu thu) hoặc chuyển khoản (phiếu thu ngân hàng). */
+        post: operations["MobileCashierController_collectDebt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/returnable-invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Đổi trả (T-18-01): hoá đơn đủ điều kiện, chi tiết chọn hàng trả, lập phiếu đổi/trả. */
+        get: operations["MobileCashierController_returnableInvoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/returnable-invoices/{invoiceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MobileCashierController_returnableDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/exchanges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MobileCashierController_exchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/shift-report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Báo cáo hoạt động trong ca đang mở (T-21-01). */
+        get: operations["MobileCashierController_shiftReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/invoices": {
         parameters: {
             query?: never;
@@ -8439,6 +8777,23 @@ export interface paths {
         get: operations["MobileInvoiceController_getById"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/invoices/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Huỷ hoá đơn bán, hoặc phiếu trả/đổi */
+        post: operations["MobileInvoiceController_cancel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -8719,6 +9074,29 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["SalesOrderController_update"];
+        trace?: never;
+    };
+    "/mobile/sales-orders/{id}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Sửa số điểm DỰ KIẾN — quyền của CẢ HAI vai.
+         *
+         *     Mảng `@RequirePermission` nghĩa là HOẶC (tiền lệ: `promotion-v2.controller`).
+         *     Tư vấn ghi con số lúc lập đơn; thu ngân sửa nó khi *Nhận xử lý* bị chặn vì
+         *     số dư không còn đủ.
+         */
+        patch: operations["SalesOrderController_setPoints"];
         trace?: never;
     };
     "/mobile/sales-orders/{id}/approve": {
@@ -13587,6 +13965,9 @@ export interface components {
             note?: string;
             isDraft: boolean;
             sessionId: string;
+            salesOrderId?: string | null;
+            /** @description Kênh bán (nhãn tự do như trên đơn tư vấn); NULL = tại cửa hàng. Mobile thu ngân, T-16-01. */
+            salesChannel?: string | null;
             draftLabel?: string;
             /**
              * @description Not a payment record: `invoice_payments` owns money that was actually taken,
@@ -13767,6 +14148,9 @@ export interface components {
             note?: string;
             isDraft: boolean;
             sessionId: string;
+            salesOrderId?: string | null;
+            /** @description Kênh bán (nhãn tự do như trên đơn tư vấn); NULL = tại cửa hàng. Mobile thu ngân, T-16-01. */
+            salesChannel?: string | null;
             draftLabel?: string;
             /**
              * @description Not a payment record: `invoice_payments` owns money that was actually taken,
@@ -14136,6 +14520,21 @@ export interface components {
              *     ở đó vẫn do tổ chức và chi nhánh quyết, không do trường này.
              */
             salespersonId?: string;
+            /**
+             * Format: uuid
+             * @description Người TẠO hoá đơn (`users.id`), ghép với [salespersonId] bằng **OR**.
+             *
+             *     Không phải một bộ lọc thứ hai mà là vế còn lại của CÙNG một câu hỏi: *"hoá
+             *     đơn nào là của tôi"*. Vai tư vấn nhận diện bằng `salesperson_id`; vai thu
+             *     ngân thì không — hoá đơn họ lập tại quầy, phiếu trả hàng và phiếu đổi hàng
+             *     đều để `salesperson_id` TRỐNG (đo trên dev 2026-09-15: 23/23 phiếu trả và
+             *     2/2 phiếu đổi đều trống). Chỉ lọc theo vế đầu thì mọi chứng từ của thu ngân
+             *     biến mất khỏi danh sách của chính họ — Loc rà 2026-09-15.
+             *
+             *     **Chỉ có tác dụng khi đi CÙNG [salespersonId]**; đứng một mình thì bị bỏ
+             *     qua, để đường web không vô tình đổi phạm vi vì một tham số lạ.
+             */
+            createdByUserId?: string;
             /** @description Ghi chú */
             note?: components["schemas"]["StringFilterDto"];
         };
@@ -16118,6 +16517,35 @@ export interface components {
             page: number;
             pageSize: number;
         };
+        MobileActivityItemDto: {
+            activityId: string;
+            /** @example 2026-09-16T08:12:03.412Z */
+            ts: string;
+            sessionId: string;
+            seq: number;
+            type: string;
+            screen: string;
+            component?: string;
+            action?: string;
+            target?: string;
+            value?: string;
+            flowId?: string;
+            parentFlowId?: string;
+            entityType?: string;
+            entityId?: string;
+            errorCode?: string;
+            /** @description Vài giá trị bổ sung nhỏ gọn. Vượt trần kích thước thì service bỏ đi. */
+            data?: Record<string, never>;
+        };
+        MobileActivityBatchDto: {
+            /** @example 1.0.3+42 */
+            appVersion: string;
+            /** @example ios */
+            platform: string;
+            /** @example 1 */
+            catalogVersion: number;
+            activities: components["schemas"]["MobileActivityItemDto"][];
+        };
         MobileLoginDto: {
             /** @description Email đăng nhập */
             email: string;
@@ -16142,6 +16570,10 @@ export interface components {
             code: string | null;
             /** @description Cửa hàng chính của tổ chức. Trường của entity tên là `isMainBranch`; rút gọn ở đây vì trong một danh sách chi nhánh thì chữ "Branch" là thừa. */
             isMain: boolean;
+            /** @description Địa chỉ cửa hàng — in ở đầu PHIẾU THU. NULL là hợp lệ: cột nullable, và dữ liệu thật đang có chi nhánh trống địa chỉ. Tờ phiếu tự bỏ dòng khi thiếu. */
+            address: string | null;
+            /** @description Điện thoại cửa hàng — in ở đầu PHIẾU THU. NULL là hợp lệ. */
+            phone: string | null;
         };
         MobileBusinessMetricsDto: {
             /** @description Doanh thu (mục II của "Kết quả kinh doanh") */
@@ -16645,6 +17077,8 @@ export interface components {
              * @description Nhóm hàng của item (mẫu mã: của item đại diện). NULL = chưa xếp nhóm.
              */
             groupId: string | null;
+            /** @description URL công khai của ảnh ĐẦU TIÊN. Biến thể dùng ảnh của mẫu mã cha. NULL khi không có ảnh hoặc kho ảnh chưa cấu hình. */
+            thumbnailUrl: string | null;
         };
         MobileInventoryProductPageDto: {
             data: components["schemas"]["MobileInventoryProductResponseDto"][];
@@ -16700,6 +17134,8 @@ export interface components {
             periodIn: number;
             /** @description Số lượng xuất trong kỳ */
             periodOut: number;
+            /** @description URL công khai của ảnh ĐẦU TIÊN — ảnh của mẫu mã cha (mọi biến thể dùng chung). NULL khi không có ảnh hoặc kho ảnh chưa cấu hình. */
+            thumbnailUrl: string | null;
         };
         MobileInventoryFlowLineDto: {
             /** @description Nhãn tiếng Việt của loại chứng từ (REFERENCE_TYPE_LABELS) */
@@ -16782,6 +17218,8 @@ export interface components {
             quantity: number;
             /** @description Doanh thu ròng trong kỳ, đơn vị đồng, có thể ÂM */
             revenue: number;
+            /** @description URL công khai của ảnh ĐẦU TIÊN của mẫu mã (hoặc của item lẻ). NULL khi không có ảnh hoặc kho ảnh chưa cấu hình. */
+            thumbnailUrl: string | null;
         };
         MobileRevenueItemPageDto: {
             data: components["schemas"]["MobileRevenueItemDto"][];
@@ -17042,6 +17480,121 @@ export interface components {
             name: string;
             values: components["schemas"]["MobileProductAttributeValueDto"][];
         };
+        MobileOpenShiftDto: {
+            /** Format: uuid */
+            cashAccountId: string;
+            /** @example 0 */
+            openingCashAmount: number;
+        };
+        MobileCloseShiftDto: {
+            /** @example 1155000 */
+            actualCash: number;
+            notes?: string;
+        };
+        MobileDraftLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            /** @description Giảm dòng theo TIỀN (giảm tay + khuyến mại đã chốt) — cùng nghĩa với `lineDiscount` của POS. */
+            lineDiscount?: number;
+            lineDiscountReason?: string;
+            note?: string;
+        };
+        MobileCreateDraftDto: {
+            /** Format: uuid */
+            customerId?: string;
+            /** Format: uuid */
+            salespersonId?: string;
+            note?: string;
+            salesChannel?: string;
+            lines: components["schemas"]["MobileDraftLineDto"][];
+        };
+        MobileUpdateDraftDto: {
+            /** Format: uuid */
+            customerId?: string;
+            /** Format: uuid */
+            salespersonId?: string;
+            note?: string;
+            salesChannel?: string;
+            lines?: components["schemas"]["MobileDraftLineDto"][];
+        };
+        MobileRedeemPointsDto: {
+            /** @description SỐ ĐIỂM, không phải số tiền. Máy chủ quy ra tiền bằng `POINT_REDEMPTION_VALUE_VND`. */
+            points: number;
+        };
+        MobilePaymentLineDto: {
+            /** @enum {string} */
+            method: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /**
+             * Format: uuid
+             * @description Tài khoản nhận (chuyển khoản) — `payment_accounts.id`; vắng thì server lấy mặc định theo phương thức.
+             */
+            paymentAccountId?: string;
+        };
+        MobileCheckoutDto: {
+            payments: components["schemas"]["MobilePaymentLineDto"][];
+            salesChannel?: string;
+            dueDate?: string;
+        };
+        MobileDebtAllocationDto: {
+            /** Format: uuid */
+            invoiceDebtId: string;
+            amount: number;
+        };
+        MobileCollectDebtDto: {
+            /** Format: uuid */
+            customerId: string;
+            /** @enum {string} */
+            paymentMethod: "cash" | "bank_transfer";
+            /** Format: uuid */
+            paymentAccountId?: string;
+            allocations: components["schemas"]["MobileDebtAllocationDto"][];
+            note?: string;
+        };
+        MobileReturnLineDto: {
+            /** Format: uuid */
+            originalInvoiceItemId: string;
+            quantity: number;
+        };
+        MobileExtraLineDto: {
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemName: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            lineDiscount?: number;
+            /** @description Ghi chú của RIÊNG dòng này — `invoice_items.note`, cùng chỗ mà dòng giỏ bán ghi vào. */
+            note?: string;
+        };
+        MobileExtraPaymentDto: {
+            /** @enum {string} */
+            method: "cash" | "bank_transfer" | "card";
+            amount: number;
+            /** Format: uuid */
+            paymentAccountId?: string;
+        };
+        MobileExchangeDto: {
+            /** Format: uuid */
+            originalInvoiceId: string;
+            reason?: string;
+            returnLines: components["schemas"]["MobileReturnLineDto"][];
+            newLines?: components["schemas"]["MobileExtraLineDto"][];
+            /** @enum {string} */
+            refundMethod: "cash" | "bank";
+            /**
+             * Format: uuid
+             * @description `payment_accounts.id` nhận/chi chuyển khoản — bắt buộc khi `refundMethod = bank`.
+             */
+            paymentAccountId?: string;
+            payments?: components["schemas"]["MobileExtraPaymentDto"][];
+        };
         MobileItemCategoryCreateDto: {
             /** @description Tên nhóm hàng */
             name: string;
@@ -17071,6 +17624,8 @@ export interface components {
             unit: string;
             /** @description Giá nhập mặc định của hàng hoá — điền sẵn vào ô đơn giá khi vừa chọn. Đây là NGOẠI LỆ có cơ sở với luật không-rò-giá-vốn của `/mobile/products`: người lập phiếu nhập buộc phải thấy và sửa được giá nhập. */
             purchasePrice: number;
+            /** @description URL công khai của ảnh ĐẦU TIÊN. Biến thể dùng ảnh của mẫu mã cha, mặt hàng lẻ dùng ảnh của chính nó — cùng luật với POS. NULL khi không có ảnh hoặc kho ảnh chưa cấu hình. */
+            thumbnailUrl: string | null;
         };
         MobileItemPageDto: {
             data: components["schemas"]["MobileItemResponseDto"][];
@@ -17090,6 +17645,8 @@ export interface components {
             name: string;
             /** @description Giá bán. Với mẫu mã có nhiều biến thể thì là giá trung bình của các biến thể */
             sellingPrice: number;
+            /** @description URL ảnh bìa (ảnh đầu tiên). `null` khi chưa có ảnh hoặc kho lưu trữ chưa cấu hình */
+            thumbnailUrl: string | null;
         };
         MobileProductPageDto: {
             data: components["schemas"]["MobileProductResponseDto"][];
@@ -17116,6 +17673,17 @@ export interface components {
             color: string | null;
             /** @description Giá trị thuộc tính `Size`, vd "39". `null` như [color] */
             size: string | null;
+        };
+        MobileProductImageDto: {
+            /**
+             * Format: uuid
+             * @description Id media — thứ gửi lại trong `imageIds`
+             */
+            id: string;
+            /** @description URL công khai, tuyệt đối, không hết hạn */
+            url: string;
+            /** @description Tên file gốc */
+            fileName: string;
         };
         MobileProductDetailResponseDto: {
             /**
@@ -17158,6 +17726,14 @@ export interface components {
             isPosVisible: boolean;
             /** @description Các biến thể, xếp theo mã. RỖNG với item lẻ — app ẩn bảng thuộc tính */
             variants: components["schemas"]["MobileProductVariantDto"][];
+            /**
+             * @description Ảnh của hàng hoá, theo thứ tự hiển thị — ảnh đầu là ảnh bìa.
+             *
+             *     Chủ sở hữu là CHÍNH `id` của dòng: mẫu mã giữ ảnh ở `products.id`, item lẻ
+             *     ở `items.id`. Biến thể KHÔNG có ảnh riêng — cùng luật với web (A-08).
+             *     Rỗng khi chưa có ảnh HOẶC khi kho lưu trữ chưa được cấu hình.
+             */
+            images: components["schemas"]["MobileProductImageDto"][];
         };
         MobileProductVariantInputDto: {
             /** @description Giá trị chiều Màu sắc */
@@ -17230,6 +17806,8 @@ export interface components {
              */
             variants?: components["schemas"]["MobileProductVariantInputDto"][];
             units?: components["schemas"]["MobileProductUnitInputDto"][];
+            /** @description Id ảnh đã upload, theo thứ tự (ảnh đầu là ảnh bìa). Vắng = giữ nguyên; `[]` = xoá hết */
+            imageIds?: string[];
         };
         MobileProductUpdateDto: {
             /** @description Tên hàng hoá */
@@ -17275,6 +17853,8 @@ export interface components {
              */
             variants?: components["schemas"]["MobileProductVariantInputDto"][];
             units?: components["schemas"]["MobileProductUnitInputDto"][];
+            /** @description Id ảnh đã upload, theo thứ tự (ảnh đầu là ảnh bìa). Vắng = giữ nguyên; `[]` = xoá hết */
+            imageIds?: string[];
         };
         MobileEvaluateCartLineDto: {
             /**
@@ -17316,6 +17896,16 @@ export interface components {
              */
             selectedProgramIds?: string[];
             /**
+             * @description Id các chương trình phải bị LOẠI khỏi cuộc đua, kể cả `auto_apply=true`
+             *     (ADR-07 bên web). Nghịch đảo của `selectedProgramIds`: cái kia chỉ THÊM,
+             *     cái này chỉ BỎ, và bỏ thắng khi một id có mặt ở cả hai.
+             *
+             *     Đây là thứ DUY NHẤT diễn tả được thao tác bỏ tick trên màn *Chương trình
+             *     khuyến mại* của app: chương trình `auto_apply=true` luôn tự chạy, nên không
+             *     gửi id của nó xuống thì lượt định giá kế tiếp lại áp nó vào.
+             */
+            excludedProgramIds?: string[];
+            /**
              * @description RỖNG là hợp lệ, có chủ ý: màn *Chương trình khuyến mại* của app bày danh
              *     mục chương trình (`availablePrograms`) trước khi đơn có dòng nào.
              */
@@ -17344,6 +17934,8 @@ export interface components {
             sellingPrice: number;
             /** @description Số biến thể gộp trong dòng. Luôn `1` khi `type=item`. Client dùng nó để biết có phải mở bảng chọn biến thể hay không. */
             variantCount: number;
+            /** @description URL công khai của ảnh ĐẦU TIÊN, hoặc `null` khi hàng chưa có ảnh — và `null` là ca THƯỜNG GẶP, phần lớn danh mục chưa gắn ảnh. Biến thể dùng chung ảnh của mẫu mã cha (A-08 của `media-storage`), nên hai biến thể của cùng một mẫu mã luôn trả cùng URL. URL là tuyệt đối, công khai và KHÔNG hết hạn. */
+            thumbnailUrl?: string | null;
         };
         MobileSalesItemPageDto: {
             data: components["schemas"]["MobileSalesItemResponseDto"][];
@@ -17387,6 +17979,8 @@ export interface components {
             id: string;
             code: string;
             name: string;
+            /** @description URL công khai ảnh đầu tiên của MẪU MÃ, `null` khi chưa có ảnh. Mọi biến thể dùng chung ảnh này nên nó không lặp lại ở từng phần tử `variants`. */
+            thumbnailUrl?: string | null;
             attributes: components["schemas"]["MobileSalesModelAttributeDto"][];
             /** @description Chỉ các biến thể CÒN BÁN ĐƯỢC (`isActive` và `isPosVisible`) — cùng tập đã dựng nên dòng mẫu mã ở danh sách, nên hai màn không lệch nhau. */
             variants: components["schemas"]["MobileSalesVariantDto"][];
@@ -17739,12 +18333,23 @@ export interface components {
              */
             salespersonId?: string;
             /**
+             * @description Điểm tích luỹ khách DỰ KIẾN dùng. `0` hoặc vắng = không dùng.
+             *
+             *     Chỉ được GHI LẠI ở bước này, KHÔNG trừ: đơn chưa có hoá đơn. Thu ngân chốt
+             *     lúc *Nhận xử lý* — xem `SalesOrderEntity.pointsRedeemed`.
+             */
+            pointsRedeemed?: number;
+            /**
              * @description `true` = LƯU TẠM: đơn ở `DRAFT`, chỉ người gửi thấy, thu ngân không thấy.
              *     `PATCH` một đơn `DRAFT` với `isDraft: false` (hoặc vắng) là GỬI nó.
              */
             isDraft?: boolean;
             note?: string;
             lines: components["schemas"]["SalesOrderLineDto"][];
+        };
+        SalesOrderPointsDto: {
+            /** @description `0` = bỏ dự kiến dùng điểm. */
+            points: number;
         };
         RejectSalesOrderDto: {
             /** @description Cùng ngưỡng 5 ký tự với `CancelInvoiceDto.reason`. */
@@ -19786,8 +20391,9 @@ export interface operations {
     PartnerLookupController_customersWithDebt: {
         parameters: {
             query?: {
-                /** @description Case-insensitive match against the customer name or code. */
+                /** @description Case-insensitive match against the customer name, code or phone. */
                 search?: string;
+                sort?: "name" | "debtDesc" | "debtAsc";
                 page?: number;
                 pageSize?: number;
             };
@@ -31405,6 +32011,27 @@ export interface operations {
             };
         };
     };
+    MobileActivityController_record: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileActivityBatchDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     MobileAuthController_login: {
         parameters: {
             query?: never;
@@ -31863,6 +32490,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MobileCustomerResponseDto"];
+                };
+            };
+        };
+    };
+    MobileCustomerController_summaryOf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerSummaryResponseDto"];
                 };
             };
         };
@@ -32692,6 +33340,426 @@ export interface operations {
             };
         };
     };
+    MobileCashierController_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description { open, session | null } */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_cashAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    MobileCashierController_openShift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileOpenShiftDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_startClose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_closeShift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCloseShiftDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_updateDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileUpdateDraftDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_createDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCreateDraftDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_redeemPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileRedeemPointsDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    MobileCashierController_removeRedeemedPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    MobileCashierController_paymentAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCheckoutDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_debtors: {
+        parameters: {
+            query?: {
+                search?: string;
+                sort?: "name" | "debtDesc" | "debtAsc";
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_debtsOf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_collectDebt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCollectDebtDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    MobileCashierController_returnableInvoices: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                search?: string;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_returnableDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_exchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileExchangeDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_shiftReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
     MobileInvoiceController_list: {
         parameters: {
             query?: {
@@ -32737,6 +33805,30 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Hoá đơn đầy đủ; 404 nếu không phải hoá đơn của người gọi */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileInvoiceController_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInvoiceDto"];
+            };
+        };
+        responses: {
+            /** @description Tờ chứng từ sau khi huỷ, cùng hình dạng với GET :id */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -33422,6 +34514,31 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["CreateSalesOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_setPoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesOrderPointsDto"];
             };
         };
         responses: {

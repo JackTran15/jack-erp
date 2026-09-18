@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /** Một chiều biến thiên của mẫu mã và các nhãn nó nhận — vd `Màu sắc: D, BO`. */
 export class MobileSalesModelAttributeDto {
@@ -81,6 +81,14 @@ export class MobileSalesModelDetailDto {
 
   @ApiProperty() code!: string;
   @ApiProperty() name!: string;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'URL công khai ảnh đầu tiên của MẪU MÃ, `null` khi chưa có ảnh. Mọi biến ' +
+      'thể dùng chung ảnh này nên nó không lặp lại ở từng phần tử `variants`.',
+  })
+  thumbnailUrl!: string | null;
 
   @ApiProperty({ type: [MobileSalesModelAttributeDto] })
   attributes!: MobileSalesModelAttributeDto[];
