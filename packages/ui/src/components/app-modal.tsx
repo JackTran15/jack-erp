@@ -117,6 +117,12 @@ export interface AppModalProps {
   bodyClassName?: string;
   /** @default true — body stretches between header and footer. Set false for compact dialogs. */
   bodyStretch?: boolean;
+  /**
+   * Size the frame to its content instead of `defaultHeight`, and keep it in
+   * sync as the content grows or shrinks. Use with `bodyStretch={false}` —
+   * a stretching body has no natural height to measure.
+   */
+  autoHeight?: boolean;
   defaultWidth?: number;
   defaultHeight?: number;
   minWidth?: number;
@@ -141,6 +147,7 @@ function AppModal({
   className,
   bodyClassName,
   bodyStretch = true,
+  autoHeight = false,
   defaultWidth = 520,
   defaultHeight = 440,
   minWidth = DEFAULT_MIN_W,
@@ -174,14 +181,102 @@ function AppModal({
   const contentRef = React.useRef<HTMLDivElement | null>(null);
   const actionRef = React.useRef<Action | null>(null);
 
-  // Re-center whenever the dialog opens.
-  React.useEffect(() => {
+  // Re-center whenever the dialog opens. Must be a layout effect so it lands
+  // before the `autoHeight` measurement below (layout effects run in
+  // declaration order); as a passive effect it would run *after* and overwrite
+  // the measured height with `defaultHeight`.
+  React.useLayoutEffect(() => {
     if (!open) return;
     const next = computeCentered(defaultWidth, defaultHeight, minWidth, minHeight);
     setBounds(next);
     setMaximized(false);
     preMaxRef.current = null;
   }, [open, defaultWidth, defaultHeight, minWidth, minHeight]);
+
+  // `autoHeight`: measure the title bar + natural body + footer and size the
+  // frame to that, so a short form does not leave dead space under the footer.
+  //
+  // Measurement hangs off CALLBACK refs, not an effect: `DialogContent` sits
+  // behind Radix's `Portal`, which renders null until its own layout effect
+  // flips `mounted`. The body/footer therefore do not exist yet while this
+  // component's effects run for the commit that opened the dialog — an effect
+  // reading a plain ref would see null, bail out, and never observe anything.
+  // A callback ref fires exactly when the node attaches, whenever that is.
+  const bodyElRef = React.useRef<HTMLDivElement | null>(null);
+  const footerElRef = React.useRef<HTMLDivElement | null>(null);
+  const autoHeightCenteredRef = React.useRef(false);
+  const autoHeightRef = React.useRef(autoHeight);
+  autoHeightRef.current = autoHeight;
+  // Keeps the frame invisible (but laid out, so it stays measurable) until the
+  // first real measurement lands — otherwise the dialog is painted at
+  // `defaultHeight` first and visibly snaps to its true size.
+  const [autoHeightReady, setAutoHeightReady] = React.useState(false);
+
+  const measureRef = React.useRef<() => void>(() => {});
+  measureRef.current = () => {
+    const body = bodyElRef.current;
+    if (!autoHeightRef.current || maximizedRef.current) return;
+    if (!body || typeof window === "undefined") return;
+
+    // A zero height means the browser has not laid the subtree out yet.
+    // Acting on it would size the frame to `minHeight` and then correct it a
+    // frame later, which reads as the dialog resizing itself on open.
+    if (body.offsetHeight === 0) return;
+
+    const natural =
+      TITLE_H + body.offsetHeight + (footerElRef.current?.offsetHeight ?? 0);
+
+    setBounds((prev) => {
+      const h = clamp(
+        natural,
+        minHeightRef.current,
+        window.innerHeight - VIEW_MARGIN * 2,
+      );
+      setAutoHeightReady(true);
+      if (h === prev.h) return prev;
+      // First measurement after opening re-centers; later ones (a form that
+      // reveals more fields) keep the top edge so the dialog does not jump.
+      if (autoHeightCenteredRef.current) return { ...prev, h };
+      autoHeightCenteredRef.current = true;
+      return {
+        ...prev,
+        h,
+        y: Math.max(VIEW_MARGIN, Math.round((window.innerHeight - h) / 2)),
+      };
+    });
+  };
+
+  const resizeObserverRef = React.useRef<ResizeObserver | null>(null);
+  if (resizeObserverRef.current === null && typeof ResizeObserver !== "undefined") {
+    resizeObserverRef.current = new ResizeObserver(() => measureRef.current());
+  }
+
+  const trackElement = React.useCallback(
+    (ref: React.MutableRefObject<HTMLDivElement | null>) =>
+      (node: HTMLDivElement | null) => {
+        const observer = resizeObserverRef.current;
+        if (ref.current && observer) observer.unobserve(ref.current);
+        ref.current = node;
+        if (node && observer) observer.observe(node);
+        measureRef.current();
+      },
+    [],
+  );
+  const setBodyEl = React.useMemo(() => trackElement(bodyElRef), [trackElement]);
+  const setFooterEl = React.useMemo(() => trackElement(footerElRef), [trackElement]);
+
+  React.useEffect(() => () => resizeObserverRef.current?.disconnect(), []);
+
+  // A fresh open must re-center and re-measure from scratch; un-maximizing must
+  // re-fit.
+  React.useEffect(() => {
+    if (!open) {
+      autoHeightCenteredRef.current = false;
+      setAutoHeightReady(false);
+    } else {
+      measureRef.current();
+    }
+  }, [open, maximized]);
 
   React.useEffect(() => {
     const unsubscribe = subscribeModalStack(forceStackRender);
@@ -412,7 +507,15 @@ function AppModal({
         freePosition
         className={cn("gap-0 p-0 [contain:layout_paint]", className)}
         overlayClassName="hidden"
-        style={{ ...frameStyle, zIndex: contentZIndex }}
+        style={{
+          ...frameStyle,
+          zIndex: contentZIndex,
+          // Transparent rather than `visibility: hidden` or unmounted: the
+          // content still has to lay out so `autoHeight` can measure it, and it
+          // must stay focusable for Radix's focus scope, which focuses the
+          // dialog on mount — before the measurement lands.
+          opacity: autoHeight && !autoHeightReady ? 0 : undefined,
+        }}
         onPointerDownOutside={(event) => {
           if (preventOutsideClose) { event.preventDefault(); return; }
           const target = event.target as Element | null;
@@ -489,6 +592,7 @@ function AppModal({
           </div>
 
           <div
+            ref={setBodyEl}
             className={cn(
               "flex min-h-0 flex-col gap-2 overflow-hidden px-4",
               bodyStretch ? "pt-3" : "py-4",
@@ -513,23 +617,32 @@ function AppModal({
 
           {showFooter ? (
             footer ? (
-              <div className="shrink-0 border-t bg-background px-4 py-3">{footer}</div>
+              <div
+                ref={setFooterEl}
+                className="shrink-0 border-t bg-background px-4 py-3"
+              >
+                {footer}
+              </div>
             ) : (
-              <DialogFooter className="shrink-0 gap-2 border-t bg-background px-4 py-3 sm:justify-end">
-                <Button type="button" variant="outline" onClick={handleCancel}>
-                  {cancelLabel}
-                </Button>
-                {onSave ? (
-                  <Button
-                    type="button"
-                    className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
-                    disabled={saveDisabled}
-                    onClick={() => void onSave()}
-                  >
-                    {saveLabel}
+              // Wrapped in a div because DialogFooter does not forward a ref,
+              // and `autoHeight` has to measure the footer's real height.
+              <div ref={setFooterEl} className="shrink-0">
+                <DialogFooter className="gap-2 border-t bg-background px-4 py-3 sm:justify-end">
+                  <Button type="button" variant="outline" onClick={handleCancel}>
+                    {cancelLabel}
                   </Button>
-                ) : null}
-              </DialogFooter>
+                  {onSave ? (
+                    <Button
+                      type="button"
+                      className="!bg-primary-blue !text-white hover:!bg-primary-blue-hover"
+                      disabled={saveDisabled}
+                      onClick={() => void onSave()}
+                    >
+                      {saveLabel}
+                    </Button>
+                  ) : null}
+                </DialogFooter>
+              </div>
             )
           ) : null}
         </div>
