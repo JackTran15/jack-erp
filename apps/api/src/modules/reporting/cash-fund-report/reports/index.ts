@@ -4,6 +4,7 @@ import { CashFundPeriodService } from '../services/cash-fund-period.service';
 import { ExpenseLinesQuery } from '../services/expense-lines.query';
 import { CashInOutListReport } from './cash-in-out-list.report';
 import { CashInOutSituationReport } from './cash-in-out-situation.report';
+import { ExpenseListByCategoryReport } from './expense-list-by-category.report';
 import { ExpensesByCategoryReport } from './expenses-by-category.report';
 import { ExpensesByTimeReport } from './expenses-by-time.report';
 
@@ -17,6 +18,7 @@ export const CASH_FUND_REPORT_DEFINITIONS: Type<ReportDefinition>[] = [
   CashInOutSituationReport,
   CashInOutListReport,
   ExpensesByCategoryReport,
+  ExpenseListByCategoryReport,
   ExpensesByTimeReport,
 ];
 
