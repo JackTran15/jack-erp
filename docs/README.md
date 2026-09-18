@@ -43,6 +43,7 @@ This folder contains the enterprise-ready blueprint for building an ERP system w
 - [Generic CRUD Platform](./21-generic-crud-platform.md)
 - [Debt Reports Spec](./24-debt-reports-spec.md)
 - [Partner Catalog API](./partner-catalog-api.md) — read-only catalogue surface for third-party storefronts
+- [Geo API](./geo-api.md) — provinces and wards lookup for third-party callers (API key or JWT, no permission)
 
 ### Entity Schema Reference
 

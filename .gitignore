@@ -45,3 +45,5 @@ graphify-out
 
 # Activity log của app mobile (MobileActivityLogWriter)
 apps/api/logs/
+# cURL/Postman cases for the Geo API — local only
+docs/geo-api-curls/

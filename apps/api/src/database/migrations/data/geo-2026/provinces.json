@@ -1,0 +1,538 @@
+[
+  {
+    "code": "2026_01",
+    "name": "Hà Nội",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_01",
+        "name": "Hà Nội"
+      }
+    ]
+  },
+  {
+    "code": "2026_04",
+    "name": "Cao Bằng",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_06",
+        "name": "Cao Bằng"
+      }
+    ]
+  },
+  {
+    "code": "2026_08",
+    "name": "Tuyên Quang",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_05",
+        "name": "Hà Giang"
+      },
+      {
+        "code": "1995_09",
+        "name": "Tuyên Quang"
+      }
+    ]
+  },
+  {
+    "code": "2026_11",
+    "name": "Điện Biên",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_62",
+        "name": "Điện Biên"
+      }
+    ]
+  },
+  {
+    "code": "2026_12",
+    "name": "Lai Châu",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_07",
+        "name": "Lai Châu"
+      }
+    ]
+  },
+  {
+    "code": "2026_14",
+    "name": "Sơn La",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_14",
+        "name": "Sơn La"
+      }
+    ]
+  },
+  {
+    "code": "2026_15",
+    "name": "Lào Cai",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_08",
+        "name": "Lào Cai"
+      },
+      {
+        "code": "1995_13",
+        "name": "Yên Bái"
+      }
+    ]
+  },
+  {
+    "code": "2026_19",
+    "name": "Thái Nguyên",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_11",
+        "name": "Bắc Kạn"
+      },
+      {
+        "code": "1995_12",
+        "name": "Thái Nguyên"
+      }
+    ]
+  },
+  {
+    "code": "2026_20",
+    "name": "Lạng Sơn",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_10",
+        "name": "Lạng Sơn"
+      }
+    ]
+  },
+  {
+    "code": "2026_22",
+    "name": "Quảng Ninh",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_17",
+        "name": "Quảng Ninh"
+      }
+    ]
+  },
+  {
+    "code": "2026_24",
+    "name": "Bắc Ninh",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_18",
+        "name": "Bắc Giang"
+      },
+      {
+        "code": "1995_19",
+        "name": "Bắc Ninh"
+      }
+    ]
+  },
+  {
+    "code": "2026_25",
+    "name": "Phú Thọ",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_15",
+        "name": "Phú Thọ"
+      },
+      {
+        "code": "1995_16",
+        "name": "Vĩnh Phúc"
+      },
+      {
+        "code": "1995_23",
+        "name": "Hoà Bình"
+      }
+    ]
+  },
+  {
+    "code": "2026_31",
+    "name": "Hải Phòng",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_03",
+        "name": "Hải Phòng"
+      },
+      {
+        "code": "1995_21",
+        "name": "Hải Dương"
+      }
+    ]
+  },
+  {
+    "code": "2026_33",
+    "name": "Hưng Yên",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_22",
+        "name": "Hưng Yên"
+      },
+      {
+        "code": "1995_26",
+        "name": "Thái Bình"
+      }
+    ]
+  },
+  {
+    "code": "2026_37",
+    "name": "Ninh Bình",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_24",
+        "name": "Hà Nam"
+      },
+      {
+        "code": "1995_25",
+        "name": "Nam Định"
+      },
+      {
+        "code": "1995_27",
+        "name": "Ninh Bình"
+      }
+    ]
+  },
+  {
+    "code": "2026_38",
+    "name": "Thanh Hoá",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_28",
+        "name": "Thanh Hoá"
+      }
+    ]
+  },
+  {
+    "code": "2026_40",
+    "name": "Nghệ An",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_29",
+        "name": "Nghệ An"
+      }
+    ]
+  },
+  {
+    "code": "2026_42",
+    "name": "Hà Tĩnh",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_30",
+        "name": "Hà Tĩnh"
+      }
+    ]
+  },
+  {
+    "code": "2026_44",
+    "name": "Quảng Trị",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_31",
+        "name": "Quảng Bình"
+      },
+      {
+        "code": "1995_32",
+        "name": "Quảng Trị"
+      }
+    ]
+  },
+  {
+    "code": "2026_46",
+    "name": "Thành phố Huế",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_33",
+        "name": "Thành phố Huế"
+      }
+    ]
+  },
+  {
+    "code": "2026_48",
+    "name": "Đà Nẵng",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_04",
+        "name": "Đà Nẵng"
+      },
+      {
+        "code": "1995_34",
+        "name": "Quảng Nam"
+      }
+    ]
+  },
+  {
+    "code": "2026_51",
+    "name": "Quảng Ngãi",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_35",
+        "name": "Quảng Ngãi"
+      },
+      {
+        "code": "1995_36",
+        "name": "Kon Tum"
+      }
+    ]
+  },
+  {
+    "code": "2026_52",
+    "name": "Gia Lai",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_37",
+        "name": "Bình Định"
+      },
+      {
+        "code": "1995_38",
+        "name": "Gia Lai"
+      }
+    ]
+  },
+  {
+    "code": "2026_56",
+    "name": "Khánh Hoà",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_41",
+        "name": "Khánh Hoà"
+      },
+      {
+        "code": "1995_45",
+        "name": "Ninh Thuận"
+      }
+    ]
+  },
+  {
+    "code": "2026_66",
+    "name": "Đắk Lắk",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_39",
+        "name": "Phú Yên"
+      },
+      {
+        "code": "1995_40",
+        "name": "Đắk Lắk"
+      }
+    ]
+  },
+  {
+    "code": "2026_68",
+    "name": "Lâm Đồng",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_42",
+        "name": "Lâm Đồng"
+      },
+      {
+        "code": "1995_47",
+        "name": "Bình Thuận"
+      },
+      {
+        "code": "1995_63",
+        "name": "Đắk Nông"
+      }
+    ]
+  },
+  {
+    "code": "2026_75",
+    "name": "Đồng Nai",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_43",
+        "name": "Bình Phước"
+      },
+      {
+        "code": "1995_48",
+        "name": "Đồng Nai"
+      }
+    ]
+  },
+  {
+    "code": "2026_79",
+    "name": "Tp. Hồ Chí Minh",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_02",
+        "name": "Tp. Hồ Chí Minh"
+      },
+      {
+        "code": "1995_44",
+        "name": "Bình Dương"
+      },
+      {
+        "code": "1995_52",
+        "name": "Bà Rịa-Vũng Tàu"
+      }
+    ]
+  },
+  {
+    "code": "2026_80",
+    "name": "Tây Ninh",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_46",
+        "name": "Tây Ninh"
+      },
+      {
+        "code": "1995_49",
+        "name": "Long An"
+      }
+    ]
+  },
+  {
+    "code": "2026_82",
+    "name": "Đồng Tháp",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_50",
+        "name": "Đồng Tháp"
+      },
+      {
+        "code": "1995_53",
+        "name": "Tiền Giang"
+      }
+    ]
+  },
+  {
+    "code": "2026_86",
+    "name": "Vĩnh Long",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_56",
+        "name": "Bến Tre"
+      },
+      {
+        "code": "1995_57",
+        "name": "Vĩnh Long"
+      },
+      {
+        "code": "1995_58",
+        "name": "Trà Vinh"
+      }
+    ]
+  },
+  {
+    "code": "2026_91",
+    "name": "An Giang",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_51",
+        "name": "An Giang"
+      },
+      {
+        "code": "1995_54",
+        "name": "Kiên Giang"
+      }
+    ]
+  },
+  {
+    "code": "2026_92",
+    "name": "Cần Thơ",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_55",
+        "name": "Cần Thơ"
+      },
+      {
+        "code": "1995_59",
+        "name": "Sóc Trăng"
+      },
+      {
+        "code": "1995_64",
+        "name": "Hậu Giang"
+      }
+    ]
+  },
+  {
+    "code": "2026_96",
+    "name": "Cà Mau",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_60",
+        "name": "Bạc Liêu"
+      },
+      {
+        "code": "1995_61",
+        "name": "Cà Mau"
+      }
+    ]
+  },
+  {
+    "code": "2026_99",
+    "name": "Cục nhà trường",
+    "isActive": true,
+    "effectiveFrom": "2026-01-01",
+    "mergedFrom": [
+      {
+        "code": "1995_65",
+        "name": "Cục nhà trường"
+      }
+    ]
+  }
+]

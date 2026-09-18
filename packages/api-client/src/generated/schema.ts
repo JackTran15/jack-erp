@@ -9198,6 +9198,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/geo/provinces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách tỉnh/thành hiện hành, tìm theo tên không dấu */
+        get: operations["GeoController_listProvinces_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/geo/provinces/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một tỉnh/thành theo mã */
+        get: operations["GeoController_findProvince_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/geo/wards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tìm phường/xã theo tên không dấu, lọc theo tỉnh, phân trang
+         * @description Mặc định chỉ trả phường hiện hành. `includeLegacy=true` thêm phường cũ; `provinceCode=1995_xx` trả phường cũ của tỉnh đó. Sắp theo tên không dấu, rồi mã tỉnh, rồi mã phường.
+         */
+        get: operations["GeoController_searchWards_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/geo/wards/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Một phường/xã theo mã */
+        get: operations["GeoController_findWard_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/media/uploads": {
         parameters: {
             query?: never;
@@ -17238,12 +17309,16 @@ export interface components {
             name: string;
             /** @description Doanh thu ròng của nhóm trong kỳ, đơn vị đồng */
             revenue: number;
+            /** @description Số lượng bán ròng của nhóm trong kỳ (trả hàng trừ ra, nên ÂM được). Cùng phép cộng `SUM(qty)` mà `items` đang dùng, nên hai màn không lệch. */
+            quantity: number;
         };
         MobileRevenueCategoryListDto: {
             /** @description Sắp doanh thu giảm dần, cùng doanh thu thì theo tên */
             data: components["schemas"]["MobileRevenueCategoryDto"][];
             /** @description Tổng doanh thu của các nhóm trong `data` */
             totalRevenue: number;
+            /** @description Tổng số lượng của các nhóm trong `data` */
+            totalQuantity: number;
         };
         MobileRevenuePointDto: {
             /** @example 2026-09-01T09:00:00 */
@@ -18473,6 +18548,54 @@ export interface components {
             description: string | null;
             attributes: components["schemas"]["PartnerAttributeDto"][];
             variants: components["schemas"]["PartnerVariantDto"][];
+        };
+        ProvinceMergedFromDto: {
+            /** @description Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này */
+            code: string;
+            name: string;
+        };
+        ProvinceDto: {
+            /** @example 2026_01 */
+            code: string;
+            /** @example Hà Nội */
+            name: string;
+            isActive: boolean;
+            /**
+             * @description Ngày hiệu lực, YYYY-MM-DD
+             * @example 2026-01-01
+             */
+            effectiveFrom: string;
+            /** @description Các tỉnh cũ đã sáp nhập vào; dùng để ánh xạ địa chỉ ghi theo mã 1995_xx */
+            mergedFrom: components["schemas"]["ProvinceMergedFromDto"][];
+        };
+        ProvinceListResponseDto: {
+            data: components["schemas"]["ProvinceDto"][];
+        };
+        WardDto: {
+            /**
+             * @description Mã phường — chỉ duy nhất trong cặp (provinceCode, code)
+             * @example 4
+             */
+            code: string;
+            /** @example Phường Ba Đình */
+            name: string;
+            /** @example 2026_01 */
+            provinceCode: string;
+            /**
+             * @description Tên tỉnh hiện hành; null với phường cũ (mã 1995_xx không còn là tỉnh)
+             * @example Hà Nội
+             */
+            provinceName: string | null;
+            /** @description Mã quận/huyện, chỉ có ở phường cũ */
+            districtCode: string | null;
+            /** @description true khi provinceCode là một tỉnh hiện hành */
+            isCurrent: boolean;
+        };
+        WardSearchResponseDto: {
+            data: components["schemas"]["WardDto"][];
+            total: number;
+            page: number;
+            limit: number;
         };
         CreateMediaUploadDto: {
             /**
@@ -34690,6 +34813,117 @@ export interface operations {
                 };
             };
             /** @description Product not found — unknown code, another organization's code, or no active variant. The same response for all three. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GeoController_listProvinces_v2: {
+        parameters: {
+            query?: {
+                /** @description Tìm theo tên, không phân biệt dấu và hoa/thường ("ha noi" khớp "Hà Nội"). Ký tự % và _ là ký tự thường, không phải wildcard. */
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvinceListResponseDto"];
+                };
+            };
+        };
+    };
+    GeoController_findProvince_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mã tỉnh hiện hành (2026_xx). Mã cũ (1995_xx) chỉ nằm trong mergedFrom → 404 */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvinceDto"];
+                };
+            };
+            /** @description Không có tỉnh/thành với mã này */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    GeoController_searchWards_v2: {
+        parameters: {
+            query?: {
+                /** @description Tìm theo tên, không phân biệt dấu và hoa/thường ("phuc xa" khớp "Phường Phúc Xá"). % và _ là ký tự thường. */
+                q?: string;
+                /** @description Lọc đúng một tỉnh. Mã 2026_xx → phường hiện hành; mã 1995_xx → phường cũ của tỉnh đó (khi có provinceCode thì includeLegacy không còn tác dụng). */
+                provinceCode?: string;
+                /** @description Chỉ dùng khi không có provinceCode: false → chỉ phường hiện hành (isCurrent = true); true → cả phường cũ (cấu trúc trước sáp nhập). */
+                includeLegacy?: boolean;
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WardSearchResponseDto"];
+                };
+            };
+        };
+    };
+    GeoController_findWard_v2: {
+        parameters: {
+            query?: {
+                /** @description Bỏ trống → tra phường hiện hành có mã này (mã phường duy nhất trong một thời kỳ). Truyền 1995_xx để tra phường cũ. */
+                provinceCode?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Mã phường. Không kèm provinceCode → tra bộ hiện hành; kèm 1995_xx → phường cũ */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WardDto"];
+                };
+            };
+            /** @description Không có phường/xã với mã này (trong thời kỳ đã chọn) */
             404: {
                 headers: {
                     [name: string]: unknown;
