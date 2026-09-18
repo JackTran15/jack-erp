@@ -34,6 +34,6 @@ rollback: revert 3 file in; hóa đơn đã in là giấy — không có gì đ�
 | Mẫu in nhiệt hẹp, hai nhãn dài làm vỡ dòng | Nhãn là `div.line-sub` riêng, đã có với ghi chú/giảm tay; kiểm ảnh ở 480px |
 
 ## Definition of done
-- [ ] AC-11, AC-12, AC-13 có bằng chứng HTML in (assert `div.line-sub` + cột TT từng dòng)
-- [ ] Khối tổng hóa đơn in **không đổi** so với ảnh `POS-05` của feature 2026091803
-- [ ] `tsc --noEmit` xanh; không file ngoài `touches:`
+- [x] AC-11, AC-12, AC-13 có bằng chứng HTML in (assert `div.line-sub` + cột TT từng dòng) — `07-verification.md`
+- [x] Khối tổng hóa đơn in **không đổi** so với ảnh `POS-05` của feature 2026091803 — cùng 5 `div.row`, cùng số
+- [x] `tsc --noEmit` xanh; không file ngoài `touches:` — commit T-02-01/T-02-02 đúng file khai

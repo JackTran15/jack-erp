@@ -186,6 +186,109 @@ def lines(page):
     page.screenshot(path=str(EVIDENCE / "L-06-bo-ctkm-a-ac06.png"))
 
 
+def receipt_from_iframe(page, ctx, png: str):
+    """Lift the printed HTML out of the printer's hidden iframe (window.print is
+    stubbed so `onafterprint` never removes it), open it standalone and return
+    (page, rows) where rows = one dict per <tr> in the item table."""
+    page.wait_for_selector('iframe[aria-hidden="true"]', state="attached", timeout=15000)
+    page.wait_for_timeout(1500)
+    frame = next((f for f in page.frames if f != page.main_frame and "col-name" in f.content()), None)
+    if frame is None:
+        raise RuntimeError("receipt iframe not found")
+    html = frame.content()
+    tmp = EVIDENCE / (png + ".html")
+    tmp.write_text(html, encoding="utf-8")
+    rp = ctx.new_page()
+    rp.set_viewport_size({"width": 480, "height": 900})
+    rp.goto(tmp.as_uri(), wait_until="load")
+    rp.wait_for_timeout(400)
+    rp.screenshot(path=str(EVIDENCE / png), full_page=True)
+    rows = []
+    for tr in rp.locator("table tr:has(td.col-name)").all():
+        name_cell = tr.locator("td.col-name")
+        rows.append({
+            "name": name_cell.evaluate("el => el.firstChild && el.firstChild.textContent.trim()"),
+            "subs": name_cell.locator("div.line-sub").all_inner_texts(),
+            "price": tr.locator("td.col-price").inner_text().strip(),
+            "total": tr.locator("td.col-total").inner_text().strip(),
+        })
+    totals = {}
+    for label in ("Tiền hàng", "Giảm giá", "Khuyến mãi", "KM theo mặt hàng", "KM theo hóa đơn", "Tổng thanh toán"):
+        loc = rp.locator(f'div.row:has-text("{label}")').first
+        totals[label] = " ".join(loc.inner_text().split()) if loc.count() else None
+    rp.close()
+    tmp.unlink()
+    # With print() stubbed, `onafterprint` never fires, so the printer's promise
+    # (and the "In tạm tính" button's busy state) would hang for its 60s
+    # timeout. Fire the handler ourselves — it removes the iframe and resolves.
+    page.evaluate(
+        "() => document.querySelectorAll('iframe[aria-hidden=\"true\"]').forEach(f => {"
+        " const w = f.contentWindow; if (w && typeof w.onafterprint === 'function') w.onafterprint(new Event('afterprint')); else f.remove(); })"
+    )
+    page.wait_for_timeout(300)
+    return rows, totals
+
+
+def receipt(page, ctx):
+    print("== --receipt")
+    add_sku(page, "SKU-685")
+    add_sku(page, "SKU-100")
+    page.click('button[aria-label="In tạm tính"]:has-text("Alt + P")')
+    rows, totals = receipt_from_iframe(page, ctx, "R-01-tam-tinh-ac11.png")
+    for r in rows:
+        print("  ", r)
+    for k, v in totals.items():
+        print("  ", v)
+    r685 = next(r for r in rows if "685" in r["name"])
+    r100 = next(r for r in rows if "100" in r["name"])
+    check("AC-11 SKU-685 line", r685["subs"] == [LABEL_A] and r685["price"] == "685.000" and r685["total"] == "616.500", str(r685))
+    check("AC-11 SKU-100 line", r100["subs"] == [LABEL_B] and r100["price"] == "100.000" and r100["total"] == "100.000", str(r100))
+    check("AC-11 totals unchanged", totals["Tiền hàng"].endswith("785.000") and totals["Khuyến mãi"].endswith("78.500")
+          and totals["KM theo mặt hàng"].endswith("68.500") and totals["KM theo hóa đơn"].endswith("10.000")
+          and totals["Tổng thanh toán"].endswith("706.500"), str(totals))
+
+    manual_discount(page, "SKU-685", 50000, "test")
+    page.click('button[aria-label="In tạm tính"]:has-text("Alt + P")')
+    rows, totals = receipt_from_iframe(page, ctx, "R-02-giam-tay-ac13.png")
+    r685 = next(r for r in rows if "685" in r["name"])
+    print("  ", r685)
+    for v in totals.values():
+        print("  ", v)
+    check("AC-13 stacked labels on print", r685["subs"] == ["KM 50.000 - test", LABEL_A] and r685["total"] == "566.500", str(r685))
+    check("AC-13 totals", (totals["Giảm giá"] or "").endswith("50.000") and totals["KM theo mặt hàng"].endswith("68.500")
+          and totals["Tổng thanh toán"].endswith("656.500"), str(totals))
+
+
+def checkout(page, ctx):
+    """Thu tiền with printing ON — the printed invoice must match the estimate (AC-12).
+    Leaves a paid invoice behind; its code is printed for UOW-03."""
+    print("== --checkout")
+    add_sku(page, "SKU-685")
+    add_sku(page, "SKU-100")
+    toggle = page.locator('[aria-label="In hóa đơn"]').first
+    if toggle.get_attribute("aria-checked") != "true":
+        toggle.click()
+    page.click('button[aria-label="Thu tiền"]')
+    try:
+        page.wait_for_selector('button:has-text("Có")', timeout=8000)
+        page.click('button:has-text("Có")')
+    except Exception:
+        pass
+    rows, totals = receipt_from_iframe(page, ctx, "R-03-sau-thu-tien-ac12.png")
+    for r in rows:
+        print("  ", r)
+    for v in totals.values():
+        print("  ", v)
+    r685 = next(r for r in rows if "685" in r["name"])
+    r100 = next(r for r in rows if "100" in r["name"])
+    check("AC-12 printed invoice lines", r685["subs"] == [LABEL_A] and r685["total"] == "616.500"
+          and r100["subs"] == [LABEL_B] and r100["total"] == "100.000")
+    check("AC-12 printed totals", totals["Tổng thanh toán"].endswith("706.500"), str(totals))
+    page.wait_for_function(
+        "() => ![...document.querySelectorAll('tr')].some(tr => tr.innerText.includes('SKU-685'))", timeout=30000)
+    print("  checkout committed, cart reset")
+
+
 def main():
     EVIDENCE.mkdir(exist_ok=True)
     with sync_playwright() as p:
@@ -195,6 +298,10 @@ def main():
         page = login(ctx)
         if "--lines" in sys.argv:
             lines(page)
+        if "--receipt" in sys.argv:
+            receipt(page, ctx)
+        if "--checkout" in sys.argv:
+            checkout(page, ctx)
         browser.close()
     print("RESULT:", "PASS" if not failures else f"FAIL {failures}")
     sys.exit(0 if not failures else 1)

@@ -115,13 +115,60 @@ feature 2026091803).
 
 ---
 
+## UOW-02 — Hóa đơn in lúc bán
+
+```
+capture-pos-evidence.py --receipt     # In tạm tính, 2 kịch bản
+capture-pos-evidence.py --checkout    # Thu tiền với "In hóa đơn" bật — TẠO hóa đơn thật
+```
+
+HTML in được lấy từ iframe của `BrowserWindowInvoicePrinter` (headless stub
+`window.print`, rồi tự gọi `onafterprint` để nhả trạng thái "đang in"), mở lại
+ở 480px và đọc từng `tr`/`div.row`.
+
+### AC-11 — In tạm tính, giỏ SKU-685 + SKU-100 ✅
+
+```
+{'name': 'Giày nữ 685 - claude', 'subs': ['CTKM-A hang hoa 10% SKU-685 - claude (68.500)'], 'price': '685.000', 'total': '616.500'}
+{'name': 'Phụ kiện 100 - claude', 'subs': ['CTKM-B hoa don 10% NON_PROMO_ONLY - claude (10.000)'], 'price': '100.000', 'total': '100.000'}
+Tiền hàng 785.000 · Khuyến mãi 78.500 · KM theo mặt hàng 68.500 · KM theo hóa đơn 10.000 · Tổng thanh toán: 706.500
+```
+
+Khối tổng **y hệt** ảnh `POS-05` của feature 2026091803 (A-05); chỉ dòng hàng
+thêm nhãn và TT sau CTKM hàng hóa.
+
+![R-01](evidence/R-01-tam-tinh-ac11.png)
+
+### AC-13 — giảm tay 50.000 + CTKM-A trên cùng dòng in ✅
+
+```
+{'name': 'Giày nữ 685 - claude', 'subs': ['KM 50.000 - test', 'CTKM-A hang hoa 10% SKU-685 - claude (68.500)'], 'price': '685.000', 'total': '566.500'}
+Tiền hàng 785.000 · Giảm giá 50.000 · Khuyến mãi 78.500 · KM theo mặt hàng 68.500 · KM theo hóa đơn 10.000 · Tổng thanh toán: 656.500
+```
+
+![R-02](evidence/R-02-giam-tay-ac13.png)
+
+### AC-12 — hóa đơn in sau Thu tiền ✅
+
+`--checkout` với *In hóa đơn* bật → hóa đơn **`2609180004`** (`paid`,
+`discount_amount` 78.500, `amount_due` 706.500). HTML in giống tạm tính từng
+nhãn, từng số (cùng `renderInvoiceHtml`, cùng payload từ
+`buildCheckoutInvoicePayload`).
+
+![R-03](evidence/R-03-sau-thu-tien-ac12.png)
+
+Hóa đơn `2609180004` (và `2609180003` từ feature trước) là dữ liệu cho UOW-03.
+
+---
+
 ## Dữ liệu để lại
 
-Không tạo gì mới: `--lines` chỉ thao tác trên giỏ chưa thu tiền. Fixture
-`SKU-685`/`SKU-100`/`KM000003`/`KM000004` (`- claude`) trên `erp_dev_3008` giữ
-nguyên từ feature 2026091803.
+- `--lines`/`--receipt` không tạo gì: chỉ thao tác trên giỏ chưa thu tiền.
+- `--checkout` tạo hóa đơn `2609180004` (`paid`, 706.500, bán vượt tồn) trên
+  `erp_dev_3008`.
+- Fixture `SKU-685`/`SKU-100`/`KM000003`/`KM000004` (`- claude`) giữ nguyên từ
+  feature 2026091803.
 
 ## Chưa kiểm chứng ở đây
 
-- AC-11..AC-13 (hóa đơn in lúc bán) — UOW-02.
 - AC-14..AC-17 (hóa đơn đã lưu, hồi quy) — UOW-03.

@@ -102,3 +102,18 @@ history:
     at: 2026-09-18T16:50:42
     by: Claude
     ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T16:50:51
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T16:51:25
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T16:51:25
+    by: Claude
+    ticket: T-02-02
