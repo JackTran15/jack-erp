@@ -18,6 +18,10 @@ export interface SingleSelectProps {
   /** Extra classes for the dropdown option rows (e.g. "text-xs" for dense filters). */
   contentClassName?: string;
   disabled?: boolean;
+  /** Show a filter box above the options and match them against `label`. */
+  searchable?: boolean;
+  /** Placeholder of the filter box; only used when `searchable`. */
+  searchPlaceholder?: string;
 }
 
 function SingleSelect({
@@ -28,9 +32,23 @@ function SingleSelect({
   className,
   contentClassName,
   disabled,
+  searchable,
+  searchPlaceholder = "Tìm kiếm…",
 }: SingleSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
   const selectedLabel = options.find((o) => o.value === value)?.label ?? placeholder;
+
+  // Start every visit to the list from an unfiltered view.
+  React.useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
+
+  const q = search.trim().toLowerCase();
+  const visibleOptions =
+    searchable && q !== ""
+      ? options.filter((o) => o.label.toLowerCase().includes(q))
+      : options;
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -51,8 +69,30 @@ function SingleSelect({
         sideOffset={4}
         className="z-50 w-[--radix-popover-trigger-width] rounded-md border bg-popover p-1 shadow-md"
       >
+        {searchable ? (
+          <input
+            autoFocus
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder}
+            className={cn(
+              "mb-1 w-full rounded-sm border-b border-border bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground",
+              contentClassName,
+            )}
+          />
+        ) : null}
         <div className="max-h-60 overflow-y-auto">
-          {options.map((opt) => {
+          {searchable && visibleOptions.length === 0 ? (
+            <p
+              className={cn(
+                "px-2 py-1.5 text-sm text-muted-foreground",
+                contentClassName,
+              )}
+            >
+              Không tìm thấy kết quả
+            </p>
+          ) : null}
+          {visibleOptions.map((opt) => {
             const selected = opt.value === value;
             return (
               <button

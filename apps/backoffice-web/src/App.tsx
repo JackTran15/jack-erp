@@ -6,7 +6,7 @@ import { RequireAuth } from "./components/auth/RequireAuth";
 import { BackofficeLayout } from "./components/layout/BackofficeLayout";
 import { LoginPage } from "./pages/auth/LoginPage";
 import { TenantSetupPage } from "./pages/setup/TenantSetupPage";
-import { DashboardPage } from "./pages/DashboardPage";
+import { OverviewPage } from "./pages/overview/OverviewPage";
 import { CrudListPage } from "./components/crud/CrudListPage";
 import { CrudCreatePage } from "./components/crud/CrudCreatePage";
 import { ProviderGroupListPage } from "./pages/inventory/ProviderGroupListPage";
@@ -93,7 +93,7 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<RequireAuth />}>
               <Route element={<BackofficeLayout />}>
-                <Route path="/" element={<DashboardPage />} />
+                <Route path="/" element={<OverviewPage />} />
                 <Route path="/admin/employees" element={<EmployeesPage />} />
                 <Route
                   path="/admin/provider-groups"
