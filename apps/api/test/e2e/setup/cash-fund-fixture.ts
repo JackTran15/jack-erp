@@ -40,6 +40,10 @@ import { RbacService } from '../../../src/modules/rbac/rbac.service';
  * - PC-06 is written by a second user assigned to branch B only: `ActorContext`
  *   takes the branch from the JWT (`branchIds[0]`), so the admin token cannot
  *   act under B by switching `X-Branch-Id`.
+ * - Every voucher carries a staff (`staff_id` / `collected_by`): the admin on
+ *   branch A, the branch-B user on PC-06 — and both users have an
+ *   `employee_profiles` row, which is what the "Nhân viên" filter option and
+ *   the `employeeIds` filter of "Bảng kê thu chi" read (AC-09).
  */
 export interface CashFundFixture {
   branchAId: string;
@@ -75,6 +79,11 @@ export interface CashFundFixture {
   };
   /** Admin-role user assigned to branch B only (wrote PC-06). */
   branchBUser: { userId: string; accessToken: string };
+  /** "Nhân viên thu/chi" of the vouchers: the admin on every branch-A voucher, the branch-B user on PC-06. */
+  staff: {
+    admin: { userId: string; code: string; name: string };
+    branchB: { userId: string; code: string; name: string };
+  };
 }
 
 /** Every permission the fixture and the cash-fund e2e suites need on the admin role. */
@@ -230,6 +239,19 @@ export async function seedCashFundFixture(
     branchIds: [branchBId],
   });
 
+  // ---- employee profiles: the two users who sign the vouchers --------------
+  const staff = {
+    admin: { userId: seed.userId, code: 'NV-A', name: 'Admin User' },
+    branchB: { userId: branchBUser.userId, code: 'NV-B', name: 'E2E User' },
+  };
+  for (const s of [staff.admin, staff.branchB]) {
+    await ds.query(
+      `INSERT INTO employee_profiles (id, organization_id, user_id, code, created_by, created_at, updated_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW(), NOW())`,
+      [seed.organizationId, s.userId, s.code, seed.userId],
+    );
+  }
+
   const headersA = {
     Authorization: authHeader(seed.accessToken),
     'X-Branch-Id': branchAId,
@@ -322,6 +344,7 @@ export async function seedCashFundFixture(
         cashAccountId: cashAccountAId,
         contraAccountId: revenueGlId,
         totalAmount: total(lines),
+        staffId: staff.admin.userId,
         lines,
       })
       .expect(201);
@@ -336,6 +359,7 @@ export async function seedCashFundFixture(
     lines: LineInput[],
     reason?: string,
   ): Promise<string> => {
+    const staffId = headers === headersB ? staff.branchB.userId : staff.admin.userId;
     const res = await request(server)
       .post('/cash-payments')
       .set(headers)
@@ -345,6 +369,7 @@ export async function seedCashFundFixture(
         cashAccountId,
         contraAccountId: purpose === 'SUPPLIER_PAYMENT' ? payableGlId : expenseGlId,
         totalAmount: total(lines),
+        staffId,
         ...(reason ? { reason } : {}),
         lines,
       })
@@ -378,6 +403,7 @@ export async function seedCashFundFixture(
       purpose: 'DEBT_COLLECTION',
       contraAccountId: revenueGlId,
       totalAmount: 1600000,
+      collectedBy: staff.admin.userId,
       lines: [{ description: 'Khách chuyển khoản trả nợ', amount: 1600000 }],
     })
     .expect(201);
@@ -464,5 +490,6 @@ export async function seedCashFundFixture(
       PC07,
     },
     branchBUser,
+    staff,
   };
 }
