@@ -221,11 +221,20 @@ export interface CashAccountsListResponse {
   pageSize?: number;
 }
 
-export interface CashVoucherCategory extends BaseRecord {
-  code?: string;
+/** One Mục thu / Mục chi as `POST /v2/cash-voucher-categories/tree` returns it, flattened. */
+export interface CashVoucherCategory {
+  id: string;
+  code: string;
   name: string;
+  description: string | null;
   direction: CashVoucherCategoryDirection;
-  isActive?: boolean;
+  isActive: boolean;
+  displayOrder: number;
+  /** Parent category (Mục cha); null for a root. */
+  parentGroupId: string | null;
+  createdAt: string;
+  /** Depth in the category tree (0 = root) — set by `useCashVoucherCategories`. */
+  depth: number;
 }
 
 export interface CoaAccount extends BaseRecord {

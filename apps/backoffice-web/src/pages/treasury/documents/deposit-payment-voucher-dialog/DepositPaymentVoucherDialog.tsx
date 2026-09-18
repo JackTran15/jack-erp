@@ -47,7 +47,10 @@ import {
   ReceiptVoucherDetailTabEnum,
 } from "../receipt-voucher-dialog/receipt-voucher.constants";
 import { CashVoucherCategoryDirection, CashVoucherPartnerType } from "../../cash-vouchers.types";
-import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import {
+  formatCategoryOptionLabel,
+  useCashVoucherCategories,
+} from "../../../../hooks/treasury/use-cash-voucher-categories";
 import type { LedgerCashVoucherDocumentLine } from "../../ledger-cash/ledger-cash.types";
 import {
   DebtRepaymentPickDialog,
@@ -599,7 +602,7 @@ export function DepositPaymentVoucherDialog({
                   <option value="">-- Chọn --</option>
                   {paymentCategories.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name}
+                      {formatCategoryOptionLabel(c)}
                     </option>
                   ))}
                 </select>
