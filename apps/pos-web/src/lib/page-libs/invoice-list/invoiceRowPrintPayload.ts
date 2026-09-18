@@ -4,6 +4,11 @@ import type { InvoiceRow } from "@erp/pos/interfaces/invoice.interface";
 import type { InvoiceStoreInfo } from "@erp/pos/interfaces/invoice-printing.interface";
 import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
 import { groupPromotionsForPrint } from "@erp/pos/lib/page-libs/checkout/printing/promotionPrintBuckets";
+import {
+  buildLinePromotionIndex,
+  formatPromotionLabel,
+  itemDiscountOfLine,
+} from "@erp/pos/lib/page-libs/checkout/linePromotionIndex";
 
 /**
  * Dựng payload in từ một hoá đơn **đã lưu** (`GET /invoices/:id`).
@@ -68,6 +73,13 @@ export function buildInvoiceRowPrintPayload(
   // CTKM đã chạy lúc checkout (T-08-01) — tách hoàn toàn khỏi giảm giá tay ở
   // trên, cùng quy tắc A-17 đã áp cho hóa đơn vừa thanh toán (T-08-03).
   const engineBuckets = groupPromotionsForPrint(invoice.appliedPromotions ?? []);
+  // Nhãn + phần trừ theo dòng từ snapshot — `lineId` là `invoice_items.id`
+  // (pos-line-promotion-breakdown ADR-01/ADR-04); hóa đơn cũ không có
+  // `lineDiscounts` thì index rỗng và dòng in như trước.
+  const lineIndex = buildLinePromotionIndex(
+    invoice.appliedPromotions ?? [],
+    new Set(purchaseOnly.map((item) => item.id)),
+  );
 
   const paymentRows = invoice.payments ?? [];
   const payments =
@@ -110,12 +122,20 @@ export function buildInvoiceRowPrintPayload(
     lines: items.map((item, index) => {
       const returned = isReturnLine(item);
       const lineTotal = Math.abs(Number(item.lineTotal) || 0);
+      // Dòng bán: cùng quy tắc với hóa đơn in lúc bán — trừ CTKM hàng hóa,
+      // CTKM hóa đơn chỉ là nhãn (ADR-02).
+      const promotions = returned ? [] : (lineIndex.byLine.get(item.id) ?? []);
+      const printedTotal = returned
+        ? -lineTotal
+        : Math.max(0, lineTotal - itemDiscountOfLine(lineIndex, item.id));
       return {
         index: index + 1,
         name: item.itemName,
         qty: returned ? -qtyOf(item) : qtyOf(item),
         unitPrice: Number(item.unitPrice) || 0,
-        lineTotal: returned ? -lineTotal : lineTotal,
+        lineTotal: printedTotal,
+        promotionLabels:
+          promotions.length > 0 ? promotions.map(formatPromotionLabel) : undefined,
         note: item.note?.trim() || undefined,
       };
     }),

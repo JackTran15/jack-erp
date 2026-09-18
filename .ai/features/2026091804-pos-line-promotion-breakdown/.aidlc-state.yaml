@@ -147,3 +147,18 @@ history:
     at: 2026-09-18T17:05:22
     by: Claude
     ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T17:05:29
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T17:43:26
+    by: Claude
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T17:43:26
+    by: Claude
+    ticket: T-03-03
