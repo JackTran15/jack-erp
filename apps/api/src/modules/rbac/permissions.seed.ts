@@ -207,6 +207,8 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "reporting.debts.consolidated.read", module: "reporting" },
   { key: "reporting.profit.read", module: "reporting" },
   { key: "reporting.profit.consolidated.read", module: "reporting" },
+  { key: "reporting.cash.read", module: "reporting" },
+  { key: "reporting.cash.consolidated.read", module: "reporting" },
   { key: INVENTORY_VALUE_PERMISSION, module: "reporting" },
 
   // Reporting — one key per report, derived from the catalogue the guard and

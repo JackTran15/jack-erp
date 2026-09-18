@@ -65,6 +65,7 @@ const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
   'reporting.invoice.consolidated.read',
   'reporting.profit.consolidated.read',
   'reporting.debts.consolidated.read',
+  'reporting.cash.consolidated.read',
 ]);
 
 /**
@@ -93,6 +94,7 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
       key.startsWith('reporting.invoice.branch.') ||
       key === 'reporting.profit.read' ||
       key === 'reporting.debts.read' ||
+      key === 'reporting.cash.read' ||
       // Every individual report of all four groups. The data each one returns is
       // clamped to the manager's own stores by `resolveReportBranchIds` (money)
       // or is quantity-only and organization-wide by design (kho); the
@@ -100,6 +102,7 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
       key.startsWith('reporting.sales.') ||
       key.startsWith('reporting.profit.') ||
       key.startsWith('reporting.debts.') ||
+      key.startsWith('reporting.cash.') ||
       key.startsWith('reporting.inventory.') ||
       key === 'reporting.invoice-template.manage' ||
       key === 'iam.user.read' ||

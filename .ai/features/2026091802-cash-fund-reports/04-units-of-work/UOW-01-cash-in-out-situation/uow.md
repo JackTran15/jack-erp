@@ -68,7 +68,7 @@ qua checkout POS, 2 phiếu chi có mục "Tiền điện"/"Tiền nước", 1 p
 | --- | --- |
 | Số I lệch số dư quỹ trên trang Sổ quỹ (`created_at` vs ngày chứng từ, ADR-02) | Tooltip tiêu đề #2 ghi "theo ngày chứng từ"; DoD có bước so với MShopKeeper chứ không so với Sổ quỹ |
 | Thiếu index trên `(organization_id, branch_id, status, voucher_date)` làm `SUM` chậm với kỳ 1 năm | T-01-05 đo `EXPLAIN` trên `erp_dev`; nếu seq scan → thêm migration index trong cùng ticket (đã khai `touches`) |
-| `report-permissions.contract.spec.ts` khoá số lượng key theo domain | T-01-02 cập nhật spec cùng lúc (khai ở cả `tests:` và `touches:`) |
+| `report-permissions.contract.spec.ts` khoá key với nhãn, seed và grants trong một bộ assert | T-01-01 gộp shared-interfaces + nhãn + migration + seed (T-01-02 đã gộp vào, G3 reopened 2026-09-18) |
 | Phiếu tiền gửi có `PENDING_APPROVAL` — lọc `status = POSTED` loại đúng nhưng người dùng có thể mong thấy | Ghi trong phụ đề: "Chỉ chứng từ đã ghi sổ" |
 
 ## Definition of done

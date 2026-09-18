@@ -217,6 +217,9 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'reporting.profit.read': 'Mở nhóm báo cáo lợi nhuận',
   'reporting.profit.consolidated.read':
     'Xem báo cáo lợi nhuận của toàn chuỗi cửa hàng',
+  'reporting.cash.read': 'Mở nhóm báo cáo quỹ tiền',
+  'reporting.cash.consolidated.read':
+    'Xem báo cáo quỹ tiền của toàn chuỗi cửa hàng',
 
   // Báo cáo bán hàng — mỗi báo cáo một quyền.
   'reporting.sales.daily-sales-summary.read':
@@ -244,6 +247,16 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
     'Xem báo cáo Công nợ nhà cung cấp',
   'reporting.debts.supplier-debts-detail-by-document-and-product.read':
     'Xem báo cáo Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng',
+
+  // Báo cáo quỹ tiền
+  'reporting.cash.cash-in-out-situation.read': 'Xem báo cáo Tình hình thu chi',
+  'reporting.cash.cash-in-out-list.read': 'Xem báo cáo Bảng kê thu chi',
+  'reporting.cash.expenses-by-category.read':
+    'Xem báo cáo Chi tiền theo mục chi',
+  'reporting.cash.expense-list-by-category.read':
+    'Xem báo cáo Bảng kê tiền chi theo mục chi',
+  'reporting.cash.expenses-by-time.read':
+    'Xem báo cáo Chi tiền theo thời gian',
 
   // Báo cáo kho
   'reporting.inventory.stock-summary.read':

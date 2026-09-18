@@ -27,3 +27,35 @@ history:
     at: 2026-09-18T09:03:57
     by: Akenzy
     evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:29:28
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T09:29:59
+    by: Akenzy
+    reason: report-permissions.contract.spec.ts ties keys to iam label catalogues, PERMISSION_SEEDS and role grants in one assertion set; T-01-01 cannot pass its own test without T-01-02's files — merge them into one 4h ticket and declare the two iam/*.ts paths the map omitted
+  - gate: G3
+    action: passed
+    at: 2026-09-18T09:30:40
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-18T09:36:15
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T09:36:26
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session, undeclared there); this ticket did not touch it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T09:36:26
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session, undeclared there); this ticket did not touch it
+    ticket: T-01-01

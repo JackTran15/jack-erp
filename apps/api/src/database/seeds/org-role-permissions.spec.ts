@@ -1,3 +1,4 @@
+import { reportPermissionsOfDomain } from '@erp/shared-interfaces';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 import {
   BRANCH_MANAGER_PERMISSION_KEYS,
@@ -352,5 +353,32 @@ describe('partner catalog permission seeds', () => {
   it('still reaches the two full-access roles through ALL_PERMISSION_KEYS', () => {
     expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(PARTNER_KEY);
     expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(PARTNER_KEY);
+  });
+});
+
+describe('cash-fund report grants', () => {
+  // The cash-fund reports follow the debts floor (migration 1790040000000):
+  // managers see them, the operational roles do not — a cashier records cash
+  // through the drawer, they do not reconcile the fund.
+  it('grants the group and every cash-fund report to the manager roles', () => {
+    for (const keys of [
+      SYSTEM_ADMIN_PERMISSION_KEYS,
+      GENERAL_MANAGER_PERMISSION_KEYS,
+      BRANCH_MANAGER_PERMISSION_KEYS,
+    ]) {
+      expect(keys).toContain('reporting.cash.read');
+      for (const key of reportPermissionsOfDomain('cash')) expect(keys).toContain(key);
+    }
+  });
+
+  it('keeps the chain-wide cash key off BRANCH_MANAGER', () => {
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain('reporting.cash.consolidated.read');
+  });
+
+  it('withholds the cash-fund reports from WAREHOUSE, SALES and CASHIER', () => {
+    for (const keys of [WAREHOUSE_PERMISSION_KEYS, SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS]) {
+      expect(keys).not.toContain('reporting.cash.read');
+      for (const key of reportPermissionsOfDomain('cash')) expect(keys).not.toContain(key);
+    }
   });
 });
