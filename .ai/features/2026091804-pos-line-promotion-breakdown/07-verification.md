@@ -161,14 +161,73 @@ Hóa đơn `2609180004` (và `2609180003` từ feature trước) là dữ liệu
 
 ---
 
+## UOW-03 — Hóa đơn đã lưu
+
+```
+capture-pos-evidence.py --posted 2609180004        # dialog + in lại, có snapshot
+capture-pos-evidence.py --checkout-noprom          # tạo hóa đơn KHÔNG snapshot (✕ CTKM-B rồi Thu tiền)
+capture-pos-evidence.py --posted-plain 2609180005  # dialog + in lại, không snapshot
+```
+
+### AC-14 — API trả snapshot đủ để vẽ từng dòng ✅ [DB]
+
+`apps/api/test/e2e/invoice-applied-promotions.e2e-spec.ts` trên `erp_test`
+(checkout thật qua `/v2/pos/checkout` rồi `GET /invoices/:id`): 2/2 ✓ — mỗi
+phần tử có `programId, code, name, type, priority, discountAmount,
+lineDiscounts[]`; `lineId` trùng `items[].id`; CTKM-B chỉ có dòng cho SKU-100;
+hóa đơn không CTKM → `[]`. Swagger `/docs-json` có `AppliedInvoicePromotionLineDto`.
+
+### AC-15 — Dialog chi tiết hóa đơn `2609180004` ✅
+
+```
+{'name': 'Giày nữ 685 - claude', 'labels': ['CTKM-A hang hoa 10% SKU-685 - claude (68.500)'], 'struck': '685.000', 'total': '616.500'}
+{'name': 'Phụ kiện 100 - claude', 'labels': ['CTKM-B hoa don 10% NON_PROMO_ONLY - claude (10.000)'], 'struck': None, 'total': '100.000'}
+```
+
+Khối tổng của dialog (*Thành tiền 706.500 / Tổng thanh toán 706.500 / Giảm giá
+78.500*) giữ nguyên như trước feature.
+
+![P-01](evidence/P-01-dialog-2609180004-ac15.png)
+
+### AC-16 — In lại từ dialog ✅
+
+HTML in từng dòng giống hóa đơn lúc bán (R-01), khối tổng 785.000 / 78.500 /
+68.500 / 10.000 / 706.500. `page.on("request")` ghi **0** lời gọi
+`/v2/promotions/evaluate` từ lúc mở dialog tới lúc in — dữ liệu là snapshot.
+
+![P-02](evidence/P-02-in-lai-2609180004-ac16.png)
+
+### Hóa đơn không snapshot `2609180005` — như hôm nay ✅
+
+Tạo bằng `--checkout-noprom` (giỏ SKU-100, thu ngân ✕ CTKM-B, Thu tiền →
+`invoice_checkout_promotions` 0 dòng). Dialog: không nhãn, không gạch, 100.000.
+In lại: không `line-sub`, không dòng *Khuyến mãi*, Tổng thanh toán 100.000.
+
+![P-03](evidence/P-03-dialog-2609180005-khong-ctkm.png)
+
+### AC-17 — Hồi quy ✅
+
+| Bộ | Kết quả |
+| --- | --- |
+| `apps/api` unit (toàn bộ) | 408 suite, **5647 passed, 1 skipped, 0 failed** |
+| `apps/api` e2e promotion/checkout (`promotion-crud`, `promotion-evaluate-pos`, `promotion-invoice-scope`, `promotion-invoice-scope-checkout`, `promotion-item-discount`, `checkout-saga-promotion`, `invoice-applied-promotions`) | **7/7 suite, 48/48 case** sau khi nới `checkout-saga-promotion` AC-10 case 2 (`toEqual` shape cũ → `toMatchObject`, khai ở T-03-04) |
+| e2e đỏ **có sẵn trên `main`** (không phải hồi quy) | `promotion-evaluate` AC-03 (đã ghi ở feature 2026091803); `invoice-order-listing`, `invoice-item-revenue-detail`, `invoice-report-template-columns` — toàn bộ case 403/500 (quyền báo cáo không được seed). Chứng minh: checkout hai file API của feature này về bản `87d4f252` → cùng 403/500 |
+| `pnpm openapi:generate` | chỉ thêm: `AppliedInvoicePromotionLineDto`, 5 field trên `AppliedInvoicePromotionDto` (+2 field `MobileRevenueCategory*` của #281 chưa regen); 0 schema/path bị xóa |
+| `apps/pos-web` `tsc --noEmit` | xanh sau mỗi ticket |
+| `git diff --stat` đối chiếu `touches:` | 10 commit, mỗi commit đúng file khai; `invoice.service.spec.ts` khai thêm vào T-03-01 |
+
+---
+
 ## Dữ liệu để lại
 
 - `--lines`/`--receipt` không tạo gì: chỉ thao tác trên giỏ chưa thu tiền.
-- `--checkout` tạo hóa đơn `2609180004` (`paid`, 706.500, bán vượt tồn) trên
+- `--checkout` tạo hóa đơn `2609180004` (`paid`, 706.500, bán vượt tồn) và
+  `--checkout-noprom` tạo `2609180005` (`paid`, 100.000, không CTKM) trên
   `erp_dev_3008`.
 - Fixture `SKU-685`/`SKU-100`/`KM000003`/`KM000004` (`- claude`) giữ nguyên từ
   feature 2026091803.
 
 ## Chưa kiểm chứng ở đây
 
-- AC-14..AC-17 (hóa đơn đã lưu, hồi quy) — UOW-03.
+- Không còn — 17/17 AC có bằng chứng ở trên (AC-03/AC-05 bằng đọc mã, còn lại
+  bằng DOM/HTML/e2e).

@@ -289,6 +289,104 @@ def checkout(page, ctx):
     print("  checkout committed, cart reset")
 
 
+def checkout_no_promo(page, ctx):
+    """Cart SKU-100 only, cashier removes CTKM-B via the panel ✕, Thu tiền →
+    an invoice with NO promotion snapshot. Prints its code for --posted-plain."""
+    print("== --checkout-noprom")
+    add_sku(page, "SKU-100")
+    page.click('button[aria-label="Bỏ áp dụng khuyến mại"]')
+    page.wait_for_selector("text=Bỏ áp dụng khuyến mại")
+    page.click('button:has-text("Bỏ áp dụng")')
+    page.wait_for_selector("text=Bỏ áp dụng khuyến mại", state="detached")
+    settle(page)
+    p = panel(page)
+    check("no-promo cart: no Khuyến mại row, due 100.000", p["km"] is None and p["due"] == "100.000", str(p))
+    toggle = page.locator('[aria-label="In hóa đơn"]').first
+    if toggle.get_attribute("aria-checked") == "true":
+        toggle.click()
+    page.click('button[aria-label="Thu tiền"]')
+    try:
+        page.wait_for_selector('button:has-text("Có")', timeout=8000)
+        page.click('button:has-text("Có")')
+    except Exception:
+        pass
+    page.wait_for_function(
+        "() => ![...document.querySelectorAll('tr')].some(tr => tr.innerText.includes('SKU-100'))", timeout=30000)
+    print("  committed — read the newest paid invoice code from the DB for --posted-plain")
+
+
+def posted_plain(page, ctx, code: str):
+    """An invoice without a snapshot renders exactly as before: no labels, no strike."""
+    print(f"== --posted-plain {code}")
+    page.goto(f"{URL}/invoices", wait_until="domcontentloaded")
+    page.wait_for_selector(f'button:has-text("{code}")', timeout=30000)
+    page.click(f'button:has-text("{code}")')
+    dialog = page.locator('[role="dialog"]:has-text("Số: ' + code + '")').first
+    dialog.wait_for(timeout=30000)
+    page.wait_for_timeout(1500)
+    tr = dialog.locator("tbody tr").first
+    cells = tr.locator("td").all()
+    labels = cells[0].locator("div.italic").all_inner_texts()
+    struck = cells[4].locator("span.line-through").count()
+    total = cells[4].inner_text().strip()
+    print("  ", {"labels": labels, "struck": struck, "total": total})
+    check("plain dialog line", labels == [] and struck == 0 and total == "100.000")
+    page.screenshot(path=str(EVIDENCE / f"P-03-dialog-{code}-khong-ctkm.png"))
+    dialog.locator('button:has-text("In hóa đơn")').first.click()
+    prows, totals = receipt_from_iframe(page, ctx, f"P-04-in-lai-{code}-khong-ctkm.png")
+    print("  ", prows[0], totals["Khuyến mãi"], totals["Tổng thanh toán"])
+    check("plain reprint", prows[0]["subs"] == [] and prows[0]["total"] == "100.000" and totals["Khuyến mãi"] is None
+          and totals["Tổng thanh toán"].endswith("100.000"))
+
+
+def posted(page, ctx, code: str):
+    """UOW-03: open a posted invoice from Hóa đơn, assert the dialog's lines and
+    the reprint HTML — all from the saved snapshot, no evaluate call (AC-15/16)."""
+    print(f"== --posted {code}")
+    evaluate_calls = []
+    page.on("request", lambda r: evaluate_calls.append(r.url) if "/v2/promotions/evaluate" in r.url else None)
+    page.goto(f"{URL}/invoices", wait_until="domcontentloaded")
+    page.wait_for_selector(f'button:has-text("{code}")', timeout=30000)
+    evaluate_calls.clear()
+    page.click(f'button:has-text("{code}")')
+    dialog = page.locator('[role="dialog"]:has-text("Số: ' + code + '")').first
+    dialog.wait_for(timeout=30000)
+    page.wait_for_timeout(1500)
+    rows = []
+    for tr in dialog.locator("tbody tr").all():
+        cells = tr.locator("td").all()
+        if len(cells) < 5:
+            continue
+        name_cell = cells[0]
+        rows.append({
+            "name": name_cell.locator("span").first.inner_text().strip(),
+            "labels": name_cell.locator("div.italic").all_inner_texts(),
+            "struck": (cells[4].locator("span.line-through").all_inner_texts() or [None])[0],
+            "total": cells[4].inner_text().split("\n")[-1].strip(),
+        })
+    for r in rows:
+        print("  ", r)
+    r685 = next(r for r in rows if "685" in r["name"])
+    r100 = next(r for r in rows if "100" in r["name"])
+    check("AC-15 SKU-685 dialog line", r685["labels"] == [LABEL_A] and r685["struck"] == "685.000" and r685["total"] == "616.500", str(r685))
+    check("AC-15 SKU-100 dialog line", r100["labels"] == [LABEL_B] and r100["struck"] is None and r100["total"] == "100.000", str(r100))
+    page.screenshot(path=str(EVIDENCE / f"P-01-dialog-{code}-ac15.png"))
+
+    dialog.locator('button:has-text("In hóa đơn")').first.click()
+    prows, totals = receipt_from_iframe(page, ctx, f"P-02-in-lai-{code}-ac16.png")
+    for r in prows:
+        print("  ", r)
+    for v in totals.values():
+        print("  ", v)
+    p685 = next(r for r in prows if "685" in r["name"])
+    p100 = next(r for r in prows if "100" in r["name"])
+    check("AC-16 reprint lines", p685["subs"] == [LABEL_A] and p685["total"] == "616.500"
+          and p100["subs"] == [LABEL_B] and p100["total"] == "100.000")
+    check("AC-16 reprint totals", totals["KM theo mặt hàng"].endswith("68.500") and totals["KM theo hóa đơn"].endswith("10.000")
+          and totals["Tổng thanh toán"].endswith("706.500"), str(totals))
+    check("AC-16 no evaluate call while dialog open", len(evaluate_calls) == 0, str(evaluate_calls))
+
+
 def main():
     EVIDENCE.mkdir(exist_ok=True)
     with sync_playwright() as p:
@@ -302,6 +400,12 @@ def main():
             receipt(page, ctx)
         if "--checkout" in sys.argv:
             checkout(page, ctx)
+        if "--checkout-noprom" in sys.argv:
+            checkout_no_promo(page, ctx)
+        if "--posted" in sys.argv:
+            posted(page, ctx, sys.argv[sys.argv.index("--posted") + 1])
+        if "--posted-plain" in sys.argv:
+            posted_plain(page, ctx, sys.argv[sys.argv.index("--posted-plain") + 1])
         browser.close()
     print("RESULT:", "PASS" if not failures else f"FAIL {failures}")
     sys.exit(0 if not failures else 1)

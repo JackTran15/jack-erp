@@ -39,6 +39,6 @@ rollback: revert DTO/service + regen api-client; không migration, không dữ l
 | `pnpm openapi:generate` cần API chạy trên :4000 với code mới — `nest build` giết dev watcher (memory `nest-build-kills-dev-watcher`) | Chạy API code mới bằng `pnpm --filter @erp/api start:dev` ở cổng khác hoặc restart có chủ ý, ghi lại trong 07-verification |
 
 ## Definition of done
-- [ ] AC-14 xanh bằng e2e Jest (đọc DB thật); AC-15/16 bằng ảnh headless + HTML in; AC-17 bằng log test
-- [ ] `packages/api-client/src/generated/schema.ts` và `openapi.snapshot.json` regen, diff chỉ thêm
-- [ ] Không file ngoài `touches:`
+- [x] AC-14 xanh bằng e2e Jest (đọc DB thật, 2/2); AC-15/16 bằng ảnh headless + HTML in (`--posted`, `--posted-plain`); AC-17 bằng log test (`07-verification.md`)
+- [x] `packages/api-client/src/generated/schema.ts` và `openapi.snapshot.json` regen, diff chỉ thêm (đối chiếu bằng script ở T-03-02)
+- [x] Không file ngoài `touches:` — hai spec có sẵn khẳng định shape cũ (`invoice.service.spec.ts`, `checkout-saga-promotion.e2e-spec.ts`) được khai thêm vào T-03-01/T-03-04 trước khi sửa
