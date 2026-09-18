@@ -2,7 +2,7 @@
 # Read by ai-dlc-core/scripts/{aidlc,uow_graph}.py.
 
 profile: none              # no stack profile written for NestJS + React yet; core-only
-ruleset: 4                 # pins the rules this plan was authored under
+ruleset: 6                 # pins the rules this plan was authored under
 
 # Layer vocabulary for jack-erp tickets. Derived from the repo's actual NestJS
 # module convention (entity / migration / service / consumer / controller-dto)

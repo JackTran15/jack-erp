@@ -107,12 +107,21 @@ export const PROMOTION_STATUS_OPTIONS: Option<ApiStatus>[] = [
 ];
 
 /**
- * Menu con của nút "Thêm mới" — bình thường đủ 5 loại chương trình khuyến mãi.
- * TẠM THỜI chỉ chừa "Giảm giá hóa đơn", 4 loại còn lại ẩn theo yêu cầu (2026-08-11).
- * Bỏ `.filter(...)` để mở lại đủ 5 loại.
+ * Menu con của nút "Thêm mới". `PROMOTION_FORM_OPTIONS` giữ đủ 5 hình thức vì
+ * còn dùng cho nhãn hiển thị; menu chỉ mở những hình thức có trong tập dưới đây.
+ *
+ * 2026-08-11 thu về một mình "Giảm giá hóa đơn"; 2026-09-18 mở lại thêm
+ * "Giảm giá hàng hóa". Ba hình thức còn lại vẫn ẩn có chủ ý — mở tiếp bằng cách
+ * thêm vào `ADD_NEW_ENABLED_FORMS`, đừng bỏ `.filter(...)`: bỏ hẳn là mở cả ba
+ * cái chưa được kiểm thử.
  */
-export const ADD_NEW_TYPE_OPTIONS = PROMOTION_FORM_OPTIONS.filter(
-  (opt) => opt.value === PromotionForm.INVOICE_DISCOUNT,
+const ADD_NEW_ENABLED_FORMS = new Set<PromotionForm>([
+  PromotionForm.INVOICE_DISCOUNT,
+  PromotionForm.PRODUCT_DISCOUNT,
+]);
+
+export const ADD_NEW_TYPE_OPTIONS = PROMOTION_FORM_OPTIONS.filter((opt) =>
+  ADD_NEW_ENABLED_FORMS.has(opt.value),
 );
 
 function toLabelMap<T extends string>(options: Option<T>[]): Record<T, string> {

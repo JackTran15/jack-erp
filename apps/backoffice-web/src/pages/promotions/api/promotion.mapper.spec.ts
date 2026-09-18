@@ -96,11 +96,14 @@ describe("promotion.mapper round-trip", () => {
     expect(form.applicableGoods).toHaveLength(1);
     expect(form.applicableGoods[0]).toMatchObject({ itemId: "item-1", sku: "SKU1", minQuantity: 3 });
 
-    // Scope lock (ADR-01): even though the loaded program hydrated
-    // form.applyScope to NON_PROMO_ONLY above, the save path must ignore it
-    // and always emit ALL_ITEMS (AC-01/AC-02).
+    // Scope is a radio again. ADR-01 of 2026091803-ctkm-item-discount-invoice-scope
+    // (2026-09-18) supersedes the scope lock from promotion-scope-points-toggle
+    // (ADR-01, 2026-08-17), which made this path emit ALL_ITEMS no matter what the
+    // form held. The save path now carries the form's value through — here the
+    // NON_PROMO_ONLY hydrated from the loaded program above, which is exactly what
+    // stops an edit from silently re-scoping a saved program (AC-17).
     const dto = toCreateDto(form, PromotionProgramType.INVOICE_DISCOUNT);
-    expect(dto.invoiceScope).toBe(PromotionInvoiceScope.ALL_ITEMS);
+    expect(dto.invoiceScope).toBe(PromotionInvoiceScope.NON_PROMO_ONLY);
     expect(dto.discountMode).toBe(PromotionDiscountMode.PERCENT);
     expect(dto.discountValue).toBe(15);
     expect(dto.condition).toMatchObject({ type: PromotionConditionType.SPECIFIC_QUANTITY });

@@ -1,0 +1,259 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: ctkm-item-discount-invoice-scope
+slug: 2026091803-ctkm-item-discount-invoice-scope
+profile: none
+created: 2026-09-18T13:09:24
+ruleset: 6
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-18T13:41:52
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-18T13:41:52
+    by: Akenzy
+    evidence: 12 assumptions, none blocking-and-pending; 23 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-18T13:41:52
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-18T13:41:52
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 12 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T13:42:14
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T13:42:44
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T13:46:38
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:00:12
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:00:12
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:00:12
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:00:12
+    by: Claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:00:37
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:00:37
+    by: Claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:00:37
+    by: Claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:02:20
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:09:52
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:10:18
+    by: Claude
+    reason: T-01-02 chi them moi apps/api/test/e2e/promotion-item-discount.e2e-spec.ts. Cac file khac trong diff thuoc T-01-01/T-02-01/T-02-02 (da done) va T-02-03 (dang lam) cua chinh feature nay, con nam trong working tree vi chua commit giua cac ticket. Khong co file nao bi sua ngoai ke hoach.
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:10:18
+    by: Claude
+    reason: T-01-02 chi them moi apps/api/test/e2e/promotion-item-discount.e2e-spec.ts. Cac file khac trong diff thuoc T-01-01/T-02-01/T-02-02 (da done) va T-02-03 (dang lam) cua chinh feature nay, con nam trong working tree vi chua commit giua cac ticket. Khong co file nao bi sua ngoai ke hoach.
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:13:45
+    by: Claude
+    ticket: T-02-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:20:49
+    by: Claude
+    reason: Diff con chua thay doi chua commit cua cac ticket khac trong cung feature; T-02-03 chi sua ApplyScopePromotionSection.tsx
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:20:49
+    by: Claude
+    reason: Diff con chua thay doi chua commit cua cac ticket khac trong cung feature; T-02-03 chi sua ApplyScopePromotionSection.tsx
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:20:50
+    by: Claude
+    reason: T-02-05 tao 07-verification.md va thu muc evidence/ (anh chup); evidence/ khong khai trong touches vi la ket qua chay, khong phai ma nguon
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:20:50
+    by: Claude
+    reason: T-02-05 tao 07-verification.md va thu muc evidence/ (anh chup); evidence/ khong khai trong touches vi la ket qua chay, khong phai ma nguon
+    ticket: T-02-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:21:34
+    by: Claude
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:23:35
+    by: Claude
+    reason: Diff con chua thay doi chua commit cua cac ticket khac cung feature; T-02-04 chi them promotion-invoice-scope.e2e-spec.ts
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:23:35
+    by: Claude
+    reason: Diff con chua thay doi chua commit cua cac ticket khac cung feature; T-02-04 chi them promotion-invoice-scope.e2e-spec.ts
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:23:35
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:25:55
+    by: Claude
+    reason: Diff con thay doi chua commit cua cac ticket khac cung feature; ticket nay chi sua promotion-item-discount.e2e-spec.ts
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:25:55
+    by: Claude
+    reason: Diff con thay doi chua commit cua cac ticket khac cung feature; ticket nay chi sua promotion-item-discount.e2e-spec.ts
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:25:56
+    by: Claude
+    ticket: T-01-04
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:25:56
+    by: Claude
+    reason: Diff con thay doi chua commit cua cac ticket khac cung feature; ticket nay chi sua promotion-item-discount.e2e-spec.ts
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:25:56
+    by: Claude
+    reason: Diff con thay doi chua commit cua cac ticket khac cung feature; ticket nay chi sua promotion-item-discount.e2e-spec.ts
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:25:56
+    by: Claude
+    ticket: T-02-06
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:30:32
+    by: Claude
+    reason: Diff con thay doi chua commit cua cac ticket khac cung feature; T-02-06 chi them promotion-invoice-scope-checkout.e2e-spec.ts
+    ticket: T-02-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:30:32
+    by: Claude
+    reason: Diff con thay doi chua commit cua cac ticket khac cung feature; T-02-06 chi them promotion-invoice-scope-checkout.e2e-spec.ts
+    ticket: T-02-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:30:32
+    by: Claude
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T14:32:14
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-18T14:32:46
+    by: Claude
+    reason: Can dang nhap POS ( -3001) thu cong - POS co trang dang nhap rieng va toi khong nhap mat khau. Moi thu khac cua ticket da xong (7 anh + PR-DRAFT.md).
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T14:47:51
+    by: Claude
+    reason: T-03-01 khong sua ma nguon (touches rong); diff con thay doi chua commit cua cac ticket khac cung feature
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T14:47:51
+    by: Claude
+    reason: T-03-01 khong sua ma nguon (touches rong); diff con thay doi chua commit cua cac ticket khac cung feature
+    ticket: T-03-01
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-18T15:03:33
+    by: Claude
+    reason: Can dang nhap POS ( -3001) thu cong - POS co trang dang nhap rieng va toi khong nhap mat khau. Moi thu khac cua ticket d
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:27:04
+    by: Claude
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:27:25
+    by: Claude
+    reason: T-03-02 chi them 07-verification.md + capture-pos-evidence.py + 2 anh POS. Bon file test bi bao drift (cart-state.spec, 3 e2e-spec promotion-*) la file MOI, chua commit, thuoc cac ticket da done T-01-03/T-01-04/T-02-01/T-02-04/T-02-06 cua chinh feature nay; untracked nen controller khong quy duoc ve ticket. Cung tinh huong T-03-01.
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:27:25
+    by: Claude
+    reason: T-03-02 chi them 07-verification.md + capture-pos-evidence.py + 2 anh POS. Bon file test bi bao drift (cart-state.spec, 3 e2e-spec promotion-*) la file MOI, chua commit, thuoc cac ticket da done T-01-03/T-01-04/T-02-01/T-02-04/T-02-06 cua chinh feature nay; untracked nen controller khong quy duoc ve ticket. Cung tinh huong T-03-01.
+    ticket: T-03-02
+  - gate: G4
+    action: passed
+    at: 2026-09-18T15:29:19
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 12 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-18T15:29:19
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

@@ -9,6 +9,8 @@ import {
   PromotionGroupMatchMode,
   PromotionTargetType,
   PromotionBuyGetPolicy,
+  PromotionTierBasis,
+  PromotionTierScope,
 } from '@erp/shared-interfaces';
 import { PromotionResolver } from './promotion-resolver';
 import { aProgram, aGroup, aLine, aTier, aCondition, aCart, aCartLine, aCatalogItem } from './__fixtures__/promotion-fixture';
@@ -241,6 +243,47 @@ describe('PromotionResolver', () => {
     // Only lineB (200,000, untouched by the ITEM_DISCOUNT) is the base for the invoice discount.
     expect(invoiceApplied.discountAmount).toBe(20_000);
     expect(invoiceApplied.lineDiscounts).toEqual([{ lineId: 'lB', discountAmount: 20_000, unitPriceAfter: 180_000 }]);
+  });
+
+  /**
+   * AC-19 (T-02-01). TIERED_DISCOUNT is the *other* member of
+   * LINE_CLAIMING_TYPES, so the BR-002 guarantee above has to hold for it too —
+   * it is easy to fix this for ITEM_DISCOUNT alone and leave tiered programs
+   * quietly double-discounting.
+   */
+  it('AC-19: a TIERED_DISCOUNT also claims its line, keeping it out of the invoice base', () => {
+    const tieredLine = aCartLine({ lineId: 'lA', itemId: 'sku-1', unitPrice: 685_000, quantity: 1 });
+    const untouched = aCartLine({ lineId: 'lB', itemId: 'sku-2', unitPrice: 100_000, quantity: 1 });
+    const tiered = aProgram()
+      .ofType(PromotionProgramType.TIERED_DISCOUNT)
+      .withPriority(10)
+      .with({
+        discountMode: undefined,
+        discountValue: undefined,
+        tierBasis: PromotionTierBasis.QUANTITY,
+        tierScope: PromotionTierScope.PER_ITEM,
+      })
+      .withGroups([
+        aGroup({
+          lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-1' })],
+          tiers: [aTier({ fromValue: 1, toValue: undefined, discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 })],
+        }),
+      ])
+      .build();
+    const invoiceDiscount = aProgram()
+      .ofType(PromotionProgramType.INVOICE_DISCOUNT)
+      .withPriority(20)
+      .with({ invoiceScope: PromotionInvoiceScope.NON_PROMO_ONLY, discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 })
+      .build();
+    const cart = aCart({ lines: [tieredLine, untouched] });
+
+    const evaluation = resolver.resolve([tiered, invoiceDiscount], cart);
+
+    expect(evaluation.appliedPrograms).toHaveLength(2);
+    const invoiceApplied = evaluation.appliedPrograms.find((p) => p.programId === invoiceDiscount.id)!;
+    // 10% of the untouched 100,000 — not of 785,000.
+    expect(invoiceApplied.discountAmount).toBe(10_000);
+    expect(invoiceApplied.lineDiscounts.map((ld) => ld.lineId)).toEqual(['lB']);
   });
 
   it('two INVOICE_DISCOUNT programs contend for the single invoice-discount slot', () => {
