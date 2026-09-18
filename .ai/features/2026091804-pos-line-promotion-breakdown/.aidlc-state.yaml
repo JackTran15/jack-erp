@@ -5,7 +5,7 @@ slug: 2026091804-pos-line-promotion-breakdown
 profile: none
 created: 2026-09-18T15:56:56
 ruleset: 6
-current_gate: G3
+current_gate: G5
 history:
   - gate: G0
     action: passed
@@ -177,3 +177,13 @@ history:
     at: 2026-09-18T19:38:40
     by: Claude
     ticket: T-03-04
+  - gate: G4
+    action: passed
+    at: 2026-09-18T19:43:24
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 10 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-18T19:44:19
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

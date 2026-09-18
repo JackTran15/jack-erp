@@ -32,3 +32,5 @@
 {"action": "ticket in_progress", "at": "2026-09-18T17:43:38", "base": "185075d218c0574f756d53de09ad5780b7d6a1c7", "by": "Claude", "gate": "G4", "id": "b78705ae2a05", "ticket": "T-03-04", "ts": "2026-09-18T17:43:38.634806"}
 {"action": "scope", "at": "2026-09-18T19:38:40", "base": "185075d218c0574f756d53de09ad5780b7d6a1c7", "by": "Claude", "gate": "G4", "id": "d48b0fef3f82", "ticket": "T-03-04", "ts": "2026-09-18T19:38:40.530513", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-18T19:38:40", "by": "Claude", "gate": "G4", "id": "d196a88f700d", "ticket": "T-03-04", "ts": "2026-09-18T19:38:40.532519"}
+{"action": "passed", "at": "2026-09-18T19:43:24", "by": "Akenzy", "evidence": "no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 10 tickets done, all UoW checklists ticked", "gate": "G4", "id": "b52818b5915e", "ts": "2026-09-18T19:43:24.284726"}
+{"action": "passed", "at": "2026-09-18T19:44:19", "by": "Akenzy", "evidence": "assumptions resolved, ADRs settled, graph valid", "gate": "G5", "id": "3b50afb7db3a", "ts": "2026-09-18T19:44:19.068140"}
