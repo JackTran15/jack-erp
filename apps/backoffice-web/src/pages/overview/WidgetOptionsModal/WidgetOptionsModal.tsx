@@ -11,8 +11,9 @@ interface Props {
   width: number;
   /**
    * Chiều cao khung, tính tay = 40 (thanh tiêu đề) + body + 65 (footer).
-   * Body = 36 mỗi dòng + 12 khoảng cách giữa các dòng + 36 padding dọc.
-   * Vd 1 dòng → 40 + 72 + 65 = 177; 2 dòng → 40 + 120 + 65 = 225.
+   * Body = 32 (padding của AppModal) + 16 (padding của form) + 36 mỗi dòng
+   * + 12 khoảng cách giữa các dòng.
+   * Vd 1 dòng → 40 + 84 + 65 = 189; 2 dòng → 40 + 132 + 65 = 237.
    */
   height: number;
   children: ReactNode;
@@ -63,7 +64,7 @@ export function WidgetOptionsModal({
         </div>
       }
     >
-      <div className="flex flex-col gap-3 px-1 pt-1">{children}</div>
+      <div className="flex flex-col gap-3 px-1 py-2">{children}</div>
     </AppModal>
   );
 }

@@ -37,6 +37,9 @@ function SingleSelect({
 }: SingleSelectProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  const itemRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
+  const isComposingRef = React.useRef(false);
   const selectedLabel = options.find((o) => o.value === value)?.label ?? placeholder;
 
   // Start every visit to the list from an unfiltered view.
@@ -49,6 +52,53 @@ function SingleSelect({
     searchable && q !== ""
       ? options.filter((o) => o.label.toLowerCase().includes(q))
       : options;
+
+  // Opening the list highlights the current value; filtering restarts at the top.
+  React.useEffect(() => {
+    if (!open) return;
+    const selectedIndex = visibleOptions.findIndex((o) => o.value === value);
+    setActiveIndex(q === "" && selectedIndex >= 0 ? selectedIndex : 0);
+    // `visibleOptions` is derived from `options`/`q`; re-running on those is enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, q, options]);
+
+  // Keep the highlighted option scrolled into view.
+  React.useEffect(() => {
+    if (open) itemRefs.current[activeIndex]?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, open]);
+
+  const select = (optionValue: string) => {
+    onValueChange(optionValue);
+    setOpen(false);
+  };
+
+  // Arrow keys drive the list while the caret stays in the search box.
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Vietnamese IME: Enter confirms the composition, it must not pick an option.
+    const composing = isComposingRef.current || e.nativeEvent.isComposing;
+    const count = visibleOptions.length;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (count > 0) setActiveIndex((i) => (i + 1) % count);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (count > 0) setActiveIndex((i) => (i - 1 + count) % count);
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveIndex(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      if (count > 0) setActiveIndex(count - 1);
+    } else if (e.key === "Enter") {
+      if (composing) return;
+      const opt = visibleOptions[activeIndex];
+      if (opt) {
+        e.preventDefault();
+        select(opt.value);
+      }
+    }
+  };
 
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -82,6 +132,13 @@ function SingleSelect({
               autoFocus
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              onCompositionStart={() => {
+                isComposingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                isComposingRef.current = false;
+              }}
               placeholder={searchPlaceholder}
               className={cn(
                 "mb-1 w-full rounded-sm border-b border-border bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground",
@@ -100,21 +157,24 @@ function SingleSelect({
                 Không tìm thấy kết quả
               </p>
             ) : null}
-            {visibleOptions.map((opt) => {
+            {visibleOptions.map((opt, index) => {
               const selected = opt.value === value;
+              const active = searchable && index === activeIndex;
               return (
                 <button
                   key={opt.value}
+                  ref={(el) => {
+                    itemRefs.current[index] = el;
+                  }}
                   type="button"
                   className={cn(
-                    "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent",
-                    selected && "bg-accent/50",
+                    "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
+                    active ? "bg-accent" : "hover:bg-accent",
+                    selected && !active && "bg-accent/50",
                     contentClassName,
                   )}
-                  onClick={() => {
-                    onValueChange(opt.value);
-                    setOpen(false);
-                  }}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => select(opt.value)}
                 >
                   <span className="min-w-0 truncate text-left">{opt.label}</span>
                   {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}

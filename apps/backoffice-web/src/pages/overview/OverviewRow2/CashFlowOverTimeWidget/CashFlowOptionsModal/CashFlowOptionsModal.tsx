@@ -53,7 +53,7 @@ export function CashFlowOptionsModal({
       open={open}
       width={520}
       // 2 dòng: "Thống kê theo" + "Kỳ báo cáo"
-      height={225}
+      height={237}
       onClose={onClose}
       onConfirm={() =>
         onConfirm({ granularity: draftGranularity, period: draftPeriod })

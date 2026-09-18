@@ -34,7 +34,7 @@ export function RevenueCostProfitOptionsModal({
       open={open}
       width={520}
       // 1 dòng "Kỳ báo cáo"
-      height={177}
+      height={189}
       onClose={onClose}
       onConfirm={() => onConfirm(draftPeriod)}
     >
