@@ -11,6 +11,20 @@ import { useReportStore } from "../../../../store/page-stores/report/report.cont
 
 type OptionsSource = "invoice" | "inventory" | "debt" | "profit" | "cash";
 
+/**
+ * Dropdown của domain quỹ tiền — BE `CashFundFilterOptionType` (domain-local,
+ * không nằm trong `ReportFilterOptionType` dùng chung). `store` trùng giá trị
+ * với enum chung; ba loại còn lại chỉ có nghĩa với `/reports/cash-fund`.
+ */
+export type CashFundFilterOptionType =
+  | "store"
+  | "employee"
+  | "paymentMethod"
+  | "expenseCategory";
+
+/** `type` mà mọi endpoint filter-options nhận — enum chung hoặc loại riêng của quỹ tiền. */
+export type ReportFilterOptionsType = ReportFilterOptionType | CashFundFilterOptionType;
+
 const OPTIONS_PATH: Record<
   OptionsSource,
   | "/reports/invoices/filter-options"
@@ -29,7 +43,7 @@ const OPTIONS_PATH: Record<
 // Gọi API options dropdown dùng chung (phân biệt bằng `type`, hỗ trợ search).
 // `branchIds` giới hạn options theo chi nhánh (hiện dùng cho type=warehouse).
 export async function fetchReportFilterOptions(
-  type: ReportFilterOptionType,
+  type: ReportFilterOptionsType,
   search?: string,
   source: OptionsSource = "invoice",
   branchIds?: string[],
@@ -53,7 +67,7 @@ export async function fetchReportFilterOptions(
 // Hook đổ options cho 1 dropdown filter. Endpoint chọn theo domain của report
 // đang mở (invoice vs inventory). queryKey gồm branchIds để cache theo scope.
 export function useReportFilterOptions(
-  type: ReportFilterOptionType,
+  type: ReportFilterOptionsType,
   search?: string,
   params?: { branchIds?: string[] },
 ) {

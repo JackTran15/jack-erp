@@ -49,6 +49,14 @@ export enum REPORT_FILTERS_LINE {
     PERIOD_COMPARE_PREVIOUS_RANGE = 'period_compare_previous_range',
     PERIOD_COMPARE_CURRENT = 'period_compare_current',
     PERIOD_COMPARE_CURRENT_RANGE = 'period_compare_current_range',
+
+    // === Quỹ tiền ===
+    // "Nhân viên" lập/thu/chi trên phiếu (A-19) — không dùng lại CASHIER vì nhãn
+    // lấy từ metadata (không có override theo registry) và filter-options của
+    // domain cash nhận `type=employee`, không phải `cashier`.
+    EMPLOYEE = 'employee',
+    // Tiền mặt (cash_*) / Chuyển khoản (bank_*) — A-05; rỗng = Tất cả.
+    PAYMENT_METHOD = 'payment_method',
 }
 
 /**
@@ -215,5 +223,13 @@ export const REPORT_FILTERS_LINE_METADATA = {
         backendField: 'currentFromDate',
         label2: 'Đến ngày',
         backendField2: 'currentToDate',
+    },
+    [REPORT_FILTERS_LINE.EMPLOYEE]: {
+        label: 'nhân viên',
+        backendField: 'employeeIds',
+    },
+    [REPORT_FILTERS_LINE.PAYMENT_METHOD]: {
+        label: 'phương thức thanh toán',
+        backendField: 'paymentMethod',
     },
 }

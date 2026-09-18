@@ -63,7 +63,8 @@ export async function fetchCashFundReportData(
  * Kỳ báo cáo đã được FE resolve từ preset sang from/to (A-09). Chi nhánh: #2/#4/#6
  * không có filter cửa hàng nên lấy chi nhánh header (`activeBranchId`, null khi
  * xem theo Chuỗi → BE gộp theo quyền hợp nhất); #3/#5 gửi `store` từ filter
- * phụ. PAYMENT_METHOD / EXPENSE_CATEGORY / bucket được UOW-02/03 bổ sung.
+ * phụ. #3: EMPLOYEE → `employeeIds` (1 phần tử), PAYMENT_METHOD → `paymentMethod`;
+ * rỗng = Tất cả → bỏ khỏi payload. EXPENSE_CATEGORY / bucket được UOW-03 bổ sung.
  */
 export function buildCashFundSearchFilters(
   filters: Partial<ReportFilterValues>,
@@ -71,7 +72,8 @@ export function buildCashFundSearchFilters(
 ): CashFundReportFilterPayload {
   const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
   const store = filters[REPORT_FILTERS_LINE.STORE];
-  const cashier = filters[REPORT_FILTERS_LINE.CASHIER];
+  const employee = filters[REPORT_FILTERS_LINE.EMPLOYEE];
+  const paymentMethod = filters[REPORT_FILTERS_LINE.PAYMENT_METHOD];
 
   const notAll = (v: string | undefined): v is string => !!v && v !== "all";
 
@@ -86,7 +88,8 @@ export function buildCashFundSearchFilters(
   } else if (opts.activeBranchId) {
     payload.branchId = opts.activeBranchId;
   }
-  if (notAll(cashier)) payload.employeeIds = [cashier];
+  if (notAll(employee)) payload.employeeIds = [employee];
+  if (paymentMethod) payload.paymentMethod = paymentMethod;
   return payload;
 }
 

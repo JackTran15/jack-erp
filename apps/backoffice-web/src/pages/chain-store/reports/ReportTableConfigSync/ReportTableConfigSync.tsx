@@ -112,8 +112,23 @@ export function ReportTableConfigSync() {
       const effectiveColumnsResult = isChainProfitByItemLocation
         ? { ...columnsResult, columns: columnsResult.columns.filter((h) => h.col !== "location") }
         : columnsResult;
+      // Catalog BE liệt kê đủ cột và `mapHeadersToTableConfig` đặt visible: true
+      // cho tất cả; cột ẩn mặc định (AC-11 quỹ tiền: "Mã đối tượng", "Số hóa
+      // đơn") là việc của registry FE — phủ `visible: false` của registry lên
+      // theo khoá BE. Chỉ registry nào khai mới bị ảnh hưởng.
+      const hiddenByRegistry = new Set(
+        getReportTableConfig(reportType, branch)
+          .columns.filter((c) => c.visible === false)
+          .map((c) => c.backendField ?? c.column),
+      );
+      const mapped = mapHeadersToTableConfig(effectiveColumnsResult);
       setConfig({
-        ...mapHeadersToTableConfig(effectiveColumnsResult),
+        ...mapped,
+        columns: hiddenByRegistry.size
+          ? mapped.columns.map((c) =>
+              hiddenByRegistry.has(c.column) ? { ...c, visible: false } : c,
+            )
+          : mapped.columns,
         reportType,
       });
       pruneColumnFilters(effectiveColumnsResult.columns.map((h) => h.col));

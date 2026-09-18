@@ -1,9 +1,11 @@
-import { type ReportFilterOptionType } from "@erp/shared-interfaces";
-import { useReportFilterOptions } from "../../../../../_api/report-filter-options.api";
+import {
+  type ReportFilterOptionsType,
+  useReportFilterOptions,
+} from "../../../../../_api/report-filter-options.api";
 import { ReportSelectField } from "../ReportSelectField/ReportSelectField";
 
 interface Props {
-  type: ReportFilterOptionType;
+  type: ReportFilterOptionsType;
   value: string;
   placeholder?: string;
   hidePlaceholder?: boolean;

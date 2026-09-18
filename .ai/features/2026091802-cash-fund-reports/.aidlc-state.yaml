@@ -276,3 +276,59 @@ history:
     by: Akenzy
     reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
     ticket: T-01-06
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:07:34
+    by: Akenzy
+    reason: T-02-03 - FE fetchReportFilterOptions is typed on the shared ReportFilterOptionType which lacks employee/paymentMethod/expenseCategory — declare _api/report-filter-options.api.ts on T-02-03 (and T-03-04) for the type widening
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:07:34
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:07:34
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:07:51
+    by: Akenzy
+    reason: same as previous reopen - the touches edit had not applied; adding _api/report-filter-options.api.ts to T-02-03 and T-03-04 now
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:07:51
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:15:47
+    by: Akenzy
+    reason: T-02-03 found - RemoteSelectField re-declares the option type; mapHeadersToTableConfig hard-codes visible -true so registry visible -false (AC-11 hidden-by-default) never applies — both join T-02-03 touches; the filter subtitle (AC-09) has no FE mechanism — new ticket T-02-06
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:15:56
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 19 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:22:24
+    by: Akenzy
+    reason: browser check of T-02-03 found docDate one day early in cash-in-out-list and expense-list-by-category - pg parses DATE as local-midnight Date and isoDate() uses toISOString(); add fix ticket T-02-07 (select  - -text as expenses-by-time does) and make T-02-05's fixture carry staff_id + employee_profiles
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:22:24
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 20 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:24:10
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:24:10
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-03

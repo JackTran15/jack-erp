@@ -1,3 +1,4 @@
+import type { CashFundKind } from "@erp/shared-interfaces";
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
 import { STORE_TYPE } from "../../../constants/store.constant";
@@ -60,6 +61,10 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE]: ReportDateRangeValue;
   [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT]: string;
   [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE]: ReportDateRangeValue;
+  // Quỹ tiền: id user của nhân viên trên phiếu ("" = Tất cả).
+  [REPORT_FILTERS_LINE.EMPLOYEE]: string;
+  // Quỹ tiền: "" = Tất cả, "cash" = Tiền mặt, "deposit" = Chuyển khoản.
+  [REPORT_FILTERS_LINE.PAYMENT_METHOD]: CashFundKind | "";
 }
 
 // Bộ filter đã "áp dụng" (commit khi bấm Lấy dữ liệu / Đồng ý) — nguồn gọi API data.

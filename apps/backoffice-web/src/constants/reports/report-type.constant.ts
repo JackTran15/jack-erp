@@ -23,6 +23,7 @@ import { chain_filterRegistryReportProfitByItem, chain_tableRegistryReportProfit
 import { chain_filterRegistryReportGrossProfitByInvoice, chain_tableRegistryReportGrossProfitByInvoice, single_filterRegistryReportGrossProfitByInvoice, single_tableRegistryReportGrossProfitByInvoice } from "./report-registry/report-gross-profit-by-invoice.registry";
 import { chain_filterRegistryReportBusinessResults, chain_tableRegistryReportBusinessResults, single_filterRegistryReportBusinessResults, single_tableRegistryReportBusinessResults } from "./report-registry/report-business-results.registry";
 import { chain_filterRegistryReportCashInOutSituation, chain_tableRegistryReportCashInOutSituation, single_filterRegistryReportCashInOutSituation, single_tableRegistryReportCashInOutSituation } from "./report-registry/report-cash-in-out-situation.registry";
+import { chain_filterRegistryReportCashInOutList, chain_tableRegistryReportCashInOutList, single_filterRegistryReportCashInOutList, single_tableRegistryReportCashInOutList } from "./report-registry/report-cash-in-out-list.registry";
 import type { ReportBackendSource, ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
@@ -466,7 +467,19 @@ export const REPORT_TYPE_CASH_FUND_METADATA = {
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportCashInOutSituation,
     },
   },
-  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST]: { label: 'Bảng kê thu chi' },
+  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST]: {
+    label: 'Bảng kê thu chi',
+    backendKey: 'cash-in-out-list',
+    backendSource: 'cash' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportCashInOutList,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportCashInOutList,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportCashInOutList,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportCashInOutList,
+    },
+  },
   [REPORT_TYPE_CASH_FUND.EXPENSES_BY_CATEGORY]: { label: 'Chi tiền theo mục chi' },
   [REPORT_TYPE_CASH_FUND.EXPENSE_LIST_BY_CATEGORY]: { label: 'Bảng kê tiền chi theo mục chi' },
   [REPORT_TYPE_CASH_FUND.EXPENSES_BY_TIME]: { label: 'Chi tiền theo thời gian' },

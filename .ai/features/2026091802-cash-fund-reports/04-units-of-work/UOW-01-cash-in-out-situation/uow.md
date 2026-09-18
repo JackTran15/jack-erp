@@ -73,8 +73,8 @@ qua checkout POS, 2 phiếu chi có mục "Tiền điện"/"Tiền nước", 1 p
 
 ## Definition of done
 
-- [ ] AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-19, AC-20, AC-21 có test (unit hoặc e2e) và xanh
-- [ ] `pnpm --filter @erp/api build`, `pnpm --filter @erp/backoffice-web build` xanh
-- [ ] `openapi.snapshot.json` + `packages/api-client/src/generated/schema.ts` đã tái sinh và commit
+- [x] AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-19, AC-20, AC-21 có test và xanh — unit 9 suite/120, e2e `cash-fund-report` 25/25, trình duyệt `verify-t0106.py` 13/13 (2026-09-18)
+- [x] `pnpm --filter @erp/api build`, `pnpm --filter @erp/backoffice-web build` xanh
+- [x] `openapi.snapshot.json` + `packages/api-client/src/generated/schema.ts` đã tái sinh và commit (T-01-07, `01661258`)
 - [ ] Đối chiếu MShopKeeper: cùng chi nhánh + cùng kỳ, chụp ảnh I/II/III/IV hai bên, ghi vào `07-verification.md`; chênh lệch (nếu có) giải thích được bằng A-01/A-02/A-04
 - [ ] Demo script chạy trước Akenzy và được chấp nhận tại G4

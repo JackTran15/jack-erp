@@ -25,6 +25,7 @@ import { WarehouseSelectField } from "./WarehouseSelectField/WarehouseSelectFiel
 import { CustomerSearchSelectField } from "./CustomerSearchSelectField/CustomerSearchSelectField";
 import { SupplierSearchSelectField } from "./SupplierSearchSelectField/SupplierSearchSelectField";
 import { StoreInChainOptionalField } from "./StoreInChainOptionalField/StoreInChainOptionalField";
+import { PaymentMethodField } from "./PaymentMethodField/PaymentMethodField";
 
 interface Props {
   line: REPORT_FILTERS_LINE;
@@ -225,6 +226,26 @@ export function ReportFilterLine({ line }: Props) {
           <SupplierSearchSelectField
             value={filters[REPORT_FILTERS_LINE.SUPPLIER] ?? null}
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.SUPPLIER, v)}
+          />
+        );
+      // Quỹ tiền — "Nhân viên" trên phiếu thu/chi; options từ
+      // /reports/cash-fund/filter-options?type=employee (chỉ nhân viên có phiếu).
+      case REPORT_FILTERS_LINE.EMPLOYEE:
+        return (
+          <RemoteSelectField
+            type="employee"
+            value={filters[REPORT_FILTERS_LINE.EMPLOYEE] ?? ""}
+            placeholder="Tất cả"
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.EMPLOYEE, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.PAYMENT_METHOD:
+        return (
+          <PaymentMethodField
+            value={filters[REPORT_FILTERS_LINE.PAYMENT_METHOD] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PAYMENT_METHOD, v)
+            }
           />
         );
       case REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL:
