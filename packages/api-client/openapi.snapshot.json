@@ -42032,9 +42032,39 @@
           "createdBy"
         ]
       },
+      "AppliedInvoicePromotionLineDto": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "string",
+            "description": "`invoice_items.id` of the line this share belongs to"
+          },
+          "discountAmount": {
+            "type": "number"
+          },
+          "unitPriceAfter": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "lineId",
+          "discountAmount",
+          "unitPriceAfter"
+        ]
+      },
       "AppliedInvoicePromotionDto": {
         "type": "object",
         "properties": {
+          "programId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
           "type": {
             "enum": [
               "INVOICE_DISCOUNT",
@@ -42045,13 +42075,28 @@
             ],
             "type": "string"
           },
+          "priority": {
+            "type": "number",
+            "description": "Lower ran first (BR-001)"
+          },
           "discountAmount": {
             "type": "number"
+          },
+          "lineDiscounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedInvoicePromotionLineDto"
+            }
           }
         },
         "required": [
+          "programId",
+          "code",
+          "name",
           "type",
-          "discountAmount"
+          "priority",
+          "discountAmount",
+          "lineDiscounts"
         ]
       },
       "DraftInvoiceResponseDto": {
@@ -50253,12 +50298,17 @@
           "revenue": {
             "type": "number",
             "description": "Doanh thu ròng của nhóm trong kỳ, đơn vị đồng"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng bán ròng của nhóm trong kỳ (trả hàng trừ ra, nên ÂM được). Cùng phép cộng `SUM(qty)` mà `items` đang dùng, nên hai màn không lệch."
           }
         },
         "required": [
           "id",
           "name",
-          "revenue"
+          "revenue",
+          "quantity"
         ]
       },
       "MobileRevenueCategoryListDto": {
@@ -50274,11 +50324,16 @@
           "totalRevenue": {
             "type": "number",
             "description": "Tổng doanh thu của các nhóm trong `data`"
+          },
+          "totalQuantity": {
+            "type": "number",
+            "description": "Tổng số lượng của các nhóm trong `data`"
           }
         },
         "required": [
           "data",
-          "totalRevenue"
+          "totalRevenue",
+          "totalQuantity"
         ]
       },
       "MobileRevenuePointDto": {
