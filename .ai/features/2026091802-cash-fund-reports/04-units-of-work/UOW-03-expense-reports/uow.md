@@ -55,7 +55,7 @@ Cùng môi trường như UOW-01, chi nhánh Hồ Chí Minh có phiếu chi nhi�
 
 ## Definition of done
 
-- [ ] AC-12..18 có test xanh
-- [ ] Hai drill-down hoạt động (ảnh trong `07-verification.md`)
+- [x] AC-12..18 có test xanh — unit 3 spec (13 + 22 + 19), e2e `cash-fund-report-expenses` 41/41 (kể cả 120 dòng tháng 10 cho AC-15), trình duyệt `verify-t0304.py` 26/26 (2026-09-18)
+- [x] Hai drill-down hoạt động — `verify-t0305.py` 22/22, ảnh `evidence/t0305-*.png`
 - [ ] Đối chiếu MShopKeeper: tổng "Chi tiền theo mục chi" = tổng "Chi tiền theo thời gian" = Σ nhóm của "Bảng kê tiền chi theo mục chi" cùng kỳ; lệch với MShopKeeper (nếu có) giải thích bằng A-02 (refund/chuyển quỹ)
 - [ ] Demo script chạy trước Akenzy và được chấp nhận tại G4

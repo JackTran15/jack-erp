@@ -55,7 +55,7 @@ Cùng môi trường và dữ liệu như UOW-01, tài khoản admin.
 
 ## Definition of done
 
-- [ ] AC-08..11 có test xanh (unit cho definition, e2e cho lọc + template)
-- [ ] Drill-down từ #2 hoạt động (kiểm tay, ảnh trong `07-verification.md`)
+- [x] AC-08..11 có test xanh — unit `cash-in-out-list.report.spec.ts` (24), e2e `cash-fund-report-list` 18/18, trình duyệt `verify-t0203.py` 18/18 (2026-09-18)
+- [x] Drill-down từ #2 hoạt động — `verify-t0204.py` 14/14, ảnh `evidence/t0204-*.png`; phụ đề bộ lọc (T-02-06) `verify-t0206.py`
 - [ ] Đối chiếu MShopKeeper "Bảng kê thu chi" cùng kỳ: số dòng, Số dư đầu kỳ, tổng thu/chi, số dư cuối
 - [ ] Demo script chạy trước Akenzy và được chấp nhận tại G4
