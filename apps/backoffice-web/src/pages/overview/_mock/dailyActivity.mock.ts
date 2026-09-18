@@ -1,5 +1,15 @@
+import { BREAKDOWN_CONFIG } from "../DailyActivityPanel/_breakdownConfig";
 import { mockDelay } from "./mockDelay";
 import { createRandom, hashSeed, randomInt, randomMoney } from "./seededRandom";
+import { splitTotal } from "./splitTotal";
+
+export interface BreakdownItem {
+  key: string;
+  label: string;
+  value: number;
+  count?: number;
+  danger?: boolean;
+}
 
 export interface DailyActivityRowData {
   key: string;
@@ -7,6 +17,8 @@ export interface DailyActivityRowData {
   value: number;
   /** Số hóa đơn — chỉ có ở biến thể row hiển thị badge. */
   count?: number;
+  /** Chi tiết hiện trong modal khi bấm vào dòng. Tổng luôn bằng `value`. */
+  breakdown?: BreakdownItem[];
 }
 
 export interface DailyActivityCardData {
@@ -16,6 +28,37 @@ export interface DailyActivityCardData {
   /** Header có thể bấm (có chevron) hay không. */
   totalClickable: boolean;
   rows: DailyActivityRowData[];
+  /** Chi tiết của header card — chỉ có khi header bấm được. */
+  breakdown?: BreakdownItem[];
+}
+
+/**
+ * Sinh các dòng chi tiết cho một điểm bấm, chia đúng `value` (và `count`) của nó
+ * ra theo cấu hình → "Tổng" trong modal luôn khớp số trên row 1.
+ */
+function buildBreakdown(
+  configKey: string,
+  value: number,
+  count: number | undefined,
+  scopeKey: string,
+): BreakdownItem[] | undefined {
+  const config = BREAKDOWN_CONFIG[configKey];
+  if (!config) return undefined;
+
+  const random = createRandom(hashSeed("breakdown", scopeKey, configKey));
+  const values = splitTotal(value, config.lines.length, random);
+  const counts =
+    config.withCount && count !== undefined
+      ? splitTotal(count, config.lines.length, random)
+      : undefined;
+
+  return config.lines.map((line, i) => ({
+    key: line.key,
+    label: line.label,
+    danger: line.danger,
+    value: values[i] ?? 0,
+    ...(counts ? { count: counts[i] ?? 0 } : {}),
+  }));
 }
 
 export interface DailyActivityData {
@@ -47,14 +90,17 @@ function buildCards(
   cashInRows: DailyActivityRowData[],
   revenueRows: DailyActivityRowData[],
   invoiceRows: DailyActivityRowData[],
+  scopeKey = "placeholder",
 ): DailyActivityCardData[] {
+  const cashInTotal = sum(cashInRows);
   return [
     {
       key: "cash_in",
       title: "Tiền thu trong ngày",
-      total: sum(cashInRows),
+      total: cashInTotal,
       totalClickable: true,
       rows: cashInRows,
+      breakdown: buildBreakdown("cash_in", cashInTotal, undefined, scopeKey),
     },
     {
       key: "estimated_revenue",
@@ -86,25 +132,39 @@ export function fetchDailyActivity(scopeKey: string): Promise<DailyActivityData>
   const dayKey = today.toISOString().slice(0, 10);
   const random = createRandom(hashSeed("daily-activity", scopeKey, dayKey));
 
-  const cashInRows: DailyActivityRowData[] = CASH_IN_ROWS.map((row) => ({
+  const withBreakdown = (
+    row: { key: string; label: string },
+    value: number,
+    count?: number,
+  ): DailyActivityRowData => ({
     ...row,
-    value: randomMoney(random, 0, 12_000_000),
-  }));
+    value,
+    ...(count === undefined ? {} : { count }),
+    breakdown: buildBreakdown(row.key, value, count, scopeKey),
+  });
 
-  const revenueRows: DailyActivityRowData[] = REVENUE_ROWS.map((row) => ({
-    ...row,
-    value: randomMoney(random, 0, 20_000_000),
-    count: randomInt(random, 0, 24),
-  }));
+  const cashInRows = CASH_IN_ROWS.map((row) =>
+    withBreakdown(row, randomMoney(random, 0, 12_000_000)),
+  );
 
-  const invoiceRows: DailyActivityRowData[] = INVOICE_ROWS.map((row) => ({
-    ...row,
-    value: randomMoney(random, 0, 15_000_000),
-    count: randomInt(random, 0, 18),
-  }));
+  const revenueRows = REVENUE_ROWS.map((row) =>
+    withBreakdown(
+      row,
+      randomMoney(random, 0, 20_000_000),
+      randomInt(random, 0, 24),
+    ),
+  );
+
+  const invoiceRows = INVOICE_ROWS.map((row) =>
+    withBreakdown(
+      row,
+      randomMoney(random, 0, 15_000_000),
+      randomInt(random, 0, 18),
+    ),
+  );
 
   return mockDelay({
     updatedAt: today.toISOString(),
-    cards: buildCards(cashInRows, revenueRows, invoiceRows),
+    cards: buildCards(cashInRows, revenueRows, invoiceRows, scopeKey),
   });
 }

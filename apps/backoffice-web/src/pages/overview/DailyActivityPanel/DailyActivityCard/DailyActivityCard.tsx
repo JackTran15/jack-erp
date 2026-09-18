@@ -7,6 +7,8 @@ import { DailyActivityRow } from "./DailyActivityRow/DailyActivityRow";
 interface Props {
   card: DailyActivityCardData;
   loading?: boolean;
+  /** Mở modal chi tiết của header card hoặc của một dòng, theo `key`. */
+  onOpenDetail: (key: string) => void;
 }
 
 function SkeletonBar({ className }: { className?: string }) {
@@ -14,14 +16,27 @@ function SkeletonBar({ className }: { className?: string }) {
 }
 
 /** Một cột của row 1: header tổng + danh sách dòng con. */
-export function DailyActivityCard({ card, loading }: Props) {
+export function DailyActivityCard({ card, loading, onOpenDetail }: Props) {
   return (
     <article className="flex flex-col rounded-sm border border-[#E0E0E0] border-t-[3px] border-t-[#2B2E6E] pb-1">
       <div
+        role={card.totalClickable ? "button" : undefined}
+        tabIndex={card.totalClickable ? 0 : undefined}
+        onClick={card.totalClickable ? () => onOpenDetail(card.key) : undefined}
+        onKeyDown={
+          card.totalClickable
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpenDetail(card.key);
+                }
+              }
+            : undefined
+        }
         className={cn(
           "flex h-9 items-center justify-between border-b border-[#E0E0E0] px-4 text-[13px] font-bold leading-5",
           card.totalClickable &&
-            "cursor-pointer transition-colors hover:bg-[#F5F6FA]",
+            "cursor-pointer transition-colors hover:bg-[#F5F6FA] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2B2E6E]/40",
         )}
       >
         <span className="truncate text-[#212121]">{card.title}</span>
@@ -48,6 +63,7 @@ export function DailyActivityCard({ card, loading }: Props) {
           label={row.label}
           value={row.value}
           count={row.count}
+          onClick={() => onOpenDetail(row.key)}
         />
       ))}
     </article>
