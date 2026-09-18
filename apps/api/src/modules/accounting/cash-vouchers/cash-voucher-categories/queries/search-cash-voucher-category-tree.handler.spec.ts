@@ -14,6 +14,7 @@ type Row = {
   displayOrder?: number;
   description?: string | null;
   parentGroupId?: string | null;
+  createdAt?: Date;
 };
 
 const actor = { organizationId: 'org1', userId: 'u1', roles: [] } as never;
@@ -30,6 +31,7 @@ function handlerWith(rows: Row[]) {
     displayOrder: 0,
     description: null,
     parentGroupId: null,
+    createdAt: new Date('2026-09-18T00:00:00Z'),
     organizationId: 'org1',
     ...r,
   }));
@@ -86,6 +88,7 @@ describe('SearchCashVoucherCategoryTreeHandler', () => {
       isActive: false,
       displayOrder: 3,
       parentGroupId: null,
+      createdAt: new Date('2026-09-18T00:00:00Z'),
     });
     expect(data[0].children[0]).toMatchObject({
       id: 'c1',

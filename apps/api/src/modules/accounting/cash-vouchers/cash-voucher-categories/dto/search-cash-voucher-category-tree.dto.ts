@@ -44,6 +44,10 @@ export class CashVoucherCategoryTreeNodeDto {
   @ApiProperty({ nullable: true })
   parentGroupId: string | null;
 
+  /** Kept so the admin table's "Ngày tạo" column has a value in tree mode. */
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt: Date;
+
   @ApiProperty({ type: () => [CashVoucherCategoryTreeNodeDto] })
   children: CashVoucherCategoryTreeNodeDto[];
 }

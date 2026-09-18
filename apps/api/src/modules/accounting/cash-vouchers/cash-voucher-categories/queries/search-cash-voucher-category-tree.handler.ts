@@ -61,6 +61,7 @@ export class SearchCashVoucherCategoryTreeHandler
       isActive: c.isActive,
       displayOrder: c.displayOrder,
       parentGroupId: c.parentGroupId ?? null,
+      createdAt: c.createdAt,
       children: childrenOf(c.id).map(toNode),
     });
 

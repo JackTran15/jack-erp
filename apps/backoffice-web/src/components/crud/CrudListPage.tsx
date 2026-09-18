@@ -59,7 +59,8 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { flattenCategoryTree, collectParentIds } from "./itemCategoryTree";
-import { useItemCategoryTree } from "./useItemCategoryTree";
+import { CRUD_TREE_ENTITIES, buildTreeBody } from "./crudTree";
+import { useCrudTree } from "./useCrudTree";
 import { useCrudListReturnState } from "./useCrudListReturnState";
 import { ActiveStatusBadge } from "../status/StatusBadge";
 
@@ -195,9 +196,11 @@ export function CrudListPage({
   };
   const useDialogMode = entityKey ? DIALOG_MODE_ENTITIES.has(entityKey) : false;
 
-  // Nhóm hàng hoá renders as a collapsible parent → child tree instead of the
-  // flat paginated list. Ids in `collapsedIds` have their children hidden.
-  const isCategoryTree = entityKey === "inventory-item-categories";
+  // Tree-mode entities (`CRUD_TREE_ENTITIES`: Nhóm hàng hoá, Danh mục thu chi)
+  // render as a collapsible parent → child tree instead of the flat paginated
+  // list. Ids in `collapsedIds` have their children hidden.
+  const treeConfig = entityKey ? CRUD_TREE_ENTITIES[entityKey] : undefined;
+  const isCategoryTree = Boolean(treeConfig);
   const toggleCategoryCollapse = useCallback((id: string) => {
     setCollapsedIds((prev) => {
       const next = new Set(prev);
@@ -239,15 +242,17 @@ export function CrudListPage({
     Boolean(v2 && config) && !isCategoryTree,
   );
 
-  // Tree data source (Nhóm hàng hoá only). Search is driven by the code/name
-  // column filters; the backend prunes the tree and keeps matching branches.
-  const treeSearch = (
-    debouncedColumnFilters.name?.value ||
-    debouncedColumnFilters.code?.value ||
-    ""
-  ).trim();
-  const treeQuery = useItemCategoryTree(
-    { search: treeSearch || undefined },
+  // Tree data source. Search is driven by the column filters the config names
+  // (the backend prunes the tree and keeps matching branches); select filters
+  // listed in `filterKeys` are passed through to the body.
+  const treeBody = useMemo(
+    () => (treeConfig ? buildTreeBody(treeConfig, debouncedColumnFilters) : {}),
+    [treeConfig, debouncedColumnFilters],
+  );
+  const treeSearch = typeof treeBody.search === "string" ? treeBody.search : "";
+  const treeQuery = useCrudTree(
+    entityKey ?? "",
+    treeBody,
     isCategoryTree && Boolean(config),
   );
   const treeNodes = useMemo(() => treeQuery.data?.data ?? [], [treeQuery.data]);
@@ -466,10 +471,7 @@ export function CrudListPage({
                   </div>
                 );
               }
-              if (
-                entityKey === "inventory-item-categories" &&
-                field.key === "name"
-              ) {
+              if (isCategoryTree && field.key === "name") {
                 return (
                   <button
                     type="button"
@@ -635,7 +637,7 @@ export function CrudListPage({
   };
 
   const handleCreate = () => {
-    if (entityKey === "inventory-item-categories") {
+    if (isCategoryTree) {
       setCreateDialogOpen(true);
       return;
     }
@@ -736,7 +738,7 @@ export function CrudListPage({
 
   const handleRowClick = (row: Record<string, unknown>) => {
     if (disableRowClick) return;
-    if (entityKey === "inventory-item-categories") {
+    if (isCategoryTree) {
       setSelectedRecordIds(new Set([String(row[config.idField])]));
       return;
     }
@@ -804,7 +806,7 @@ export function CrudListPage({
         handleEdit: () => {
           if (!selectedRecord) return;
           const id = String(selectedRecord[config.idField]);
-          if (entityKey === "inventory-item-categories") {
+          if (isCategoryTree) {
             openCategoryEditDialog();
             return;
           }

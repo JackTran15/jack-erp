@@ -19025,6 +19025,134 @@
         ]
       }
     },
+    "/reports/cash-fund/columns": {
+      "get": {
+        "operationId": "CashFundReportController_getColumns",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
+    "/reports/cash-fund/filter-options": {
+      "get": {
+        "operationId": "CashFundReportController_getFilterOptions",
+        "parameters": [
+          {
+            "name": "type",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "store",
+                "employee",
+                "paymentMethod",
+                "expenseCategory"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Optional case-insensitive partial search.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Shared dropdown options for the report filters (store, employee, paymentMethod, expenseCategory).",
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
+    "/reports/cash-fund/search": {
+      "post": {
+        "operationId": "CashFundReportController_search",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashFundReportSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
     "/reports/profit/columns": {
       "get": {
         "operationId": "ProfitReportController_getColumns",
@@ -28567,6 +28695,11 @@
             "type": "string",
             "nullable": true
           },
+          "createdAt": {
+            "type": "string",
+            "description": "Kept so the admin table's \"Ngày tạo\" column has a value in tree mode.",
+            "format": "date-time"
+          },
           "children": {
             "type": "array",
             "items": {
@@ -28583,6 +28716,7 @@
           "isActive",
           "displayOrder",
           "parentGroupId",
+          "createdAt",
           "children"
         ]
       },
@@ -45527,6 +45661,116 @@
             "additionalProperties": {
               "type": "string"
             }
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
+      "CashFundReportFilterDto": {
+        "type": "object",
+        "properties": {
+          "paymentMethod": {
+            "type": "string",
+            "description": "Phương thức thanh toán = which fund: cash vouchers or deposit vouchers.",
+            "enum": [
+              "cash",
+              "deposit"
+            ]
+          },
+          "fundKind": {
+            "type": "string",
+            "description": "Drill-down from a \"Tiền cuối kỳ\" cell of \"Tình hình thu chi\" into one fund's ledger.",
+            "enum": [
+              "cash",
+              "deposit"
+            ]
+          },
+          "timeBucket": {
+            "type": "string",
+            "description": "\"Thống kê theo\" of \"Chi tiền theo thời gian\"; defaults to `day`.",
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "quarter",
+              "year"
+            ]
+          },
+          "period": {
+            "description": "Report period on the voucher date (ADR-02).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "branchId": {
+            "type": "string",
+            "description": "The header branch — reports that have no store picker.",
+            "format": "uuid"
+          },
+          "store": {
+            "description": "Multi-store scope — \"Bảng kê thu chi\" and \"Bảng kê tiền chi theo mục chi\".",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StoreScopeDto"
+              }
+            ]
+          },
+          "employeeIds": {
+            "description": "Nhân viên thu/chi (`staff_id` on the voucher) — \"Bảng kê thu chi\".",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "categoryIds": {
+            "description": "Mục chi filter for the expense reports. Category ids, or the literal\n`uncategorized` (CASH_FUND_UNCATEGORIZED) for lines without a category.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CashFundReportSearchDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run (CASH_FUND_REPORT_KEYS)."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys only — cash-fund reports have no dynamic columns).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/CashFundReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 500
           }
         },
         "required": [
