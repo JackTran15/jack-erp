@@ -542,6 +542,23 @@ describe('CashInOutListReport', () => {
     });
   });
 
+  describe('T-02-07 — the calendar date never round-trips through a Date', () => {
+    it('selects doc_date::text for the row and reads it as-is', async () => {
+      await build().buildData(dto(), actor);
+      const pageSql = query.mock.calls.map((c) => c[0] as string).find((q) => q.includes('doc_date_text'));
+      expect(pageSql).toContain('v.doc_date::text AS doc_date_text');
+    });
+
+    it('keeps the local calendar date when pg hands a date column over as a local-midnight Date', async () => {
+      // pg parses `date` into `new Date(y, m, d)` in the process time zone; on a
+      // +07:00 host `toISOString()` of that is the previous day 17:00Z.
+      const pgDate = new Date(2026, 8, 3) as unknown as string;
+      const rows = [voucher('PTG-01', 'BANK_RECEIPT', pgDate, 1600000)];
+      const { rows: out } = await build(rows, []).buildData(dto(), actor);
+      expect(out[1]).toMatchObject({ documentNumber: 'PTG-01', docDate: '2026-09-03' });
+    });
+  });
+
   describe('scope and validation', () => {
     it('requires a period and rejects an inverted one', async () => {
       const report = build();

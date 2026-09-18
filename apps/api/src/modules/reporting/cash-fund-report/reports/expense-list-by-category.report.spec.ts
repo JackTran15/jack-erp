@@ -514,6 +514,22 @@ describe('ExpenseListByCategoryReport', () => {
     });
   });
 
+  describe('T-02-07 — the calendar date never round-trips through a Date', () => {
+    it('selects doc_date::text for the row and reads it as-is', async () => {
+      await build().buildData(dto(), actor);
+      const pageSql = query.mock.calls.map((c) => c[0] as string).find((q) => q.includes('doc_date_text'));
+      expect(pageSql).toContain('v.doc_date::text AS doc_date_text');
+    });
+
+    it('keeps the local calendar date when pg hands a date column over as a local-midnight Date', async () => {
+      const pgDate = new Date(2026, 8, 9) as unknown as string;
+      const rows = [line('PC-03', 'l-pc03', pgDate, 'cat-electric', 60000)];
+      const { rows: out } = await build(rows).buildData(dto(), actor);
+      const detail = out.find((r) => r[CASH_FUND_ROW_KEYS.ROW_KIND] === 'detail');
+      expect(detail).toMatchObject({ documentNumber: 'PC-03', docDate: '2026-09-09' });
+    });
+  });
+
   describe('scope and validation', () => {
     it('requires the period and rejects from > to', async () => {
       const report = build();

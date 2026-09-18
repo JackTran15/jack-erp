@@ -95,6 +95,8 @@ interface RawRow {
   fund: CashFundKind;
   id: string;
   doc_date: string | Date;
+  /** `doc_date::text` — the calendar date without a `Date` round-trip (T-02-07). */
+  doc_date_text?: string;
   document_number: string | null;
   reference: string | null;
   amount_in: unknown;
@@ -134,8 +136,23 @@ const num = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const isoDate = (v: string | Date): string =>
-  v instanceof Date ? v.toISOString().slice(0, 10) : String(v).slice(0, 10);
+/**
+ * The calendar date of a voucher, as `YYYY-MM-DD`.
+ *
+ * The page SQL selects `doc_date::text` so pg hands the date over as a string.
+ * The `Date` branch is only a guard: pg parses a bare `date` column into a
+ * local-midnight `Date`, and `toISOString()` on that rolls a +07:00 process
+ * back to the previous day (T-02-07) — so read the local calendar fields,
+ * never the UTC instant.
+ */
+const isoDate = (v: string | Date): string => {
+  if (v instanceof Date) {
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${v.getFullYear()}-${m}-${d}`;
+  }
+  return String(v).slice(0, 10);
+};
 
 const escapeLike = (s: string): string => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
@@ -357,7 +374,7 @@ export class CashInOutListReport implements ReportDefinition {
     if (scope.fund) where.push(`v.fund = ${p(scope.fund)}`);
     if (scope.staffIds) where.push(`v.staff_id = ANY(${p(scope.staffIds)}::text[])`);
 
-    const base = `SELECT v.kind, v.fund, v.id, v.doc_date, v.document_number,
+    const base = `SELECT v.kind, v.fund, v.id, v.doc_date, v.doc_date::text AS doc_date_text, v.document_number,
         CASE WHEN v.direction = 'in' THEN v.total_amount ELSE 0 END AS amount_in,
         CASE WHEN v.direction = 'out' THEN v.total_amount ELSE 0 END AS amount_out,
         CASE WHEN v.direction = 'in' THEN v.total_amount ELSE -v.total_amount END AS signed,
@@ -502,7 +519,7 @@ export class CashInOutListReport implements ReportDefinition {
 
   private toRow(r: RawRow, runningBalance: number | null): ReportRow {
     return {
-      docDate: isoDate(r.doc_date),
+      docDate: isoDate(r.doc_date_text ?? r.doc_date),
       documentNumber: r.document_number ?? null,
       documentKind: CASH_FUND_DOCUMENT_KIND_LABELS_VI[r.kind] ?? r.kind,
       reference: r.reference ?? null,
