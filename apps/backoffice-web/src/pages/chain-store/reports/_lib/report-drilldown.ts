@@ -9,9 +9,19 @@
  * click is meaningful on exactly one of each. That is why clickability lives
  * here, keyed by (backendKey, columnKey), instead of on the flag (ADR-02).
  */
-import { REPORT_ROW_BRANCH_ID, REPORT_ROW_INVOICE_ID } from "@erp/shared-interfaces";
+import {
+  CASH_FUND_KIND_LABELS_VI,
+  CASH_FUND_ROW_KEYS,
+  REPORT_ROW_BRANCH_ID,
+  REPORT_ROW_INVOICE_ID,
+  type CashFundKind,
+} from "@erp/shared-interfaces";
 import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
-import { REPORT_TYPE_INVENTORY, REPORT_TYPE_SALES } from "../../../../constants/reports/report-type.constant";
+import {
+  REPORT_TYPE_CASH_FUND,
+  REPORT_TYPE_INVENTORY,
+  REPORT_TYPE_SALES,
+} from "../../../../constants/reports/report-type.constant";
 import type {
   InvoiceDetailTarget,
   ReportDrillDown,
@@ -276,6 +286,47 @@ const transferDifferenceDetail: DrillDownResolver = ({ raw, row, filters, anchor
   };
 };
 
+/**
+ * "Bảng kê thu chi" của kỳ đang xem, lọc theo một phương thức thanh toán.
+ *
+ * Chỉ dòng "IV. Tiền cuối kỳ" (`lineKey === 'closing'`) mở được: các dòng I–III
+ * là số gộp theo nguồn thu / mục chi, không có bảng kê nào cộng về đúng một ô
+ * trong số đó. Cột `total` cố ý không có resolver — bảng kê không lọc được
+ * "cả hai" thành một dòng tổng khớp.
+ *
+ * Kế thừa filter bằng allow-list như các drill-down khác. #2 không có dòng
+ * Cửa hàng (A-14): chi nhánh lấy từ header qua `activeBranchId` trong
+ * `ReportPageTable`, dialog con dùng cùng cơ chế nên tự khớp; ở chế độ Chuỗi
+ * `STORE` của #2 rỗng ⇒ bảng kê cũng gộp theo quyền hợp nhất như #2.
+ */
+const cashInOutListForClosing =
+  (kind: CashFundKind): DrillDownResolver =>
+  ({ row, filters }) => {
+    if (row[CASH_FUND_ROW_KEYS.LINE_KEY] !== "closing") return null;
+
+    const range = filters[REPORT_FILTERS_LINE.RANGE_DATE];
+    const period =
+      range?.fromDate && range?.toDate
+        ? ` Từ ${formatVnDate(range.fromDate)} đến ${formatVnDate(range.toDate)}`
+        : "";
+
+    return {
+      kind: "report",
+      drillDown: {
+        reportType: REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST,
+        title: "BẢNG KÊ THU CHI",
+        subtitle: `Phương thức thanh toán ${CASH_FUND_KIND_LABELS_VI[kind]}${period}`,
+        filters: {
+          [REPORT_FILTERS_LINE.STORE]: filters[REPORT_FILTERS_LINE.STORE],
+          [REPORT_FILTERS_LINE.REPORT_PERIOD]:
+            filters[REPORT_FILTERS_LINE.REPORT_PERIOD],
+          [REPORT_FILTERS_LINE.RANGE_DATE]: range,
+          [REPORT_FILTERS_LINE.PAYMENT_METHOD]: kind,
+        },
+      },
+    };
+  };
+
 const DRILL_DOWNS: Record<string, Record<string, DrillDownResolver>> = {
   // Giữ nguyên hành vi sẵn có: đây là hai báo cáo duy nhất có cột `invoiceCode`.
   "invoice-order-listing": { invoiceCode: invoiceDetail },
@@ -291,6 +342,12 @@ const DRILL_DOWNS: Record<string, Record<string, DrillDownResolver>> = {
     outQty: transferDocs("out"),
     receivedQty: transferDocs("received"),
     diffQty: transferDifferenceDetail,
+  },
+  // Khoá cột là `col` của catalog BE (mapHeadersToTableConfig), không phải
+  // ReportTableColumn của registry FE.
+  "cash-in-out-situation": {
+    cash: cashInOutListForClosing("cash"),
+    deposit: cashInOutListForClosing("deposit"),
   },
 };
 
