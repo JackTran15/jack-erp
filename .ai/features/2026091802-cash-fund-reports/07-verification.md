@@ -49,8 +49,29 @@ Kết quả 2026-09-18: **13/13 PASS**.
 - **Chân bảng "Tổng 0 0 0"** của `ReportPageTable` cho báo cáo `totals: null` — thẩm mỹ, ngoài
   AC, follow-up chung với Kết quả kinh doanh.
 
-## UOW-02 / UOW-03
+## Steps — UOW-02 (Bảng kê thu chi)
 
-Bổ sung khi các ticket FE (T-02-03, T-03-04) và drill-down (T-02-04, T-03-05) đóng: cùng
-script, thêm các bước cho Bảng kê thu chi (lọc cửa hàng / nhân viên / phương thức, cột ẩn),
-ba báo cáo chi tiền và hai drill-down.
+Cùng môi trường; mỗi script in PASS/FAIL từng bước và thoát khác 0 khi có lỗi.
+
+| Script | Kiểm | Verifies | Kết quả 2026-09-18 | Evidence |
+|---|---|---|---|---|
+| `verify-t0203.py` | dialog Nhân viên / Phương thức / Kỳ / Từ–Đến; lưới 14 cột mặc định (Mã đối tượng, Số hóa đơn ẩn); dòng Số dư đầu kỳ 1.500.000, 9 phiếu, luỹ kế cuối 3.770.000, chân bảng 2.670.000 / 400.000; lọc cột Diễn giải "Tiền điện" → 2 dòng; Chuyển khoản → 1 dòng, Tiền mặt → 8; Sửa mẫu 16 cột, 2 tắt, 4 ghim; bật Số hóa đơn → cột hiện; ngày chứng từ khớp DB | AC-08, AC-09, AC-10, AC-11 | 18/18 sau T-02-07 (17/18 trước đó — dòng đỏ là ngày lệch) | `t0203-0{1..6}-*.png` |
+| `verify-t0204.py` | ô IV Tiền mặt / Tiền gửi của Tình hình thu chi là link, các ô khác không; mở dialog Bảng kê cùng kỳ lọc theo phương thức; đóng dialog không gọi lại API | AC-08 (drill-down) | 14/14 | `t0204-0{1..3}-*.png` |
+
+## Steps — UOW-03 (ba báo cáo chi tiền)
+
+| Script | Kiểm | Verifies | Kết quả 2026-09-18 | Evidence |
+|---|---|---|---|---|
+| `verify-t0304.py` | #4: Tiền điện 150.000 / Chi khác 40.000 / Tiền nước 10.000, Tổng 200.000, Sửa mẫu có ID/Loại mục chi ẩn; #5: TỔNG CHI đậm, dòng nhóm đậm, chi tiết thụt lề, 8 dòng phẳng, dialog Nhân viên / PTTT / Mục chi; #6: Ngày → 3 dòng, Tháng → 09/2026, Mục chi = Tiền điện → 150.000 | AC-12, AC-14, AC-16, AC-17 | 26/26 | `t0304-0{1..6}-*.png` |
+| `verify-t0305.py` | "Tiền điện" ở #4 → dialog #5 TỔNG CHI 150.000 một nhóm; "Chi khác" → 40.000; 08/09/2026 ở #6 → #5 TỔNG CHI 100.000 hai nhóm; giữ Mục chi đang lọc | AC-13, AC-18 | 22/22 | `t0305-0{1..4}-*.png` |
+
+Phụ đề "Xem theo cửa hàng / Nhân viên" (T-02-06) kiểm riêng khi ticket đóng.
+
+## Ngoài AC — follow-up chung của report-core FE (không sửa trong feature này)
+
+- Ô kiểu `date` được `ReportPageTableView` in nguyên chuỗi `YYYY-MM-DD` (mọi domain, vì
+  `toBusinessDate` trả ISO và bảng không định dạng theo `dataType`); MShopKeeper in
+  `dd/MM/yyyy`. Một chỗ sửa trong `ReportPageTableView.tsx` cho cả 4+1 domain.
+- Chân bảng "Tổng 0 0 0" cho báo cáo `totals: null` (Tình hình thu chi, Kết quả kinh doanh).
+- Tên mục chi trong phụ đề drill-down #6 là "đang lọc" thay vì tên thật (DrillDownContext
+  không có nhãn option).
