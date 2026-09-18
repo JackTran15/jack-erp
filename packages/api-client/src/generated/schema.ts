@@ -6664,6 +6664,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/cash-fund/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashFundReportController_listTemplates"];
+        put?: never;
+        post: operations["CashFundReportController_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashFundReportController_getTemplate"];
+        put?: never;
+        post?: never;
+        delete: operations["CashFundReportController_deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["CashFundReportController_updateTemplate"];
+        trace?: never;
+    };
+    "/reports/cash-fund/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export one cash-fund report as an .xlsx workbook */
+        post: operations["CashFundReportController_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Print-ready payload for one cash-fund report */
+        post: operations["CashFundReportController_printPayload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/profit/columns": {
         parameters: {
             query?: never;
@@ -15617,6 +15683,49 @@ export interface components {
             page: number;
             /** @default 50 */
             limit: number;
+        };
+        CreateCashFundReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
+            reportType: string;
+            name: string;
+            description?: string;
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        UpdateCashFundReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
+            name?: string;
+            description?: string;
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        CashFundReportExportDto: {
+            /** @description Which backend report definition to run (CASH_FUND_REPORT_KEYS). */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys only — cash-fund reports have no dynamic columns). */
+            columns: string[];
+            filters: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @description Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label. */
+            columnLabels?: {
+                [key: string]: string;
+            };
         };
         ProfitReportFilterDto: {
             /**
@@ -30279,6 +30388,166 @@ export interface operations {
         };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_listTemplates: {
+        parameters: {
+            query?: {
+                reportType?: string;
+                scope?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashFundReportTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_getTemplate: {
+        parameters: {
+            query?: {
+                scope?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_deleteTemplate: {
+        parameters: {
+            query?: {
+                scope?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCashFundReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashFundReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashFundReportController_printPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashFundReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

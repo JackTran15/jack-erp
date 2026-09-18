@@ -19153,6 +19153,242 @@
         ]
       }
     },
+    "/reports/cash-fund/templates": {
+      "get": {
+        "operationId": "CashFundReportController_listTemplates",
+        "parameters": [
+          {
+            "name": "reportType",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      },
+      "post": {
+        "operationId": "CashFundReportController_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCashFundReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
+    "/reports/cash-fund/templates/{id}": {
+      "get": {
+        "operationId": "CashFundReportController_getTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      },
+      "patch": {
+        "operationId": "CashFundReportController_updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCashFundReportTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      },
+      "delete": {
+        "operationId": "CashFundReportController_deleteTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
+    "/reports/cash-fund/export": {
+      "post": {
+        "operationId": "CashFundReportController_export",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashFundReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Export one cash-fund report as an .xlsx workbook",
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
+    "/reports/cash-fund/print-payload": {
+      "post": {
+        "operationId": "CashFundReportController_printPayload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CashFundReportExportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Print-ready payload for one cash-fund report",
+        "tags": [
+          "reports/cash-fund"
+        ]
+      }
+    },
     "/reports/profit/columns": {
       "get": {
         "operationId": "ProfitReportController_getColumns",
@@ -45771,6 +46007,135 @@
             "default": 50,
             "minimum": 1,
             "maximum": 500
+          }
+        },
+        "required": [
+          "reportType",
+          "columns",
+          "filters"
+        ]
+      },
+      "CreateCashFundReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
+          "reportType": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/CashFundReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "reportType",
+          "name",
+          "columns"
+        ]
+      },
+      "UpdateCashFundReportTemplateDto": {
+        "type": "object",
+        "properties": {
+          "scope": {
+            "type": "string",
+            "description": "Which tier to write to. Must be declared by the client: the backoffice sends\n`X-Branch-Id` even in chain view, so the server cannot tell the two apart\n(ADR-02). Omitted ⇒ branch tier when the actor has a branch.",
+            "enum": [
+              "chain",
+              "branch"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "description": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportTemplateColumnDto"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/CashFundReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "sortOrder": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "CashFundReportExportDto": {
+        "type": "object",
+        "properties": {
+          "reportType": {
+            "type": "string",
+            "description": "Which backend report definition to run (CASH_FUND_REPORT_KEYS)."
+          },
+          "columns": {
+            "description": "Selected column keys (fixed registry keys only — cash-fund reports have no dynamic columns).",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "filters": {
+            "$ref": "#/components/schemas/CashFundReportFilterDto"
+          },
+          "columnFilters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnFilterDto"
+            }
+          },
+          "columnLabels": {
+            "type": "object",
+            "description": "Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label.",
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         },
         "required": [
