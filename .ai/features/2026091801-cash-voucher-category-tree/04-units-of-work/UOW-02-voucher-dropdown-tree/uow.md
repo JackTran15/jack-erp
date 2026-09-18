@@ -50,6 +50,6 @@ thì tạo lại).
 
 ## Definition of done
 
-- [ ] AC-08 pass
-- [ ] `tsc --noEmit` của `apps/backoffice-web` sạch
+- [ ] AC-08 pass — 4 dialog, PC000038 lưu/mở lại, lưới tiền mặt và sổ chi tiết đã kiểm (T-02-01); tick khi demo dưới chạy xong (bước 3 và 5 còn lại)
+- [x] `tsc --noEmit` của `apps/backoffice-web` sạch — 18/09/2026
 - [ ] Demo script chạy đầu-cuối và được nghiệm thu ở G4

@@ -74,9 +74,9 @@ Môi trường `local-backoffice` (Chrome của Akenzy, org MT, chi nhánh `${LO
 
 ## Definition of done
 
-- [ ] AC-01 … AC-07, AC-09, AC-10 pass
-- [ ] `pnpm --filter @erp/api test -- cash-voucher-categories.service.spec.ts search-cash-voucher-category-tree.handler.spec.ts` xanh; toàn bộ `pnpm --filter @erp/api test` xanh
-- [ ] `pnpm migration:generate` sau `migration:run` không ra diff
-- [ ] `tsc --noEmit` của `apps/api` và `apps/backoffice-web` sạch
-- [ ] `packages/api-client/src/generated/schema.ts` + `openapi.snapshot.json` sinh lại và commit
+- [ ] AC-01 … AC-07, AC-09, AC-10 pass — từng AC đã có bằng chứng ở ticket (spec, e2e, Playwright); ô này tick khi demo dưới chạy xong
+- [x] `pnpm --filter @erp/api test -- cash-voucher-categories.service.spec.ts search-cash-voucher-category-tree.handler.spec.ts` xanh; toàn bộ `pnpm --filter @erp/api test` xanh — 20/20 + 6/6; toàn bộ 410 suite / 5 686 test xanh (1 skipped có sẵn), 18/09/2026
+- [x] `pnpm migration:generate` sau `migration:run` không sinh câu nào nhắc tới `parent_group_id`, FK hay index mới — tiêu chí gốc "không ra diff" được Akenzy đổi 18/09/2026 vì repo lệch entity ↔ migration từ trước (xem T-01-01)
+- [x] `tsc --noEmit` của `apps/api` và `apps/backoffice-web` sạch — 18/09/2026
+- [x] `packages/api-client/src/generated/schema.ts` + `openapi.snapshot.json` sinh lại và commit — a03de26f, ce6d973a
 - [ ] Demo script chạy đầu-cuối và được nghiệm thu ở G4
