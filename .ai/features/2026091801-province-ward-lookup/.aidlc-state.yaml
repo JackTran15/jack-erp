@@ -1,0 +1,185 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: province-ward-lookup
+slug: 2026091801-province-ward-lookup
+profile: none
+created: 2026-09-18T14:23:34
+ruleset: 6
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-18T15:02:07
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-18T15:02:07
+    by: Akenzy
+    evidence: 14 assumptions, none blocking-and-pending; 12 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-18T15:02:07
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-18T15:02:08
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 8 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:02:08
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:02:08
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:03:13
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:03:25
+    by: Akenzy
+    reason: web_gateway.*.json là input thô của script, untracked có chủ ý (không commit); scripts/bench-catalog-page.js untracked từ trước phiên, không thuộc ticket
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:03:25
+    by: Akenzy
+    reason: web_gateway.*.json là input thô của script, untracked có chủ ý (không commit); scripts/bench-catalog-page.js untracked từ trước phiên, không thuộc ticket
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:07:59
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:08:17
+    by: Akenzy
+    reason: cùng 3 file untracked có trước phiên như T-01-01 (dump thô + bench script), không thuộc ticket
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:08:17
+    by: Akenzy
+    reason: cùng 3 file untracked có trước phiên như T-01-01 (dump thô + bench script), không thuộc ticket
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:08:18
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:08:18
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:11:49
+    by: Akenzy
+    reason: cùng 3 file untracked có trước phiên (dump thô + bench script); T-01-04 đang song song
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:11:49
+    by: Akenzy
+    reason: cùng 3 file untracked có trước phiên (dump thô + bench script); T-01-04 đang song song
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:23:09
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:23:09
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:23:25
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:23:25
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:23:25
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:23:25
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:30:00
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:30:00
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:30:00
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:30:00
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:30:00
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T15:30:00
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T15:31:14
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T15:31:14
+    by: Akenzy
+    reason: 3 file untracked có trước phiên (dump thô + bench script) và file của các ticket trước chưa commit (Akenzy chọn không commit theo ticket)
+    ticket: T-02-03
+  - gate: G4
+    action: passed
+    at: 2026-09-18T15:53:46
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 8 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-18T15:53:46
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

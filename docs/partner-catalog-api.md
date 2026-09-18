@@ -20,6 +20,9 @@ Three read-only endpoints. Nothing here writes.
 | 2 | `POST /v2/partner/catalog/products/search` | Listing: filter, sort, paginate | **Live** |
 | 3 | `GET /v2/partner/catalog/products/:productCode` | Product page: variants + attributes | **Live** |
 
+The same key also reaches the province/ward lookup at `/v2/geo/*` with no extra
+permission — see [Geo API](./geo-api.md) for address pickers.
+
 ### Why a separate surface
 
 The obvious alternative was to hand a partner an API key and point it at the existing

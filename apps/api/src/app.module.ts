@@ -52,6 +52,7 @@ import { SalesOrderModule } from './modules/sales-order/sales-order.module';
 // pool is ever created with the driver's process-timezone date handling.
 applyUtcTimestampCodec();
 import { ApiKeyModule } from './modules/api-key/api-key.module';
+import { GeoModule } from './modules/geo/geo.module';
 import { PartnerCatalogModule } from './modules/partner-catalog/partner-catalog.module';
 import { MediaModule } from './modules/media/media.module';
 
@@ -141,6 +142,7 @@ import { MediaModule } from './modules/media/media.module';
     SalesOrderModule,
     ApiKeyModule,
     PartnerCatalogModule,
+    GeoModule,
     MediaModule,
   ],
 })

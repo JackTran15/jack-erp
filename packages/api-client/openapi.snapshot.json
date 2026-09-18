@@ -27165,6 +27165,227 @@
         ]
       }
     },
+    "/v2/geo/provinces": {
+      "get": {
+        "operationId": "GeoController_listProvinces_v2",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo tên, không phân biệt dấu và hoa/thường (\"ha noi\" khớp \"Hà Nội\"). Ký tự % và _ là ký tự thường, không phải wildcard.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvinceListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          },
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Danh sách tỉnh/thành hiện hành, tìm theo tên không dấu",
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
+    "/v2/geo/provinces/{code}": {
+      "get": {
+        "operationId": "GeoController_findProvince_v2",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "description": "Mã tỉnh hiện hành (2026_xx). Mã cũ (1995_xx) chỉ nằm trong mergedFrom → 404",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvinceDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có tỉnh/thành với mã này"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          },
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Một tỉnh/thành theo mã",
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
+    "/v2/geo/wards": {
+      "get": {
+        "description": "Mặc định chỉ trả phường hiện hành. `includeLegacy=true` thêm phường cũ; `provinceCode=1995_xx` trả phường cũ của tỉnh đó. Sắp theo tên không dấu, rồi mã tỉnh, rồi mã phường.",
+        "operationId": "GeoController_searchWards_v2",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Tìm theo tên, không phân biệt dấu và hoa/thường (\"phuc xa\" khớp \"Phường Phúc Xá\"). % và _ là ký tự thường.",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Lọc đúng một tỉnh. Mã 2026_xx → phường hiện hành; mã 1995_xx → phường cũ của tỉnh đó (khi có provinceCode thì includeLegacy không còn tác dụng).",
+            "schema": {
+              "maxLength": 16,
+              "example": "2026_01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeLegacy",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ dùng khi không có provinceCode: false → chỉ phường hiện hành (isCurrent = true); true → cả phường cũ (cấu trúc trước sáp nhập).",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WardSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          },
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Tìm phường/xã theo tên không dấu, lọc theo tỉnh, phân trang",
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
+    "/v2/geo/wards/{code}": {
+      "get": {
+        "operationId": "GeoController_findWard_v2",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "description": "Mã phường. Không kèm provinceCode → tra bộ hiện hành; kèm 1995_xx → phường cũ",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "provinceCode",
+            "required": false,
+            "in": "query",
+            "description": "Bỏ trống → tra phường hiện hành có mã này (mã phường duy nhất trong một thời kỳ). Truyền 1995_xx để tra phường cũ.",
+            "schema": {
+              "maxLength": 16,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WardDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Không có phường/xã với mã này (trong thời kỳ đã chọn)"
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          },
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Một phường/xã theo mã",
+        "tags": [
+          "Geo"
+        ]
+      }
+    },
     "/media/uploads": {
       "post": {
         "operationId": "MediaUploadController_requestUpload",
@@ -50253,12 +50474,17 @@
           "revenue": {
             "type": "number",
             "description": "Doanh thu ròng của nhóm trong kỳ, đơn vị đồng"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Số lượng bán ròng của nhóm trong kỳ (trả hàng trừ ra, nên ÂM được). Cùng phép cộng `SUM(qty)` mà `items` đang dùng, nên hai màn không lệch."
           }
         },
         "required": [
           "id",
           "name",
-          "revenue"
+          "revenue",
+          "quantity"
         ]
       },
       "MobileRevenueCategoryListDto": {
@@ -50274,11 +50500,16 @@
           "totalRevenue": {
             "type": "number",
             "description": "Tổng doanh thu của các nhóm trong `data`"
+          },
+          "totalQuantity": {
+            "type": "number",
+            "description": "Tổng số lượng của các nhóm trong `data`"
           }
         },
         "required": [
           "data",
-          "totalRevenue"
+          "totalRevenue",
+          "totalQuantity"
         ]
       },
       "MobileRevenuePointDto": {
@@ -53479,6 +53710,138 @@
           "description",
           "attributes",
           "variants"
+        ]
+      },
+      "ProvinceMergedFromDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "ProvinceDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "2026_01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Hà Nội"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "example": "2026-01-01",
+            "description": "Ngày hiệu lực, YYYY-MM-DD"
+          },
+          "mergedFrom": {
+            "description": "Các tỉnh cũ đã sáp nhập vào; dùng để ánh xạ địa chỉ ghi theo mã 1995_xx",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvinceMergedFromDto"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isActive",
+          "effectiveFrom",
+          "mergedFrom"
+        ]
+      },
+      "ProvinceListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvinceDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "WardDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "4",
+            "description": "Mã phường — chỉ duy nhất trong cặp (provinceCode, code)"
+          },
+          "name": {
+            "type": "string",
+            "example": "Phường Ba Đình"
+          },
+          "provinceCode": {
+            "type": "string",
+            "example": "2026_01"
+          },
+          "provinceName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Hà Nội",
+            "description": "Tên tỉnh hiện hành; null với phường cũ (mã 1995_xx không còn là tỉnh)"
+          },
+          "districtCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã quận/huyện, chỉ có ở phường cũ"
+          },
+          "isCurrent": {
+            "type": "boolean",
+            "description": "true khi provinceCode là một tỉnh hiện hành"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "provinceCode",
+          "provinceName",
+          "districtCode",
+          "isCurrent"
+        ]
+      },
+      "WardSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WardDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
         ]
       },
       "CreateMediaUploadDto": {
