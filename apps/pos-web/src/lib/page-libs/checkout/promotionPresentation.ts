@@ -18,6 +18,7 @@ import type {
   SkippedProgramReason,
 } from "@erp/shared-interfaces";
 import { PromotionDiscountMode, PromotionProgramType } from "@erp/shared-interfaces";
+import { bucketOf } from "@erp/pos/lib/page-libs/checkout/linePromotionIndex";
 
 const KIND_LABELS: Record<PromotionKind, string> = {
   [PromotionKindEnum.AMOUNT_OFF]: "Giảm tiền",
@@ -182,15 +183,16 @@ export function mapEvaluateResponseToPromotionItems(
 
 /**
  * Nhãn cho dòng "Khuyến mại" ở panel thanh toán. Chỉ hiện "(X%)" khi đúng 1
- * chương trình đang áp và nó là `INVOICE_DISCOUNT` kiểu `PERCENT` — mọi
+ * chương trình **hóa đơn** đang áp và nó là `INVOICE_DISCOUNT` kiểu `PERCENT` — mọi
  * trường hợp khác (0, loại khác, hoặc ≥2 chương trình cộng dồn) trả về nhãn
  * phẳng, vì một con số % lẻ không mô tả đúng tổng đã cộng dồn. Không suy
  * diễn % gần đúng từ `discountAmount / subtotal` — chỉ dùng giá trị thật.
  */
 export function buildPromotionRowLabel(data: EvaluateCartResponse): string {
-  const [only] = data.appliedPrograms;
+  const programs = invoiceLevelPrograms(data);
+  const [only] = programs;
   const isSolePercentInvoiceDiscount =
-    data.appliedPrograms.length === 1 &&
+    programs.length === 1 &&
     only.type === PromotionProgramType.INVOICE_DISCOUNT &&
     only.discountMode === PromotionDiscountMode.PERCENT &&
     only.discountValue != null;
@@ -200,7 +202,21 @@ export function buildPromotionRowLabel(data: EvaluateCartResponse): string {
     : "Khuyến mại";
 }
 
-/** Guard cho dòng "Khuyến mại" — ẩn khi không có giảm giá thật. */
+/**
+ * Các CTKM ở nhóm `invoice` (ADR-02 pos-line-promotion-breakdown): dòng
+ * "Khuyến mại" của panel phải chỉ nói về chúng — CTKM hàng hóa đã trừ thẳng
+ * vào Thành tiền từng dòng và vào "Tổng tiền".
+ */
+export function invoiceLevelPrograms(data: EvaluateCartResponse): AppliedProgram[] {
+  return data.appliedPrograms.filter((p) => bucketOf(p.type) === "invoice");
+}
+
+/** Số tiền của dòng "Khuyến mại" — chỉ phần CTKM hóa đơn. */
+export function invoiceLevelDiscount(data: EvaluateCartResponse): number {
+  return invoiceLevelPrograms(data).reduce((sum, p) => sum + p.discountAmount, 0);
+}
+
+/** Guard cho dòng "Khuyến mại" — ẩn khi không có CTKM hóa đơn nào đang giảm. */
 export function shouldShowPromotionRow(data: EvaluateCartResponse): boolean {
-  return data.promotionDiscount > 0;
+  return invoiceLevelDiscount(data) > 0;
 }
