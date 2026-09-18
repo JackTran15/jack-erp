@@ -444,3 +444,29 @@ history:
     by: Akenzy
     reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
     ticket: T-03-06
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:53:49
+    by: Akenzy
+    reason: full API unit run - rbac/employee-listing-surfaces.spec.ts guards every file that queries users/employee_profiles against employee-branch-scope.md — the T-02-02 handler must be documented there; add chore ticket T-02-08
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:53:49
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 21 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:53:50
+    by: Akenzy
+    ticket: T-02-08
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:54:53
+    by: Akenzy
+    ticket: T-02-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:54:53
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-08
