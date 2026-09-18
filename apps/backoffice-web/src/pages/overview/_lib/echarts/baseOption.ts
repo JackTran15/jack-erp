@@ -66,10 +66,18 @@ export function xAxis(
     nameLocation: "end" as const,
     nameTextStyle: { ...AXIS_NAME, align: "right" as const },
     data,
-    axisLine: { lineStyle: { color: CHART_COLOR.axisLine } },
+    axisLine: {
+      // Mặc định của ECharts là `onZero: true` → khi miền Y có giá trị âm, trục
+      // X bị kéo lên mức 0 giữa biểu đồ và vẽ xuyên qua nhãn category. Ghim trục
+      // xuống đáy lưới, đúng spec ("trục X dưới cùng, ở mức thấp nhất").
+      onZero: false,
+      lineStyle: { color: CHART_COLOR.axisLine },
+    },
     axisTick: { show: false },
     axisLabel: {
       ...AXIS_LABEL,
+      // Đẩy nhãn xuống dưới đường trục cho khỏi dính.
+      margin: 10,
       rotate: extra?.rotate ?? 0,
       interval: extra?.interval ?? "auto",
       hideOverlap: extra?.interval === 0 ? false : true,

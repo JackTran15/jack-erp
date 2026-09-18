@@ -18,7 +18,6 @@ export function WidgetTypeSelect({ value, options, onChange, width }: Props) {
         options={options}
         value={value}
         onValueChange={onChange}
-        searchable
         placeholder="Loại báo cáo"
         className="h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]"
         contentClassName="text-[13px]"

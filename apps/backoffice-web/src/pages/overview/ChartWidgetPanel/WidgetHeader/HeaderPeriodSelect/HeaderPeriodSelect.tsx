@@ -24,7 +24,6 @@ export function HeaderPeriodSelect({ value, periods, onChange, width = 120 }: Pr
         options={periodOptions(periods)}
         value={value}
         onValueChange={(v) => onChange(v as OverviewPeriod)}
-        searchable
         className="h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]"
         contentClassName="text-[13px]"
       />

@@ -69,6 +69,24 @@ export const REVENUE_WIDGET_PERIODS: readonly OverviewPeriod[] = [
   ...MONTH_PERIODS,
 ];
 
+/**
+ * Kỳ báo cáo của widget trái row 3 ("Tỉ trọng doanh thu hàng hóa" và "Hàng hóa
+ * bán chạy") — dài hơn row 2, có thêm các mốc ngày/tuần.
+ */
+export const PRODUCT_SHARE_PERIODS: readonly OverviewPeriod[] = [
+  "today",
+  "yesterday",
+  "this_week",
+  "last_week",
+  "this_month",
+  "last_month",
+  "this_quarter",
+  "last_quarter",
+  "this_year",
+  "last_year",
+  ...MONTH_PERIODS,
+];
+
 /** `year_2026`, `year_2025`, `year_2024` … đếm lùi từ năm hiện tại. */
 export function yearPeriods(count: number, now: Date = new Date()): OverviewPeriod[] {
   const current = now.getFullYear();
