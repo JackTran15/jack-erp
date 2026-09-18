@@ -49,6 +49,12 @@ export interface TreeSelectInputProps {
   /** Render a pinned "all/none" option at the top that selects the empty value. */
   allOptionLabel?: string;
   onSelectItem?: (item: RawItem) => void;
+  /**
+   * Extra `filters` for the records query (keys must be in the entity's
+   * `filterDefinitions`), e.g. `{ direction: "OUT" }` so a Mục chi only
+   * offers Mục chi parents. Parent hydration is by id and ignores them.
+   */
+  filters?: Record<string, unknown>;
 }
 
 // ─── Tree helpers ────────────────────────────────────────────────────────────
@@ -171,9 +177,13 @@ export function TreeSelectInput({
   inputClassName,
   allOptionLabel,
   onSelectItem,
+  filters,
 }: TreeSelectInputProps) {
   const fallbackId = useId();
   const id = inputId ?? fallbackId;
+  // Serialised once so the effects below re-run on content, not identity.
+  const filtersJson =
+    filters && Object.keys(filters).length ? JSON.stringify(filters) : undefined;
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const requestSeqRef = useRef(0);
@@ -247,11 +257,17 @@ export function TreeSelectInput({
       const seq = ++requestSeqRef.current;
       setLoading(true);
       try {
-        const params: { page: number; pageSize: number; search?: string } = {
+        const params: {
+          page: number;
+          pageSize: number;
+          search?: string;
+          filters?: string;
+        } = {
           page: pageToLoad,
           pageSize: PAGE_SIZE,
         };
         if (queryToLoad) params.search = queryToLoad;
+        if (filtersJson) params.filters = filtersJson;
 
         const res = await requireErpData(
           await erpApi.GET<PaginatedResponse<Record<string, unknown>>>(
@@ -281,7 +297,7 @@ export function TreeSelectInput({
         if (seq === requestSeqRef.current) setLoading(false);
       }
     },
-    [entityKey, hydrateParents],
+    [entityKey, filtersJson, hydrateParents],
   );
 
   const query = inputText.trim();

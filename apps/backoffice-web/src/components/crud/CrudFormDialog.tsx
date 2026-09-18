@@ -7,6 +7,7 @@ import { formatCrudEnumOption } from "../../lib/crud-display";
 import { buildCrudPayload } from "./crudPayload";
 import { SearchListingInput } from "../forms/SearchListingInput";
 import { TreeSelectInput } from "../forms/TreeSelectInput";
+import { CRUD_TREE_ENTITIES } from "./crudTree";
 
 type SearchSelection = {
   id: string;
@@ -157,6 +158,54 @@ const HIDE_STATUS_ON_DUPLICATE = new Set([
   "inventory-providers",
 ]);
 
+/**
+ * Initial values for a blank create form, per entity. `buildInitialValues`
+ * starts every boolean at `false` and every other field at `""`, which for
+ * these entities would create records that are switched off by default.
+ */
+const FORM_DEFAULTS: Record<string, Record<string, unknown>> = {
+  "inventory-item-categories": { status: "ACTIVE" },
+  "cash-voucher-categories": { isActive: true },
+};
+
+/**
+ * Relation pickers that narrow their options by another field of the same
+ * form. Keyed "{entityKey}.{fieldKey}"; the value maps a picker filter key to
+ * the form field it reads. The server rule stays the contract (a Chi parent
+ * on a Thu category is refused either way) — this only keeps the picker
+ * from offering the wrong half of the list.
+ */
+const RELATION_PICKER_FILTERS: Record<string, Record<string, string>> = {
+  "cash-voucher-categories.parentGroupId": { direction: "direction" },
+};
+
+function applyFormDefaults(
+  entityKey: string,
+  values: Record<string, unknown>,
+): Record<string, unknown> {
+  const defaults = FORM_DEFAULTS[entityKey];
+  if (!defaults) return values;
+  for (const [key, def] of Object.entries(defaults)) {
+    if (key in values && !values[key]) values[key] = def;
+  }
+  return values;
+}
+
+function pickerFiltersFor(
+  entityKey: string,
+  fieldKey: string,
+  values: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  const mapping = RELATION_PICKER_FILTERS[`${entityKey}.${fieldKey}`];
+  if (!mapping) return undefined;
+  const filters: Record<string, unknown> = {};
+  for (const [filterKey, sourceField] of Object.entries(mapping)) {
+    const v = values[sourceField];
+    if (typeof v === "string" && v.trim()) filters[filterKey] = v;
+  }
+  return Object.keys(filters).length ? filters : undefined;
+}
+
 const getSearchSelectionId = (value: unknown): string => {
   if (typeof value === "string") return value;
   if (value && typeof value === "object" && "id" in value) {
@@ -262,15 +311,11 @@ export function CrudFormDialog({
   const formRef = useRef<HTMLFormElement>(null);
 
   const [values, setValues] = useState<Record<string, unknown>>(() => {
-    const base = buildInitialValues(editableFields, record, duplicateSource);
+    const base = applyFormDefaults(
+      config.entityKey,
+      buildInitialValues(editableFields, record, duplicateSource),
+    );
     editableFields.forEach((f) => {
-      if (
-        config.entityKey === "inventory-item-categories" &&
-        f.key === "status" &&
-        !base[f.key]
-      ) {
-        base[f.key] = "ACTIVE";
-      }
       const searchConfig = getSearchFieldConfig(config.entityKey, f.key);
       if (!searchConfig) return;
       if (record) {
@@ -334,11 +379,11 @@ export function CrudFormDialog({
       if (mode === "save-and-new" && onSaveAndAddNew) {
         await onSaveAndAddNew(payload);
         // Reset form to empty state for next entry
-        const next = buildInitialValues(editableFields, null, null);
+        const next = applyFormDefaults(
+          config.entityKey,
+          buildInitialValues(editableFields, null, null),
+        );
         editableFields.forEach((f) => {
-          if (config.entityKey === "inventory-item-categories" && f.key === "status" && !next[f.key]) {
-            next[f.key] = "ACTIVE";
-          }
           const searchConfig = getSearchFieldConfig(config.entityKey, f.key);
           if (searchConfig) next[f.key] = { id: "", label: "" };
         });
@@ -375,9 +420,11 @@ export function CrudFormDialog({
     : isEdit
       ? "Lưu"
       : "Lưu";
-  const isItemCategory = config.entityKey === "inventory-item-categories";
-  const defaultWidth = isItemCategory ? 720 : 560;
-  const defaultHeight = isItemCategory ? 560 : 460;
+  // Tree entities carry a tree picker whose dropdown must not be clipped, so
+  // they get a wider modal with an overflow-visible body.
+  const isTreeEntity = Boolean(CRUD_TREE_ENTITIES[config.entityKey]);
+  const defaultWidth = isTreeEntity ? 720 : 560;
+  const defaultHeight = isTreeEntity ? 560 : 460;
 
   return (
     <AppModal
@@ -393,7 +440,7 @@ export function CrudFormDialog({
       }
       defaultWidth={defaultWidth}
       defaultHeight={defaultHeight}
-      bodyClassName={isItemCategory ? "overflow-visible" : undefined}
+      bodyClassName={isTreeEntity ? "overflow-visible" : undefined}
       footer={
         <div className="flex items-center justify-between">
           <button
@@ -436,6 +483,7 @@ export function CrudFormDialog({
             value={values[f.key]}
             error={errors[f.key]}
             currentRecordId={isEdit ? String(record?.[config.idField] ?? "") : undefined}
+            pickerFilters={pickerFiltersFor(config.entityKey, f.key, values)}
             onChange={(v) => handleChange(f.key, v)}
           />
         ))}
@@ -450,6 +498,7 @@ function FieldInput({
   value,
   error,
   currentRecordId,
+  pickerFilters,
   onChange,
 }: {
   entityKey: string;
@@ -458,6 +507,8 @@ function FieldInput({
   error?: string;
   /** Current record's id — excludes self (and descendants) from relation tree pickers. */
   currentRecordId?: string;
+  /** Extra `filters` for a relation tree picker (see RELATION_PICKER_FILTERS). */
+  pickerFilters?: Record<string, unknown>;
   onChange: (v: unknown) => void;
 }) {
   const id = `field-${field.key}`;
@@ -539,6 +590,7 @@ function FieldInput({
           onChange={(selectedId) => onChange(selectedId || null)}
           entityKey={field.relationEntity}
           excludeId={currentRecordId}
+          filters={pickerFilters}
           placeholder={`Tìm ${field.label.toLowerCase()}…`}
         />
       </FieldRow>
