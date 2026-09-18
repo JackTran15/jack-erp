@@ -244,11 +244,10 @@ describe('Cash-fund reports (E2E)', () => {
       for (const key of ['inTotal', 'inSales', 'inUncategorized', 'outTotal', 'outPurchase', 'outUncategorized']) {
         expect(amounts(rowByKey(rows, key))).toEqual([0, 0, 0]);
       }
-      // A-03 (resolved): `deposit_accounts.opening_balance` is added regardless of
-      // `opening_date`, as Sổ tiền gửi does — so I and IV on the deposit side carry
-      // the 1.000.000 opening balance even for a period before that date.
-      expect(amounts(rowByKey(rows, 'opening'))).toEqual([0, 1000000, 1000000]);
-      expect(amounts(rowByKey(rows, 'closing'))).toEqual([0, 1000000, 1000000]);
+      // A-03: the deposit account opens on 2026-01-01, so a period before that
+      // date starts — and ends — with no balance at all (T-01-08).
+      expect(amounts(rowByKey(rows, 'opening'))).toEqual([0, 0, 0]);
+      expect(amounts(rowByKey(rows, 'closing'))).toEqual([0, 0, 0]);
     });
   });
 
@@ -271,9 +270,7 @@ describe('Cash-fund reports (E2E)', () => {
           branchIds: [fx.branchAId],
         })
       ).accessToken;
-      // Consolidated reader with no branch assignment: the only actor for whom
-      // the header-branch fallback (`filters.branchId ?? actor.branchId`) is
-      // empty, i.e. the only way the report drops the branch predicate.
+      // Consolidated reader with no branch assignment at all.
       chainReaderToken = (
         await createLoggedInUser(app, seed, {
           email: 'chain-reader@test.com',
@@ -307,6 +304,19 @@ describe('Cash-fund reports (E2E)', () => {
       const rows = await search({ period: SEPTEMBER }, chainReaderToken);
       expect(tienDien(rows)).toBe(180000);
       expect(amounts(rowByKey(rows, 'outTotal'))).toEqual([430000, 0, 430000]);
+    });
+
+    it('admin assigned to A, in chain mode (no branchId), also sums every branch: 180.000 (T-01-08)', async () => {
+      // The JWT carries branch A; the report must not fall back to it when the
+      // client sends no `filters.branchId` — that is what chain mode means.
+      const rows = await search({ period: SEPTEMBER });
+      expect(tienDien(rows)).toBe(180000);
+      expect(amounts(rowByKey(rows, 'outTotal'))).toEqual([430000, 0, 430000]);
+    });
+
+    it('admin asking for A sees A only: 150.000', async () => {
+      const rows = await search({ period: SEPTEMBER, branchId: fx.branchAId });
+      expect(tienDien(rows)).toBe(150000);
     });
 
     it('filter-options store: assigned branches only, every branch when consolidated', async () => {

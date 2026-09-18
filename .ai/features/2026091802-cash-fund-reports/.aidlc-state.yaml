@@ -239,3 +239,29 @@ history:
     by: Akenzy
     reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
     ticket: T-01-07
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:49:22
+    by: Akenzy
+    reason: e2e (T-01-07) exposed two defects - deposit opening_balance added regardless of opening_date (violates confirmed A-03, breaks AC-06), and header-branch reports fall back to actor.branchId so chain mode never consolidates (AC-07) — add fix ticket T-01-08
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:49:23
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:49:23
+    by: Akenzy
+    ticket: T-01-08
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:52:24
+    by: Akenzy
+    ticket: T-01-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:52:24
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-08

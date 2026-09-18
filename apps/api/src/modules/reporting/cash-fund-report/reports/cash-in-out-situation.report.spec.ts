@@ -180,12 +180,23 @@ describe('CashInOutSituationReport', () => {
       );
     });
 
-    it('drops the branch predicate for a consolidated actor with no branch filter', async () => {
+    it('drops the branch predicate for a consolidated actor with no branch filter — even though the JWT carries a branch (AC-07, T-01-08)', async () => {
       rbac.hasPermission.mockResolvedValue(true);
-      const chainActor = { ...actor, branchId: undefined } as unknown as ActorContext;
-      await report.buildData(dto(), chainActor);
+      // `actor.branchId` is always the JWT's first branch; chain mode is the
+      // absence of `filters.branchId`, never the absence of an assignment.
+      await report.buildData(dto(), actor);
       expect(period.periodTotals).toHaveBeenCalledWith(
         { organizationId: 'org-1', branchIds: null },
+        '2026-09-01',
+        '2026-09-30',
+      );
+    });
+
+    it('scopes a non-consolidated actor with no branch filter to every assigned branch', async () => {
+      const twoBranchActor = { ...actor, branchIds: [BRANCH_A, 'b-c'] } as unknown as ActorContext;
+      await report.buildData(dto(), twoBranchActor);
+      expect(period.periodTotals).toHaveBeenCalledWith(
+        { organizationId: 'org-1', branchIds: [BRANCH_A, 'b-c'] },
         '2026-09-01',
         '2026-09-30',
       );

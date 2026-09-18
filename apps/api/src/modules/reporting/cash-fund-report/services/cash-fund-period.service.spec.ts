@@ -74,8 +74,10 @@ describe('CashFundPeriodService', () => {
       expect(voucherParams).toEqual([ORG, ['b-a'], '2026-09-01']);
       const [depositSql, depositParams] = query.mock.calls[1] as [string, unknown[]];
       expect(depositSql).toContain('FROM deposit_accounts a');
+      // An account opened after `from` has no balance at the start of the period (AC-06, A-03).
+      expect(depositSql).toContain('a.opening_date <= $3::date');
       expect(depositSql).toContain('a.deleted_at IS NULL');
-      expect(depositParams).toEqual([ORG, ['b-a']]);
+      expect(depositParams).toEqual([ORG, ['b-a'], '2026-09-01']);
     });
 
     it('is zero for a fund with no history and passes NULL for a consolidated scope', async () => {

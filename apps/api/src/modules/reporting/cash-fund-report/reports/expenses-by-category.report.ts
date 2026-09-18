@@ -77,7 +77,10 @@ export class ExpensesByCategoryReport implements ReportDefinition {
     const branchIds = resolveReportBranchIds(
       hasConsolidated,
       undefined,
-      dto.filters.branchId ?? actor.branchId ?? undefined,
+      // Only what the client asked for: in single-branch mode the FE sends the
+      // header branch, in chain mode nothing — falling back to the JWT's first
+      // branch would make chain mode impossible for anyone with an assignment.
+      dto.filters.branchId,
       actor,
     );
     const scope = { organizationId: actor.organizationId, branchIds };

@@ -66,10 +66,13 @@ export class CashFundPeriodService {
 
   /**
    * Số dư đầu kỳ per fund (A-03): the signed sum of every posted voucher dated
-   * before `from`, plus — on the deposit side — each account's `opening_balance`.
-   * The opening balance is added unconditionally, as the deposit ledger does
-   * (BR-LEDG-02 in `deposit-ledger.service.ts`), so this report's figure agrees
-   * with the Sổ tiền gửi screen.
+   * before `from`, plus — on the deposit side — the `opening_balance` of each
+   * account whose `opening_date` is on or before `from`. An account that opens
+   * inside the period has no balance at its start (AC-06); one that opens on
+   * `from` has its opening balance from the first minute of that day. Note the
+   * deposit ledger (`deposit-ledger.service.ts`, BR-LEDG-02) adds the opening
+   * balance regardless of date, so the two screens differ only for a period
+   * that starts before the account existed.
    */
   async openingBalance(scope: CashFundScope, from: string): Promise<FundAmounts> {
     const params = [scope.organizationId, scope.branchIds, from];
@@ -89,8 +92,9 @@ export class CashFundPeriodService {
          FROM deposit_accounts a
         WHERE a.organization_id = $1
           AND a.deleted_at IS NULL
+          AND a.opening_date <= $3::date
           AND ($2::text[] IS NULL OR a.branch_id = ANY($2::text[]))`,
-      [scope.organizationId, scope.branchIds],
+      [scope.organizationId, scope.branchIds, from],
     )) as { opening: unknown }[];
     opening.deposit += num(deposit?.opening);
 

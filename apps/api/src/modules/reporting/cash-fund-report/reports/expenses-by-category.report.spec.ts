@@ -196,8 +196,8 @@ describe('ExpensesByCategoryReport', () => {
 
     it('drops the branch predicate for a consolidated actor with no branch filter', async () => {
       rbac.hasPermission.mockResolvedValue(true);
-      const chainActor = { ...actor, branchId: undefined } as unknown as ActorContext;
-      await report.buildData(dto(), chainActor);
+      // The JWT still carries branch A; chain mode is the absence of `filters.branchId` (T-01-08).
+      await report.buildData(dto(), actor);
       const [, params] = lastSql();
       expect(params).toEqual(['org-1', null, '2026-09-01', '2026-09-30']);
     });
