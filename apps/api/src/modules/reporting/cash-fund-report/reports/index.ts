@@ -5,6 +5,7 @@ import { ExpenseLinesQuery } from '../services/expense-lines.query';
 import { CashInOutListReport } from './cash-in-out-list.report';
 import { CashInOutSituationReport } from './cash-in-out-situation.report';
 import { ExpensesByCategoryReport } from './expenses-by-category.report';
+import { ExpensesByTimeReport } from './expenses-by-time.report';
 
 /**
  * The one place a cash-fund report registers itself. Each `*.report.ts` adds
@@ -16,6 +17,7 @@ export const CASH_FUND_REPORT_DEFINITIONS: Type<ReportDefinition>[] = [
   CashInOutSituationReport,
   CashInOutListReport,
   ExpensesByCategoryReport,
+  ExpensesByTimeReport,
 ];
 
 export const CASH_FUND_REPORT_PROVIDERS: Provider[] = [CashFundPeriodService, ExpenseLinesQuery];
