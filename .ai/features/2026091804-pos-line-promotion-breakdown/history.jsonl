@@ -2,3 +2,6 @@
 {"action": "passed", "at": "2026-09-18T16:34:19", "by": "Akenzy", "evidence": "12 assumptions, none blocking-and-pending; 17 acceptance criteria defined", "gate": "G1", "id": "38b3a8486402", "ts": "2026-09-18T16:34:19.011371"}
 {"action": "passed", "at": "2026-09-18T16:34:19", "by": "Akenzy", "evidence": "5 ADR(s) recorded", "gate": "G2", "id": "f57d2c78077d", "ts": "2026-09-18T16:34:19.078495"}
 {"action": "passed", "at": "2026-09-18T16:34:19", "by": "Akenzy", "evidence": "graph valid - 3 UoW, 10 tickets, no cycles", "gate": "G3", "id": "f238c4a432df", "ts": "2026-09-18T16:34:19.201013"}
+{"action": "ticket in_progress", "at": "2026-09-18T16:35:37", "base": "267a4e3611cb29843bbfab26a7948a696d94e10b", "by": "Claude", "gate": "G4", "id": "7f10ae895637", "ticket": "T-01-01", "ts": "2026-09-18T16:35:37.547592"}
+{"action": "scope", "at": "2026-09-18T16:38:07", "base": "267a4e3611cb29843bbfab26a7948a696d94e10b", "by": "Claude", "gate": "G4", "id": "117fc60f05f1", "ticket": "T-01-01", "ts": "2026-09-18T16:38:07.824835", "verdict": "clean"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-18T16:38:07", "by": "Claude", "gate": "G4", "id": "cac203b03ef8", "ticket": "T-01-01", "ts": "2026-09-18T16:38:07.826137"}
