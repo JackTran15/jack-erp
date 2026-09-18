@@ -11,3 +11,6 @@
 {"action": "ticket in_progress", "at": "2026-09-18T16:42:55", "base": "cb46e6510c619ba3b7a9f8cccc964bebbea08aeb", "by": "Claude", "gate": "G4", "id": "cc2b9effd7b3", "ticket": "T-01-03", "ts": "2026-09-18T16:42:55.753180"}
 {"action": "scope", "at": "2026-09-18T16:45:45", "base": "cb46e6510c619ba3b7a9f8cccc964bebbea08aeb", "by": "Claude", "gate": "G4", "id": "acd9ff125821", "ticket": "T-01-03", "ts": "2026-09-18T16:45:45.452093", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-18T16:45:45", "by": "Claude", "gate": "G4", "id": "dc7e53720617", "ticket": "T-01-03", "ts": "2026-09-18T16:45:45.454655"}
+{"action": "ticket in_progress", "at": "2026-09-18T16:45:54", "base": "1c496b4a1ea39137d09007e02b9a8b7f2f0de77a", "by": "Claude", "gate": "G4", "id": "7d1a29b87a8b", "ticket": "T-01-04", "ts": "2026-09-18T16:45:54.639360"}
+{"action": "scope", "at": "2026-09-18T16:47:03", "base": "1c496b4a1ea39137d09007e02b9a8b7f2f0de77a", "by": "Claude", "gate": "G4", "id": "245a3410c743", "ticket": "T-01-04", "ts": "2026-09-18T16:47:03.644750", "verdict": "clean"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-18T16:47:03", "by": "Claude", "gate": "G4", "id": "4895c686cb9d", "ticket": "T-01-04", "ts": "2026-09-18T16:47:03.646946"}

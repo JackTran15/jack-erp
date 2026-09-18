@@ -40,7 +40,7 @@ rollback: revert 4 file pos-web; không có dữ liệu nào ghi xuống — pre
 | ✕ đổi hành vi (chỉ bỏ CTKM hóa đơn) làm thu ngân quen tay bất ngờ | Câu xác nhận nêu đích danh chương trình bị bỏ; ghi trong PR (A-04) |
 
 ## Definition of done
-- [ ] AC-01..AC-10 có bằng chứng: ảnh headless assert DOM cho 01/02/04/07/08/10, đọc mã cho 03/05/06/09
-- [ ] Còn phải thu **không đổi từng đồng** so với trước feature ở cả 3 giỏ demo (so với `amountAfterPromotion` của `evaluate`)
-- [ ] `tsc --noEmit` pos-web xanh
-- [ ] Không file nào ngoài `touches:` của các ticket bị đụng
+- [x] AC-01..AC-10 có bằng chứng: ảnh headless assert DOM cho 01/02/04/06/07/08/09/10, đọc mã cho 03/05 — `07-verification.md`
+- [x] Còn phải thu **không đổi từng đồng** so với trước feature ở cả 3 giỏ demo (616.500 / 706.500 / 656.500 = `amountAfterPromotion`)
+- [x] `tsc --noEmit` pos-web xanh (sau mỗi ticket)
+- [x] Không file nào ngoài `touches:` của các ticket bị đụng — 4 commit T-01-01..04, mỗi commit đúng file khai
