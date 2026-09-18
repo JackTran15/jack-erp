@@ -1,7 +1,9 @@
 import { Provider, Type } from '@nestjs/common';
 import { ReportDefinition } from '../report-definition';
 import { CashFundPeriodService } from '../services/cash-fund-period.service';
+import { ExpenseLinesQuery } from '../services/expense-lines.query';
 import { CashInOutSituationReport } from './cash-in-out-situation.report';
+import { ExpensesByCategoryReport } from './expenses-by-category.report';
 
 /**
  * The one place a cash-fund report registers itself. Each `*.report.ts` adds
@@ -11,6 +13,7 @@ import { CashInOutSituationReport } from './cash-in-out-situation.report';
  */
 export const CASH_FUND_REPORT_DEFINITIONS: Type<ReportDefinition>[] = [
   CashInOutSituationReport,
+  ExpensesByCategoryReport,
 ];
 
-export const CASH_FUND_REPORT_PROVIDERS: Provider[] = [CashFundPeriodService];
+export const CASH_FUND_REPORT_PROVIDERS: Provider[] = [CashFundPeriodService, ExpenseLinesQuery];
