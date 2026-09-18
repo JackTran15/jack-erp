@@ -76,3 +76,49 @@ history:
     by: Akenzy
     reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts and any cash-voucher-categories/* changes belong to the concurrent feature 2026091801-cash-voucher-category-tree (another session); this ticket did not touch them
     ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:56:51
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:56:51
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:56:51
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:06:07
+    by: Akenzy
+    reason: T-01-04 - template handlers are verified repo-wide by report-core/template-scope-parity.spec.ts (4 domains x 5 handlers) — declare it on the ticket and extend it to cash; ADR-04 wrongly claimed XlsxStreamWriter bolds rows carrying bold=1 — it only bolds header/totals; report_templates has no domain column
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:06:07
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:07:21
+    by: Akenzy
+    reason: T-01-06 - ReportTableConfigSync.tsx is a fifth backendSource dispatch point the plan missed (columns fetch); the ADR-02 title tooltip has no home in ReportTypeMetadata — dropped; sortable -false does not exist on ReportColumnTableConfig
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:07:22
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:09:05
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:09:05
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-04

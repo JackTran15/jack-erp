@@ -14,11 +14,18 @@ import { BankReceiptEntity } from '../../accounting/deposit-vouchers/bank-receip
 import { BranchEntity } from '../../branch/branch.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { RbacModule } from '../../rbac/rbac.module';
+import { ReportExportService } from '../report-core/report-export.service';
 import { ReportPermissionGuard } from '../report-core/report-permission.guard';
 import { ReportTemplateEntity } from '../report-core/report-template.entity';
 import { CashFundReportController } from './cash-fund-report.controller';
+import { CreateCashFundReportTemplateHandler } from './commands/create-cash-fund-report-template.handler';
+import { DeleteCashFundReportTemplateHandler } from './commands/delete-cash-fund-report-template.handler';
+import { UpdateCashFundReportTemplateHandler } from './commands/update-cash-fund-report-template.handler';
 import { GetCashFundReportColumnsHandler } from './queries/get-cash-fund-report-columns.handler';
+import { GetCashFundReportDocumentHandler } from './queries/get-cash-fund-report-document.handler';
+import { GetCashFundReportTemplateHandler } from './queries/get-cash-fund-report-template.handler';
 import { GetReportFilterOptionsHandler } from './queries/get-report-filter-options.handler';
+import { ListCashFundReportTemplatesHandler } from './queries/list-cash-fund-report-templates.handler';
 import { SearchCashFundReportHandler } from './queries/search-cash-fund-report.handler';
 import { ReportDefinition, ReportRegistry } from './report-definition';
 import { CASH_FUND_REPORT_DEFINITIONS, CASH_FUND_REPORT_PROVIDERS } from './reports';
@@ -50,6 +57,7 @@ import { CASH_FUND_REPORT_DEFINITIONS, CASH_FUND_REPORT_PROVIDERS } from './repo
   ],
   controllers: [CashFundReportController],
   providers: [
+    ReportExportService,
     ReportPermissionGuard,
     ...CASH_FUND_REPORT_PROVIDERS,
     ...CASH_FUND_REPORT_DEFINITIONS,
@@ -58,10 +66,16 @@ import { CASH_FUND_REPORT_DEFINITIONS, CASH_FUND_REPORT_PROVIDERS } from './repo
       useFactory: (...definitions: ReportDefinition[]) => new ReportRegistry(definitions),
       inject: CASH_FUND_REPORT_DEFINITIONS,
     },
-    // Handlers (search/columns/filter-options dispatch generically via ReportRegistry).
+    // Handlers (search/columns/filter-options/templates/export dispatch generically via ReportRegistry).
     GetCashFundReportColumnsHandler,
     GetReportFilterOptionsHandler,
     SearchCashFundReportHandler,
+    GetCashFundReportDocumentHandler,
+    ListCashFundReportTemplatesHandler,
+    GetCashFundReportTemplateHandler,
+    CreateCashFundReportTemplateHandler,
+    UpdateCashFundReportTemplateHandler,
+    DeleteCashFundReportTemplateHandler,
   ],
 })
 export class CashFundReportModule {}

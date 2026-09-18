@@ -38,4 +38,7 @@ code.
 
 | ID | What we assumed | What is actually true | Consequence |
 | ---- | ---------------- | ----------------------------------------- | ----------------------------- |
-| — | (không có) | | |
+| A-21 | `report-core/export/xlsx-style.ts` đọc `bold` trên từng dòng nên file xlsx của #2/#5 in được dòng đậm (ADR-04) | `XlsxStreamWriter` chỉ đậm header và dòng tổng; `bold`/`indentLevel` tới writer nhưng bị bỏ qua — Kết quả kinh doanh cũng vậy | ADR-04 sửa hệ quả 2026-09-18; xlsx của #2/#5 dòng đậm hiện thường; sửa writer là follow-up report-core, ngoài feature này |
+| A-22 | `report_templates` có cột `domain` để tách mẫu của domain `cash` | Không có cột domain; mẫu phân biệt bằng `reportType` (khoá của `cash` là chuỗi riêng) | Chỉ sửa chữ ở 03-logical-design §Templates; code giống debt-report |
+| A-23 | Bốn dispatcher trong `_api/` là mọi chỗ FE rẽ nhánh theo `backendSource` | Còn `ReportTableConfigSync.tsx:66-86` gọi `/reports/<source>/columns` — thiếu nhánh `cash` là cột catalog rơi về registry và search bị từ chối | T-01-06 thêm file này vào `touches` (G3 reopened 2026-09-18) |
+| A-24 | Tiêu đề báo cáo có tooltip để ghi "theo ngày chứng từ" (ADR-02) và registry có `sortable: false` (ADR-04) | `ReportPageHeaderTitle` không có tooltip, `ReportTypeMetadata` không có trường; `ReportColumnTableConfig` không có `sortable` (bảng không sort theo cột) | Bỏ cả hai; ghi chú ngày chứng từ đi vào phụ đề tài liệu in/xuất (`cashFundFilterSummary`) |

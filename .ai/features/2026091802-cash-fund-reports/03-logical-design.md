@@ -114,7 +114,8 @@ Ngữ nghĩa từng báo cáo:
 
 ### Templates, export, print
 `GET/POST/PATCH/DELETE /reports/cash-fund/templates[/:id]?scope=chain|branch` — y hệt
-debt-report trên `report_templates` (`domain = 'cash'`). `POST export` (`CashFundReportExportDto
+debt-report trên `report_templates` (không có cột domain; phân biệt bằng `reportType`, các
+khoá của domain `cash` là chuỗi riêng). `POST export` (`CashFundReportExportDto
 = OmitType(Search, ['page','limit']) + columnLabels`) → `.xlsx` qua `ExportPipeline`;
 `POST print-payload` → `ReportDocumentPayload`.
 
@@ -172,7 +173,7 @@ templates / export / print) và quyền theo báo cáo chỉ có ở `ReportPerm
 **Decision:** Mọi lọc kỳ, số dư đầu kỳ, bucket thời gian dùng `voucher_date` (tiền mặt) /
 `doc_date` (tiền gửi). Chủ sở hữu xác nhận 2026-09-18 (A-01).
 **Consequences:** Phiếu ghi lùi ngày làm III ở đây lệch "Chi khác" của Kết quả kinh doanh
-cùng tháng — ghi rõ trong tooltip tiêu đề #2. Cần index
+cùng tháng — ghi trong phụ đề tài liệu (`cashFundFilterSummary`), vì tiêu đề không có tooltip (A-24). Cần index
 `(organization_id, branch_id, status, voucher_date)` trên `cash_receipts`/`cash_payments`
 nếu chưa có (kiểm tra trong T-01-05; migration chỉ khi thiếu).
 **Status:** accepted
@@ -196,6 +197,8 @@ dòng nhóm. FE `ReportPageTable` đã render `bold`/`indentLevel` cho Kết qu�
 (và `lineKey`/`categoryId`/`bucketFrom` cho drill-down); `InvoiceReportResult` giữ nguyên.
 #5 phân trang trên danh sách phẳng, `grandTotal` chỉ ở trang 1.
 **Consequences:** Không cần contract mới, `ColumnConfigDialog` / export / print dùng chung.
-Export xlsx của #2/#5 in được dòng đậm nhờ `xlsx-style.ts` đọc `bold`. Sắp xếp theo cột
-bị tắt cho #2/#5 (thứ tự do BE quyết định) — registry đặt `sortable: false`.
+Bản in (HTML) giữ đậm/thụt lề; **file xlsx thì không** — `XlsxStreamWriter` chỉ đậm header và
+dòng tổng, không đọc `bold` từng dòng (phát hiện khi xây T-01-04, 2026-09-18; Kết quả kinh
+doanh cũng đang như vậy). Sửa writer là việc của report-core, ngoài feature này (A-21).
+`ReportPageTableView` không sort theo cột nên thứ tự dòng do BE quyết định là đủ (A-24).
 **Status:** accepted
