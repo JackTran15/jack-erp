@@ -133,3 +133,19 @@ history:
     by: Akenzy
     reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
     ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:09:36
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:14:30
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:14:30
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-05

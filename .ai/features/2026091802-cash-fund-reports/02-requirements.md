@@ -99,7 +99,7 @@ And III = 400.000 / 0
 ```gherkin
 Given chi nhánh A, kỳ 2025 (không có chứng từ nào)
 When tôi chạy báo cáo cash-in-out-situation
-Then vẫn có đúng 9 dòng: I; II; Thu từ bán hàng; Thu khác; III; Chi mua hàng hóa; Chi khác; IV — tất cả bằng 0
+Then vẫn có đúng 8 dòng: I; II; Thu từ bán hàng; Thu khác; III; Chi mua hàng hóa; Chi khác; IV — tất cả bằng 0
 ```
 
 **AC-07** — Phạm vi chi nhánh
