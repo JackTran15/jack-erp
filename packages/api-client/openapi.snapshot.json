@@ -1765,6 +1765,38 @@
         ]
       }
     },
+    "/v2/cash-voucher-categories/tree": {
+      "post": {
+        "operationId": "CashVoucherCategoryTreeController_tree_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchCashVoucherCategoryTreeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCashVoucherCategoryTreeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List cash voucher categories (Mục thu / Mục chi) as a parent → child tree",
+        "tags": [
+          "cash-voucher-categories"
+        ]
+      }
+    },
     "/cash-receipts": {
       "post": {
         "operationId": "CashReceiptsController_create",
@@ -2864,9 +2896,22 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Case-insensitive match against the customer name or code.",
+            "description": "Case-insensitive match against the customer name, code or phone.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "debtDesc",
+                "debtAsc"
+              ]
             }
           },
           {
@@ -22153,6 +22198,31 @@
         ]
       }
     },
+    "/mobile/activities": {
+      "post": {
+        "operationId": "MobileActivityController_record",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileActivityBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Ghi nhận hoạt động người dùng của app mobile",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/auth/login": {
       "post": {
         "operationId": "MobileAuthController_login",
@@ -22899,6 +22969,37 @@
           }
         },
         "summary": "Xoá khách hàng; 409 khi còn công nợ/tín dụng",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/customers/{id}/summary": {
+      "get": {
+        "operationId": "MobileCustomerController_summaryOf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerSummaryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Tổng quan một khách: chi tiêu, công nợ, thẻ thành viên",
         "tags": [
           "mobile"
         ]
@@ -24902,6 +25003,608 @@
         ]
       }
     },
+    "/mobile/cashier/session": {
+      "get": {
+        "operationId": "MobileCashierController_session",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "{ open, session | null }"
+          }
+        },
+        "summary": "Phiên POS đang mở của chi nhánh (ưu tiên phiên do người gọi mở)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/cash-accounts": {
+      "get": {
+        "operationId": "MobileCashierController_cashAccounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Két quầy (REGISTER) của chi nhánh — ô Két tiền của màn Mở ca",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/session/open": {
+      "post": {
+        "operationId": "MobileCashierController_openShift",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileOpenShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mở ca (open + start-sales)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/session/start-close": {
+      "post": {
+        "operationId": "MobileCashierController_startClose",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mở màn Đóng ca: phiên sang CLOSING, trả Tiền thu trong ca",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/session/reopen": {
+      "post": {
+        "operationId": "MobileCashierController_reopen",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "HỦY BỎ màn Đóng ca: CLOSING → ACTIVE_SALES (A-68)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/session/close": {
+      "post": {
+        "operationId": "MobileCashierController_closeShift",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCloseShiftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "ĐỒNG Ý màn Đóng ca: kiểm kê + đóng; lệch → 409 VARIANCE_NEEDS_APPROVAL",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/drafts/{invoiceId}": {
+      "get": {
+        "operationId": "MobileCashierController_draft",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hoá đơn nháp dưới hình dạng giỏ (T-15-01). Quyền lớp: `accounting.cash.create`.",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "patch": {
+        "operationId": "MobileCashierController_updateDraft",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileUpdateDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/drafts": {
+      "post": {
+        "operationId": "MobileCashierController_createDraft",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCreateDraftDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Giỏ thu ngân tự dựng → hoá đơn nháp (cần ca đang mở).",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/drafts/{invoiceId}/points": {
+      "post": {
+        "operationId": "MobileCashierController_redeemPoints",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileRedeemPointsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đổi điểm tích luỹ vào hoá đơn nháp",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "delete": {
+        "operationId": "MobileCashierController_removeRedeemedPoints",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceEntity"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Gỡ đổi điểm khỏi hoá đơn nháp",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/payment-accounts": {
+      "get": {
+        "operationId": "MobileCashierController_paymentAccounts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Tài khoản nhận chuyển khoản/thẻ cho màn Thu tiền (T-16-01).",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/drafts/{invoiceId}/checkout": {
+      "post": {
+        "operationId": "MobileCashierController_checkout",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCheckoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Thu tiền hoá đơn nháp — phát hành số hoá đơn, ghi sổ quỹ / công nợ.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/debtors": {
+      "get": {
+        "operationId": "MobileCashierController_debtors",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "name",
+                "debtDesc",
+                "debtAsc"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Khách còn nợ (T-17-01).",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/debtors/{customerId}/debts": {
+      "get": {
+        "operationId": "MobileCashierController_debtsOf",
+        "parameters": [
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/debts/collect": {
+      "post": {
+        "operationId": "MobileCashierController_collectDebt",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCollectDebtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thu nợ nhiều hoá đơn — tiền mặt (phiếu thu) hoặc chuyển khoản (phiếu thu ngân hàng).",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/returnable-invoices": {
+      "get": {
+        "operationId": "MobileCashierController_returnableInvoices",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Đổi trả (T-18-01): hoá đơn đủ điều kiện, chi tiết chọn hàng trả, lập phiếu đổi/trả.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/returnable-invoices/{invoiceId}": {
+      "get": {
+        "operationId": "MobileCashierController_returnableDetail",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/exchanges": {
+      "post": {
+        "operationId": "MobileCashierController_exchange",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileExchangeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/shift-report": {
+      "get": {
+        "operationId": "MobileCashierController_shiftReport",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Báo cáo hoạt động trong ca đang mở (T-21-01).",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/invoices": {
       "get": {
         "operationId": "MobileInvoiceController_list",
@@ -25003,6 +25706,40 @@
           }
         },
         "summary": "Một hoá đơn, kèm dòng hàng và các khoản đã thu",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/invoices/{id}/cancel": {
+      "post": {
+        "operationId": "MobileInvoiceController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelInvoiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tờ chứng từ sau khi huỷ, cùng hình dạng với GET :id"
+          }
+        },
+        "summary": "Huỷ hoá đơn bán, hoặc phiếu trả/đổi",
         "tags": [
           "mobile"
         ]
@@ -26190,6 +26927,47 @@
             }
           }
         },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/{id}/points": {
+      "patch": {
+        "operationId": "SalesOrderController_setPoints",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesOrderPointsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sửa số điểm DỰ KIẾN — quyền của CẢ HAI vai.\n\nMảng `@RequirePermission` nghĩa là HOẶC (tiền lệ: `promotion-v2.controller`).\nTư vấn ghi con số lúc lập đơn; thu ngân sửa nó khi *Nhận xử lý* bị chặn vì\nsố dư không còn đủ.",
         "tags": [
           "mobile"
         ]
@@ -27735,6 +28513,92 @@
             ]
           }
         }
+      },
+      "SearchCashVoucherCategoryTreeDto": {
+        "type": "object",
+        "properties": {
+          "search": {
+            "type": "string",
+            "description": "Match on category name or code"
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Only active (true) or only inactive (false) categories"
+          }
+        }
+      },
+      "CashVoucherCategoryTreeNodeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "direction": {
+            "enum": [
+              "IN",
+              "OUT"
+            ],
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "displayOrder": {
+            "type": "number"
+          },
+          "parentGroupId": {
+            "type": "string",
+            "nullable": true
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashVoucherCategoryTreeNodeDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "description",
+          "direction",
+          "isActive",
+          "displayOrder",
+          "parentGroupId",
+          "children"
+        ]
+      },
+      "SearchCashVoucherCategoryTreeResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CashVoucherCategoryTreeNodeDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
       },
       "CashReceiptLineDto": {
         "type": "object",
@@ -40862,6 +41726,15 @@
           "sessionId": {
             "type": "string"
           },
+          "salesOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesChannel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Kênh bán (nhãn tự do như trên đơn tư vấn); NULL = tại cửa hàng. Mobile thu ngân, T-16-01."
+          },
           "draftLabel": {
             "type": "string"
           },
@@ -41436,6 +42309,15 @@
           },
           "sessionId": {
             "type": "string"
+          },
+          "salesOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesChannel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Kênh bán (nhãn tự do như trên đơn tư vấn); NULL = tại cửa hàng. Mobile thu ngân, T-16-01."
           },
           "draftLabel": {
             "type": "string"
@@ -42278,6 +43160,11 @@
           "salespersonId": {
             "type": "string",
             "description": "Nhân viên được ghi công bán — `employee_profiles.id`, KHÔNG phải `users.id`.\n\nThêm cho `/mobile/invoices`, nơi vai tư vấn chỉ được thấy hoá đơn của chính\nmình. Đường mobile tra `employee_profiles` từ `actor.userId` rồi đặt trường\nnày; **client không đặt được nó** vì DTO của đường mobile không phơi ra.\n\nỞ đường web thì nó là một bộ lọc bình thường như mọi bộ lọc khác — phạm vi\nở đó vẫn do tổ chức và chi nhánh quyết, không do trường này.",
+            "format": "uuid"
+          },
+          "createdByUserId": {
+            "type": "string",
+            "description": "Người TẠO hoá đơn (`users.id`), ghép với [salespersonId] bằng **OR**.\n\nKhông phải một bộ lọc thứ hai mà là vế còn lại của CÙNG một câu hỏi: *\"hoá\nđơn nào là của tôi\"*. Vai tư vấn nhận diện bằng `salesperson_id`; vai thu\nngân thì không — hoá đơn họ lập tại quầy, phiếu trả hàng và phiếu đổi hàng\nđều để `salesperson_id` TRỐNG (đo trên dev 2026-09-15: 23/23 phiếu trả và\n2/2 phiếu đổi đều trống). Chỉ lọc theo vế đầu thì mọi chứng từ của thu ngân\nbiến mất khỏi danh sách của chính họ — Loc rà 2026-09-15.\n\n**Chỉ có tác dụng khi đi CÙNG [salespersonId]**; đứng một mình thì bị bỏ\nqua, để đường web không vô tình đổi phạm vi vì một tham số lạ.",
             "format": "uuid"
           },
           "note": {
@@ -47590,6 +48477,116 @@
           "pageSize"
         ]
       },
+      "MobileActivityItemDto": {
+        "type": "object",
+        "properties": {
+          "activityId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "ts": {
+            "type": "string",
+            "example": "2026-09-16T08:12:03.412Z"
+          },
+          "sessionId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "seq": {
+            "type": "number",
+            "minimum": 0
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "screen": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "component": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "flowId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "parentFlowId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "entityType": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "entityId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "errorCode": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "data": {
+            "type": "object",
+            "description": "Vài giá trị bổ sung nhỏ gọn. Vượt trần kích thước thì service bỏ đi."
+          }
+        },
+        "required": [
+          "activityId",
+          "ts",
+          "sessionId",
+          "seq",
+          "type",
+          "screen"
+        ]
+      },
+      "MobileActivityBatchDto": {
+        "type": "object",
+        "properties": {
+          "appVersion": {
+            "type": "string",
+            "maxLength": 32,
+            "example": "1.0.3+42"
+          },
+          "platform": {
+            "type": "string",
+            "maxLength": 16,
+            "example": "ios"
+          },
+          "catalogVersion": {
+            "type": "number",
+            "minimum": 0,
+            "example": 1
+          },
+          "activities": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileActivityItemDto"
+            }
+          }
+        },
+        "required": [
+          "appVersion",
+          "platform",
+          "catalogVersion",
+          "activities"
+        ]
+      },
       "MobileLoginDto": {
         "type": "object",
         "properties": {
@@ -47644,13 +48641,25 @@
           "isMain": {
             "type": "boolean",
             "description": "Cửa hàng chính của tổ chức. Trường của entity tên là `isMainBranch`; rút gọn ở đây vì trong một danh sách chi nhánh thì chữ \"Branch\" là thừa."
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "description": "Địa chỉ cửa hàng — in ở đầu PHIẾU THU. NULL là hợp lệ: cột nullable, và dữ liệu thật đang có chi nhánh trống địa chỉ. Tờ phiếu tự bỏ dòng khi thiếu."
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true,
+            "description": "Điện thoại cửa hàng — in ở đầu PHIẾU THU. NULL là hợp lệ."
           }
         },
         "required": [
           "id",
           "name",
           "code",
-          "isMain"
+          "isMain",
+          "address",
+          "phone"
         ]
       },
       "MobileBusinessMetricsDto": {
@@ -48895,6 +49904,11 @@
             "nullable": true,
             "format": "uuid",
             "description": "Nhóm hàng của item (mẫu mã: của item đại diện). NULL = chưa xếp nhóm."
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL công khai của ảnh ĐẦU TIÊN. Biến thể dùng ảnh của mẫu mã cha. NULL khi không có ảnh hoặc kho ảnh chưa cấu hình."
           }
         },
         "required": [
@@ -48904,7 +49918,8 @@
           "unit",
           "quantity",
           "stockValue",
-          "groupId"
+          "groupId",
+          "thumbnailUrl"
         ]
       },
       "MobileInventoryProductPageDto": {
@@ -49045,6 +50060,11 @@
           "periodOut": {
             "type": "number",
             "description": "Số lượng xuất trong kỳ"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL công khai của ảnh ĐẦU TIÊN — ảnh của mẫu mã cha (mọi biến thể dùng chung). NULL khi không có ảnh hoặc kho ảnh chưa cấu hình."
           }
         },
         "required": [
@@ -49056,7 +50076,8 @@
           "stockValue",
           "openingQuantity",
           "periodIn",
-          "periodOut"
+          "periodOut",
+          "thumbnailUrl"
         ]
       },
       "MobileInventoryFlowLineDto": {
@@ -49283,6 +50304,11 @@
           "revenue": {
             "type": "number",
             "description": "Doanh thu ròng trong kỳ, đơn vị đồng, có thể ÂM"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL công khai của ảnh ĐẦU TIÊN của mẫu mã (hoặc của item lẻ). NULL khi không có ảnh hoặc kho ảnh chưa cấu hình."
           }
         },
         "required": [
@@ -49291,7 +50317,8 @@
           "name",
           "unit",
           "quantity",
-          "revenue"
+          "revenue",
+          "thumbnailUrl"
         ]
       },
       "MobileRevenueItemPageDto": {
@@ -50062,6 +51089,391 @@
           "values"
         ]
       },
+      "MobileOpenShiftDto": {
+        "type": "object",
+        "properties": {
+          "cashAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "openingCashAmount": {
+            "type": "number",
+            "minimum": 0,
+            "example": 0
+          }
+        },
+        "required": [
+          "cashAccountId",
+          "openingCashAmount"
+        ]
+      },
+      "MobileCloseShiftDto": {
+        "type": "object",
+        "properties": {
+          "actualCash": {
+            "type": "number",
+            "minimum": 0,
+            "example": 1155000
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "actualCash"
+        ]
+      },
+      "MobileDraftLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lineDiscount": {
+            "type": "number",
+            "description": "Giảm dòng theo TIỀN (giảm tay + khuyến mại đã chốt) — cùng nghĩa với `lineDiscount` của POS.",
+            "minimum": 0
+          },
+          "lineDiscountReason": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "itemId",
+          "itemCode",
+          "itemName",
+          "unit",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "MobileCreateDraftDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "salespersonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string"
+          },
+          "salesChannel": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileDraftLineDto"
+            }
+          }
+        },
+        "required": [
+          "lines"
+        ]
+      },
+      "MobileUpdateDraftDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "salespersonId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string"
+          },
+          "salesChannel": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileDraftLineDto"
+            }
+          }
+        }
+      },
+      "MobileRedeemPointsDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "number",
+            "description": "SỐ ĐIỂM, không phải số tiền. Máy chủ quy ra tiền bằng `POINT_REDEMPTION_VALUE_VND`.",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "MobilePaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "card"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "description": "Tài khoản nhận (chuyển khoản) — `payment_accounts.id`; vắng thì server lấy mặc định theo phương thức.",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "method",
+          "amount"
+        ]
+      },
+      "MobileCheckoutDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "minItems": 0,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobilePaymentLineDto"
+            }
+          },
+          "salesChannel": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "dueDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "payments"
+        ]
+      },
+      "MobileDebtAllocationDto": {
+        "type": "object",
+        "properties": {
+          "invoiceDebtId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "invoiceDebtId",
+          "amount"
+        ]
+      },
+      "MobileCollectDebtDto": {
+        "type": "object",
+        "properties": {
+          "customerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_transfer"
+            ]
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "allocations": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileDebtAllocationDto"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "customerId",
+          "paymentMethod",
+          "allocations"
+        ]
+      },
+      "MobileReturnLineDto": {
+        "type": "object",
+        "properties": {
+          "originalInvoiceItemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.01
+          }
+        },
+        "required": [
+          "originalInvoiceItemId",
+          "quantity"
+        ]
+      },
+      "MobileExtraLineDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "unitPrice": {
+            "type": "number",
+            "minimum": 0
+          },
+          "lineDiscount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "note": {
+            "type": "string",
+            "description": "Ghi chú của RIÊNG dòng này — `invoice_items.note`, cùng chỗ mà dòng giỏ bán ghi vào.",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "itemId",
+          "itemCode",
+          "itemName",
+          "unit",
+          "quantity",
+          "unitPrice"
+        ]
+      },
+      "MobileExtraPaymentDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank_transfer",
+              "card"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0.01
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "method",
+          "amount"
+        ]
+      },
+      "MobileExchangeDto": {
+        "type": "object",
+        "properties": {
+          "originalInvoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "returnLines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileReturnLineDto"
+            }
+          },
+          "newLines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileExtraLineDto"
+            }
+          },
+          "refundMethod": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "bank"
+            ]
+          },
+          "paymentAccountId": {
+            "type": "string",
+            "description": "`payment_accounts.id` nhận/chi chuyển khoản — bắt buộc khi `refundMethod = bank`.",
+            "format": "uuid"
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileExtraPaymentDto"
+            }
+          }
+        },
+        "required": [
+          "originalInvoiceId",
+          "returnLines",
+          "refundMethod"
+        ]
+      },
       "MobileItemCategoryCreateDto": {
         "type": "object",
         "properties": {
@@ -50118,6 +51530,11 @@
           "purchasePrice": {
             "type": "number",
             "description": "Giá nhập mặc định của hàng hoá — điền sẵn vào ô đơn giá khi vừa chọn. Đây là NGOẠI LỆ có cơ sở với luật không-rò-giá-vốn của `/mobile/products`: người lập phiếu nhập buộc phải thấy và sửa được giá nhập."
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL công khai của ảnh ĐẦU TIÊN. Biến thể dùng ảnh của mẫu mã cha, mặt hàng lẻ dùng ảnh của chính nó — cùng luật với POS. NULL khi không có ảnh hoặc kho ảnh chưa cấu hình."
           }
         },
         "required": [
@@ -50126,7 +51543,8 @@
           "name",
           "variantLabel",
           "unit",
-          "purchasePrice"
+          "purchasePrice",
+          "thumbnailUrl"
         ]
       },
       "MobileItemPageDto": {
@@ -50174,13 +51592,19 @@
           "sellingPrice": {
             "type": "number",
             "description": "Giá bán. Với mẫu mã có nhiều biến thể thì là giá trung bình của các biến thể"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "URL ảnh bìa (ảnh đầu tiên). `null` khi chưa có ảnh hoặc kho lưu trữ chưa cấu hình"
           }
         },
         "required": [
           "id",
           "code",
           "name",
-          "sellingPrice"
+          "sellingPrice",
+          "thumbnailUrl"
         ]
       },
       "MobileProductPageDto": {
@@ -50254,6 +51678,29 @@
           "sellingPrice",
           "color",
           "size"
+        ]
+      },
+      "MobileProductImageDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Id media — thứ gửi lại trong `imageIds`"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL công khai, tuyệt đối, không hết hạn"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Tên file gốc"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "fileName"
         ]
       },
       "MobileProductDetailResponseDto": {
@@ -50339,6 +51786,13 @@
             "items": {
               "$ref": "#/components/schemas/MobileProductVariantDto"
             }
+          },
+          "images": {
+            "description": "Ảnh của hàng hoá, theo thứ tự hiển thị — ảnh đầu là ảnh bìa.\n\nChủ sở hữu là CHÍNH `id` của dòng: mẫu mã giữ ảnh ở `products.id`, item lẻ\nở `items.id`. Biến thể KHÔNG có ảnh riêng — cùng luật với web (A-08).\nRỗng khi chưa có ảnh HOẶC khi kho lưu trữ chưa được cấu hình.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductImageDto"
+            }
           }
         },
         "required": [
@@ -50358,7 +51812,8 @@
           "barcode",
           "description",
           "isPosVisible",
-          "variants"
+          "variants",
+          "images"
         ]
       },
       "MobileProductVariantInputDto": {
@@ -50535,6 +51990,15 @@
             "items": {
               "$ref": "#/components/schemas/MobileProductUnitInputDto"
             }
+          },
+          "imageIds": {
+            "description": "Id ảnh đã upload, theo thứ tự (ảnh đầu là ảnh bìa). Vắng = giữ nguyên; `[]` = xoá hết",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         },
         "required": [
@@ -50640,6 +52104,15 @@
             "items": {
               "$ref": "#/components/schemas/MobileProductUnitInputDto"
             }
+          },
+          "imageIds": {
+            "description": "Id ảnh đã upload, theo thứ tự (ảnh đầu là ảnh bìa). Vắng = giữ nguyên; `[]` = xoá hết",
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -50685,6 +52158,14 @@
           },
           "selectedProgramIds": {
             "description": "Id các chương trình người dùng TỰ CHỌN. Hai nghĩa, và đó là chủ ý của bản\nweb (ADR-03 bên đó): bật một chương trình `auto_apply=false`, và cho một\nchương trình thắng tranh chấp tài nguyên trước cả `priority`.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "description": "Id các chương trình phải bị LOẠI khỏi cuộc đua, kể cả `auto_apply=true`\n(ADR-07 bên web). Nghịch đảo của `selectedProgramIds`: cái kia chỉ THÊM,\ncái này chỉ BỎ, và bỏ thắng khi một id có mặt ở cả hai.\n\nĐây là thứ DUY NHẤT diễn tả được thao tác bỏ tick trên màn *Chương trình\nkhuyến mại* của app: chương trình `auto_apply=true` luôn tự chạy, nên không\ngửi id của nó xuống thì lượt định giá kế tiếp lại áp nó vào.",
             "type": "array",
             "items": {
               "type": "string",
@@ -51678,6 +53159,11 @@
             "description": "`employee_profiles.id` được ghi công bán. Vắng = hồ sơ của người gọi.\nPhải là nhân viên đang hoạt động, được phân vào chi nhánh của request.",
             "format": "uuid"
           },
+          "pointsRedeemed": {
+            "type": "number",
+            "description": "Điểm tích luỹ khách DỰ KIẾN dùng. `0` hoặc vắng = không dùng.\n\nChỉ được GHI LẠI ở bước này, KHÔNG trừ: đơn chưa có hoá đơn. Thu ngân chốt\nlúc *Nhận xử lý* — xem `SalesOrderEntity.pointsRedeemed`.",
+            "minimum": 0
+          },
           "isDraft": {
             "type": "boolean",
             "description": "`true` = LƯU TẠM: đơn ở `DRAFT`, chỉ người gửi thấy, thu ngân không thấy.\n`PATCH` một đơn `DRAFT` với `isDraft: false` (hoặc vắng) là GỬI nó."
@@ -51695,6 +53181,19 @@
         },
         "required": [
           "lines"
+        ]
+      },
+      "SalesOrderPointsDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "number",
+            "description": "`0` = bỏ dự kiến dùng điểm.",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "points"
         ]
       },
       "RejectSalesOrderDto": {

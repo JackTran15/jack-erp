@@ -53,6 +53,8 @@ import { SupplierDebtPaymentController } from './supplier-debt-payment/supplier-
 import { CashVoucherV2Controller } from './controllers/cash-voucher-v2.controller';
 import { SearchCashVouchersV2Handler } from './queries/search-cash-vouchers-v2.handler';
 import { CashLedgerV2Controller } from './cash-ledger/controllers/cash-ledger-v2.controller';
+import { CashVoucherCategoryTreeController } from './cash-voucher-categories/cash-voucher-category-tree.controller';
+import { SearchCashVoucherCategoryTreeHandler } from './cash-voucher-categories/queries/search-cash-voucher-category-tree.handler';
 import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-ledger-v2.handler';
 
 @Module({
@@ -80,6 +82,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
   controllers: [
     CashVoucherV2Controller,
     CashLedgerV2Controller,
+    CashVoucherCategoryTreeController,
     CashReceiptsController,
     CashPaymentsController,
     CashLedgerController,
@@ -116,6 +119,7 @@ import { SearchCashLedgerV2Handler } from './cash-ledger/queries/search-cash-led
     InvoiceCancelCollectCashConsumer,
     SearchCashVouchersV2Handler,
     SearchCashLedgerV2Handler,
+    SearchCashVoucherCategoryTreeHandler,
   ],
   exports: [
     CashVoucherCategorySeederService,
