@@ -16,6 +16,7 @@ import { mockVariants } from "../../../_mock/catalog.mock";
 import { OptionsFormRow } from "../../../WidgetOptionsModal/OptionsFormRow/OptionsFormRow";
 import { OptionsRadioGroup } from "../../../WidgetOptionsModal/OptionsRadioGroup/OptionsRadioGroup";
 import { WidgetOptionsModal } from "../../../WidgetOptionsModal/WidgetOptionsModal";
+import { OVERVIEW_SELECT_CLASS } from "../../../_lib/selectClass";
 
 const DIMENSION_OPTIONS = [
   { value: "product_group", label: "Nhóm hàng hóa" },
@@ -53,7 +54,6 @@ interface Props {
   onConfirm: (next: Draft) => void;
 }
 
-const SELECT_CLASS = "h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]";
 
 /**
  * Modal "Tùy chọn" dùng chung cho cả hai loại báo cáo của widget trái row 3.
@@ -110,7 +110,7 @@ export function ProductShareOptionsModal({ open, state, onClose, onConfirm }: Pr
           // Đổi nhóm → mẫu mã cũ không còn thuộc nhóm nữa, đưa về "Tất cả".
           onValueChange={(v) => patch({ categoryId: v, variantId: ALL_VALUE })}
           searchable
-          className={SELECT_CLASS}
+          className={OVERVIEW_SELECT_CLASS}
           contentClassName="text-[13px]"
         />
       </OptionsFormRow>
@@ -122,7 +122,7 @@ export function ProductShareOptionsModal({ open, state, onClose, onConfirm }: Pr
             value={draft.variantId}
             onValueChange={(v) => patch({ variantId: v })}
             searchable
-            className={SELECT_CLASS}
+            className={OVERVIEW_SELECT_CLASS}
             contentClassName="text-[13px]"
           />
         </OptionsFormRow>
@@ -134,7 +134,7 @@ export function ProductShareOptionsModal({ open, state, onClose, onConfirm }: Pr
           value={draft.period}
           onValueChange={(v) => patch({ period: v as OverviewPeriod })}
           searchable
-          className={SELECT_CLASS}
+          className={OVERVIEW_SELECT_CLASS}
           contentClassName="text-[13px]"
         />
       </OptionsFormRow>

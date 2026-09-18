@@ -1,4 +1,5 @@
 import { SingleSelect } from "@erp/ui";
+import { OVERVIEW_SELECT_CLASS } from "../../../_lib/selectClass";
 
 interface Props {
   value: string;
@@ -19,7 +20,7 @@ export function WidgetTypeSelect({ value, options, onChange, width }: Props) {
         value={value}
         onValueChange={onChange}
         placeholder="Loại báo cáo"
-        className="h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]"
+        className={OVERVIEW_SELECT_CLASS}
         contentClassName="text-[13px]"
       />
     </div>

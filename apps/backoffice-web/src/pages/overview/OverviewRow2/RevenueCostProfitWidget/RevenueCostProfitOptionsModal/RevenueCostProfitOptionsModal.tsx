@@ -7,6 +7,7 @@ import {
 } from "../../../_lib/period";
 import { OptionsFormRow } from "../../../WidgetOptionsModal/OptionsFormRow/OptionsFormRow";
 import { WidgetOptionsModal } from "../../../WidgetOptionsModal/WidgetOptionsModal";
+import { OVERVIEW_SELECT_CLASS } from "../../../_lib/selectClass";
 
 interface Props {
   open: boolean;
@@ -44,7 +45,7 @@ export function RevenueCostProfitOptionsModal({
           value={draftPeriod}
           onValueChange={(v) => setDraftPeriod(v as OverviewPeriod)}
           searchable
-          className="h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]"
+          className={OVERVIEW_SELECT_CLASS}
           contentClassName="text-[13px]"
         />
       </OptionsFormRow>

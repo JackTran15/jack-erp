@@ -10,8 +10,8 @@ import {
 import { periodOptions, type OverviewPeriod } from "../../../_lib/period";
 import { OptionsFormRow } from "../../../WidgetOptionsModal/OptionsFormRow/OptionsFormRow";
 import { WidgetOptionsModal } from "../../../WidgetOptionsModal/WidgetOptionsModal";
+import { OVERVIEW_SELECT_CLASS } from "../../../_lib/selectClass";
 
-const SELECT_CLASS = "h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]";
 
 interface Props {
   open: boolean;
@@ -67,7 +67,7 @@ export function RevenueOverTimeOptionsModal({
           value={draftGranularity}
           onValueChange={(v) => changeGranularity(v as Granularity)}
           searchable
-          className={SELECT_CLASS}
+          className={OVERVIEW_SELECT_CLASS}
           contentClassName="text-[13px]"
         />
       </OptionsFormRow>
@@ -78,7 +78,7 @@ export function RevenueOverTimeOptionsModal({
           value={draftPeriod}
           onValueChange={(v) => setDraftPeriod(v as OverviewPeriod)}
           searchable
-          className={SELECT_CLASS}
+          className={OVERVIEW_SELECT_CLASS}
           contentClassName="text-[13px]"
         />
       </OptionsFormRow>

@@ -15,6 +15,7 @@ import { AllOrManySelect } from "../../../WidgetOptionsModal/AllOrManySelect/All
 import { OptionsFormRow } from "../../../WidgetOptionsModal/OptionsFormRow/OptionsFormRow";
 import { OptionsRadioGroup } from "../../../WidgetOptionsModal/OptionsRadioGroup/OptionsRadioGroup";
 import { WidgetOptionsModal } from "../../../WidgetOptionsModal/WidgetOptionsModal";
+import { OVERVIEW_SELECT_CLASS } from "../../../_lib/selectClass";
 
 type Draft = Pick<
   Row3RightState,
@@ -131,7 +132,7 @@ export function ProductProfitOptionsModal({ open, state, onClose, onConfirm }: P
           value={draft.period}
           onValueChange={(v) => setDraft((d) => ({ ...d, period: v as OverviewPeriod }))}
           searchable
-          className="h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]"
+          className={OVERVIEW_SELECT_CLASS}
           contentClassName="text-[13px]"
         />
       </OptionsFormRow>

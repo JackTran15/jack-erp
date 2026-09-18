@@ -3,6 +3,7 @@ import {
   periodOptions,
   type OverviewPeriod,
 } from "../../../_lib/period";
+import { OVERVIEW_SELECT_CLASS } from "../../../_lib/selectClass";
 
 interface Props {
   value: OverviewPeriod;
@@ -24,7 +25,7 @@ export function HeaderPeriodSelect({ value, periods, onChange, width = 120 }: Pr
         options={periodOptions(periods)}
         value={value}
         onValueChange={(v) => onChange(v as OverviewPeriod)}
-        className="h-9 rounded-sm border-[#BDBDBD] px-2 text-[13px]"
+        className={OVERVIEW_SELECT_CLASS}
         contentClassName="text-[13px]"
       />
     </div>
