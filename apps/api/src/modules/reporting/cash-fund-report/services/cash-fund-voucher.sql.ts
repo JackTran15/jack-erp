@@ -32,7 +32,7 @@ interface TableSpec {
   staffColumn: string;
   /** The party name column (payer on receipts, payee on payments). */
   partyNameColumn: 'payer_name' | 'payee_name';
-  /** Deposit account column, NULL on the cash side. */
+  /** Deposit account expression over alias `h`; a typed NULL on the cash side. */
   depositAccountExpr: string;
 }
 
@@ -71,7 +71,7 @@ export const VOUCHER_TABLES: readonly TableSpec[] = [
     lineFk: 'bank_receipt_id',
     staffColumn: 'collected_by',
     partyNameColumn: 'payer_name',
-    depositAccountExpr: 'deposit_account_id',
+    depositAccountExpr: 'h.deposit_account_id',
   },
   {
     table: 'bank_payments',
@@ -83,7 +83,7 @@ export const VOUCHER_TABLES: readonly TableSpec[] = [
     lineFk: 'bank_payment_id',
     staffColumn: 'paid_by',
     partyNameColumn: 'payee_name',
-    depositAccountExpr: 'deposit_account_id',
+    depositAccountExpr: 'h.deposit_account_id',
   },
 ];
 
@@ -124,7 +124,7 @@ export function voucherHeadersSql(): string {
        h.total_amount::numeric AS total_amount, h.branch_id::text AS branch_id,
        h.${t.staffColumn} AS staff_id, h.partner_type::text AS partner_type, h.partner_id,
        h.partner_name_snapshot AS partner_name, h.${t.partyNameColumn} AS party_name,
-       h.reason, h.${t.depositAccountExpr} AS deposit_account_id
+       h.reason, ${t.depositAccountExpr} AS deposit_account_id
      FROM ${t.table} h
      WHERE ${voucherHeaderWhere('h')}`,
   ).join('\n UNION ALL \n');

@@ -49,7 +49,7 @@ Cùng môi trường và dữ liệu như UOW-01, tài khoản admin.
 
 | Risk | Mitigation |
 | --- | --- |
-| Số dư luỹ kế khi có lọc cột: đầu kỳ + Σ tập đã lọc không còn là số dư thật | Cùng cách hiểu như `cash-ledger.service.ts:73-78` — ghi rõ trong tooltip cột; AC-10 chấp nhận |
+| Số dư luỹ kế khi có lọc cột: đầu kỳ + Σ tập đã lọc không còn là số dư thật | AC-10 chọn: đầu kỳ và tổng tính trên **tập đã lọc** (khác Sổ quỹ `cash-ledger.service.ts:73-78`, vốn không thu hẹp đầu kỳ theo lọc cột — sửa lại mô tả 2026-09-18 khi xây T-02-01); ghi trong comment của class |
 | Phân trang offset trên UNION 4 bảng chậm với kỳ dài | `countRows` + row cap; export đi keyset `(doc_date, id)`; index của T-01-05 |
 | 5 file FE + handler filter-options dùng chung với UOW-03 | UOW-03 khai phụ thuộc lên T-02-01 / T-02-03 / T-02-04, nên UoW này đi trước ở phần FE; hazard còn lại chỉ là barrel `reports/index.ts` (mỗi ticket thêm một dòng) |
 

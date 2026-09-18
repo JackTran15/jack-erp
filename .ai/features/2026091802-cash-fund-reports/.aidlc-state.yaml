@@ -170,3 +170,34 @@ history:
     by: Akenzy
     reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
     ticket: T-03-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:29:05
+    by: Akenzy
+    reason: T-01-07 (backend e2e + openapi regen) was declared to depend on T-01-06 (frontend) for no data or contract reason; the FE ticket's browser boxes in fact need T-01-07's fixture data — drop the edge so the e2e can run first
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:29:05
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:29:32
+    by: Akenzy
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:29:32
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:33:18
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:33:18
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-01
