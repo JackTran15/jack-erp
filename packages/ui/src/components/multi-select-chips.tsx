@@ -172,61 +172,70 @@ function MultiSelectChips({
           </button>
         </div>
       </PopoverPrimitive.Anchor>
-      <PopoverPrimitive.Content
-        align="start"
-        className="z-50 w-[--radix-popover-trigger-width] rounded-md border bg-popover p-1 shadow-md"
-        sideOffset={4}
-        onOpenAutoFocus={(e) => e.preventDefault()}
-        onInteractOutside={(e) => {
-          if (containerRef.current?.contains(e.target as Node)) {
-            e.preventDefault();
-          }
-        }}
-      >
-        <div className="max-h-60 overflow-y-auto overscroll-contain">
-          {availableOptions.length === 0 ? (
-            <div
-              className={cn(
-                "px-2 py-1.5 text-sm text-muted-foreground",
-                contentClassName,
-              )}
-            >
-              {q !== "" ? "Không tìm thấy" : "Đã chọn tất cả"}
-            </div>
-          ) : (
-            availableOptions.map((opt, index) => (
-              <button
-                key={opt.value}
-                ref={(el) => {
-                  itemRefs.current[index] = el;
-                }}
-                type="button"
+      {/*
+        Portal is required: without it the list is a child of whatever container
+        holds the trigger, so a dialog with `contain: paint` (AppModal) or an
+        `overflow-auto` body clips the options. z-index sits above the AppModal
+        stack (40 + 20*depth + 10), which the list must clear since the portal
+        drops it straight onto `document.body`.
+      */}
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="start"
+          className="z-[1000] w-[--radix-popover-trigger-width] rounded-md border bg-popover p-1 shadow-md"
+          sideOffset={4}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => {
+            if (containerRef.current?.contains(e.target as Node)) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <div className="max-h-60 overflow-y-auto overscroll-contain">
+            {availableOptions.length === 0 ? (
+              <div
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
-                  index === activeIndex ? "bg-accent" : "hover:bg-accent",
+                  "px-2 py-1.5 text-sm text-muted-foreground",
                   contentClassName,
                 )}
-                onMouseEnter={() => setActiveIndex(index)}
-                onClick={() => add(opt.value)}
               >
-                <span className="min-w-0 truncate text-left">{opt.label}</span>
-              </button>
-            ))
-          )}
-        </div>
-        {value.length > 0 ? (
-          <div className="border-t p-1">
-            <button
-              type="button"
-              className="flex w-full items-center justify-center gap-1 rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
-              onClick={() => onValueChange([])}
-            >
-              <X className="h-3 w-3" />
-              Bỏ chọn tất cả
-            </button>
+                {q !== "" ? "Không tìm thấy" : "Đã chọn tất cả"}
+              </div>
+            ) : (
+              availableOptions.map((opt, index) => (
+                <button
+                  key={opt.value}
+                  ref={(el) => {
+                    itemRefs.current[index] = el;
+                  }}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors",
+                    index === activeIndex ? "bg-accent" : "hover:bg-accent",
+                    contentClassName,
+                  )}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => add(opt.value)}
+                >
+                  <span className="min-w-0 truncate text-left">{opt.label}</span>
+                </button>
+              ))
+            )}
           </div>
-        ) : null}
-      </PopoverPrimitive.Content>
+          {value.length > 0 ? (
+            <div className="border-t p-1">
+              <button
+                type="button"
+                className="flex w-full items-center justify-center gap-1 rounded-sm px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
+                onClick={() => onValueChange([])}
+              >
+                <X className="h-3 w-3" />
+                Bỏ chọn tất cả
+              </button>
+            </div>
+          ) : null}
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
   );
 }

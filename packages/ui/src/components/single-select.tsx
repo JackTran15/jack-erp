@@ -64,57 +64,66 @@ function SingleSelect({
           <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverPrimitive.Trigger>
-      <PopoverPrimitive.Content
-        align="start"
-        sideOffset={4}
-        className="z-50 w-[--radix-popover-trigger-width] rounded-md border bg-popover p-1 shadow-md"
-      >
-        {searchable ? (
-          <input
-            autoFocus
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={searchPlaceholder}
-            className={cn(
-              "mb-1 w-full rounded-sm border-b border-border bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground",
-              contentClassName,
-            )}
-          />
-        ) : null}
-        <div className="max-h-60 overflow-y-auto">
-          {searchable && visibleOptions.length === 0 ? (
-            <p
+      {/*
+        Portal is required: without it the list is a child of whatever container
+        holds the trigger, so a dialog with `contain: paint` (AppModal) or an
+        `overflow-auto` body clips the options. z-index sits above the AppModal
+        stack (40 + 20*depth + 10), which the list must clear since the portal
+        drops it straight onto `document.body`.
+      */}
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          align="start"
+          sideOffset={4}
+          className="z-[1000] w-[--radix-popover-trigger-width] rounded-md border bg-popover p-1 shadow-md"
+        >
+          {searchable ? (
+            <input
+              autoFocus
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={searchPlaceholder}
               className={cn(
-                "px-2 py-1.5 text-sm text-muted-foreground",
+                "mb-1 w-full rounded-sm border-b border-border bg-transparent px-2 py-1.5 text-sm outline-none placeholder:text-muted-foreground",
                 contentClassName,
               )}
-            >
-              Không tìm thấy kết quả
-            </p>
+            />
           ) : null}
-          {visibleOptions.map((opt) => {
-            const selected = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
+          <div className="max-h-60 overflow-y-auto">
+            {searchable && visibleOptions.length === 0 ? (
+              <p
                 className={cn(
-                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent",
-                  selected && "bg-accent/50",
+                  "px-2 py-1.5 text-sm text-muted-foreground",
                   contentClassName,
                 )}
-                onClick={() => {
-                  onValueChange(opt.value);
-                  setOpen(false);
-                }}
               >
-                <span className="min-w-0 truncate text-left">{opt.label}</span>
-                {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
-              </button>
-            );
-          })}
-        </div>
-      </PopoverPrimitive.Content>
+                Không tìm thấy kết quả
+              </p>
+            ) : null}
+            {visibleOptions.map((opt) => {
+              const selected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent",
+                    selected && "bg-accent/50",
+                    contentClassName,
+                  )}
+                  onClick={() => {
+                    onValueChange(opt.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="min-w-0 truncate text-left">{opt.label}</span>
+                  {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
     </PopoverPrimitive.Root>
   );
 }

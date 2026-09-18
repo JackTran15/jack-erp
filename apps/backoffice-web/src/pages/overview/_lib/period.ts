@@ -55,6 +55,20 @@ export const MONTH_PERIODS: readonly OverviewPeriod[] = Array.from(
   (_, i) => `month_${i + 1}` as MonthPeriod,
 );
 
+/**
+ * Kỳ báo cáo của widget "Doanh thu, chi phí, lợi nhuận" (row 2) — không phụ
+ * thuộc "Thống kê theo".
+ */
+export const REVENUE_WIDGET_PERIODS: readonly OverviewPeriod[] = [
+  "this_month",
+  "last_month",
+  "this_quarter",
+  "last_quarter",
+  "this_year",
+  "last_year",
+  ...MONTH_PERIODS,
+];
+
 /** `year_2026`, `year_2025`, `year_2024` … đếm lùi từ năm hiện tại. */
 export function yearPeriods(count: number, now: Date = new Date()): OverviewPeriod[] {
   const current = now.getFullYear();

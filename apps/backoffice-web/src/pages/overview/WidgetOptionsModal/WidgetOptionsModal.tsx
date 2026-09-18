@@ -9,6 +9,11 @@ interface Props {
   /** Commit bản nháp vào store. */
   onConfirm: () => void;
   width: number;
+  /**
+   * Chiều cao khung, tính tay = 40 (thanh tiêu đề) + body + 65 (footer).
+   * Body = 36 mỗi dòng + 12 khoảng cách giữa các dòng + 36 padding dọc.
+   * Vd 1 dòng → 40 + 72 + 65 = 177; 2 dòng → 40 + 120 + 65 = 225.
+   */
   height: number;
   children: ReactNode;
 }
@@ -37,8 +42,13 @@ export function WidgetOptionsModal({
       title="Tùy chọn"
       defaultWidth={width}
       defaultHeight={height}
-      minHeight={160}
+      // Chiều cao chốt cứng: khung dựng đúng kích thước ngay từ frame đầu,
+      // không đo lại sau khi mount nên không có bước co giãn nào.
+      autoHeight={false}
       bodyStretch={false}
+      // BẮT BUỘC thấp hơn `height`: mặc định của AppModal là 220, sẽ kẹp
+      // ngược chiều cao của form 1 dòng (177) lên 220.
+      minHeight={120}
       preventOutsideClose
       footer={
         <div className="flex w-full items-center justify-end gap-4">
