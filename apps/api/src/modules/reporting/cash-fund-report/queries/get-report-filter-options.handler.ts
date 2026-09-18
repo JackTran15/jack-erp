@@ -3,7 +3,9 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CASH_FUND_KIND_LABELS_VI, IDropdownOption } from '@erp/shared-interfaces';
 import { FindOptionsWhere, ILike, In, Repository } from 'typeorm';
+import { UserEntity } from '../../../auth/user.entity';
 import { BranchEntity } from '../../../branch/branch.entity';
+import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
 import { RbacService } from '../../../rbac/rbac.service';
 import { CASH_CONSOLIDATED } from '../report-definition';
 import {
@@ -12,6 +14,37 @@ import {
 } from '../dto/report-filter-options-query.dto';
 import { GetReportFilterOptionsQuery } from './get-report-filter-options.query';
 
+/** "First Last" — matches the codebase-wide name convention (see counterparty-name.util.ts). */
+const fullName = (u: { firstName?: string; lastName?: string }): string | null => {
+  const name = [u.firstName, u.lastName].filter(Boolean).join(' ').trim();
+  return name || null;
+};
+
+/**
+ * The staff column of each voucher table, as text: `staff_id` is a uuid on the
+ * cash tables while the deposit tables keep the user id in `collected_by` /
+ * `paid_by` varchar columns. All four hold `users.id`.
+ */
+const VOUCHER_STAFF_COLUMNS: ReadonlyArray<[table: string, column: string]> = [
+  ['cash_receipts', 'staff_id'],
+  ['cash_payments', 'staff_id'],
+  ['bank_receipts', 'collected_by'],
+  ['bank_payments', 'paid_by'],
+];
+
+/**
+ * The distinct staff over the four voucher tables within the report scope.
+ * `UNION` (not `UNION ALL`) so the join below sees each user once.
+ */
+export function voucherStaffSql(consolidated: boolean): string {
+  const scope = consolidated ? '' : ' AND branch_id = ANY(:branchIds)';
+  return VOUCHER_STAFF_COLUMNS.map(
+    ([table, column]) =>
+      `SELECT ${column}::text AS staff_id FROM ${table}` +
+      ` WHERE organization_id = :org AND deleted_at IS NULL AND ${column} IS NOT NULL${scope}`,
+  ).join(' UNION ');
+}
+
 @QueryHandler(GetReportFilterOptionsQuery)
 export class GetReportFilterOptionsHandler
   implements IQueryHandler<GetReportFilterOptionsQuery>
@@ -19,6 +52,8 @@ export class GetReportFilterOptionsHandler
   constructor(
     @InjectRepository(BranchEntity)
     private readonly branches: Repository<BranchEntity>,
+    @InjectRepository(EmployeeProfileEntity)
+    private readonly employees: Repository<EmployeeProfileEntity>,
     private readonly rbac: RbacService,
   ) {}
 
@@ -26,12 +61,18 @@ export class GetReportFilterOptionsHandler
     switch (dto.type) {
       case CashFundFilterOptionType.STORE:
         return this.stores(dto, actor.organizationId, actor.userId, actor.branchIds ?? []);
+      case CashFundFilterOptionType.EMPLOYEE:
+        return this.employeesWithVouchers(
+          dto,
+          actor.organizationId,
+          actor.userId,
+          actor.branchIds ?? [],
+        );
       case CashFundFilterOptionType.PAYMENT_METHOD:
         return (Object.keys(CASH_FUND_KIND_LABELS_VI) as (keyof typeof CASH_FUND_KIND_LABELS_VI)[]).map(
           (kind) => ({ value: kind, label: CASH_FUND_KIND_LABELS_VI[kind] }),
         );
-      // Wired by UOW-02 (employee) and UOW-03 (expenseCategory).
-      case CashFundFilterOptionType.EMPLOYEE:
+      // Wired by UOW-03.
       case CashFundFilterOptionType.EXPENSE_CATEGORY:
         throw new BadRequestException(`Filter option type not available yet: ${dto.type}`);
       default:
@@ -71,5 +112,51 @@ export class GetReportFilterOptionsHandler
       take: this.take(dto),
     });
     return rows.map((b) => ({ value: b.id, label: b.name, metadata: { branchId: b.id } }));
+  }
+
+  /**
+   * "Nhân viên" — only the employees recorded as staff on at least one voucher
+   * the actor may read (every branch when consolidated, else the assigned
+   * ones), so the picker is not the whole HR roster. value = user id, which is
+   * what the voucher's `staff_id` holds and what `filters.employeeIds` is
+   * matched against. Label is "{employee code} - {name}", as in invoice-report.
+   */
+  private async employeesWithVouchers(
+    dto: ReportFilterOptionsQueryDto,
+    org: string,
+    userId: string,
+    assigned: string[],
+  ): Promise<IDropdownOption[]> {
+    const hasConsolidated = await this.rbac.hasPermission(userId, org, CASH_CONSOLIDATED);
+    if (!hasConsolidated && !assigned.length) return [];
+
+    const qb = this.employees
+      .createQueryBuilder('e')
+      .innerJoin(UserEntity, 'u', 'u.id = e.userId AND e.organization_id::uuid = u.organizationId')
+      .innerJoin(`(${voucherStaffSql(hasConsolidated)})`, 's', 's.staff_id = u.id::text')
+      .where('e.organizationId = :org', hasConsolidated ? { org } : { org, branchIds: assigned })
+      .select('u.id', 'userId')
+      .addSelect('e.code', 'code')
+      .addSelect('u.firstName', 'firstName')
+      .addSelect('u.lastName', 'lastName');
+    if (dto.search) {
+      qb.andWhere('(u.firstName ILIKE :s OR u.lastName ILIKE :s OR e.code ILIKE :s)', {
+        s: `%${dto.search}%`,
+      });
+    }
+    const rows = await qb
+      .orderBy('u.lastName', 'ASC')
+      .addOrderBy('u.firstName', 'ASC')
+      .offset(this.skip(dto))
+      .limit(this.take(dto))
+      .getRawMany<{ userId: string; code: string; firstName?: string; lastName?: string }>();
+    return rows.map((r) => {
+      const name = fullName(r);
+      return {
+        value: r.userId,
+        label: name ? `${r.code} - ${name}` : r.code,
+        metadata: { name: name ?? r.code },
+      };
+    });
   }
 }
