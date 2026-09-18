@@ -27,3 +27,18 @@ history:
     at: 2026-09-18T08:46:11
     by: Akenzy
     evidence: graph valid - 2 UoW, 5 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T08:46:36
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T09:23:38
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T09:23:38
+    by: Claude
+    ticket: T-01-01
