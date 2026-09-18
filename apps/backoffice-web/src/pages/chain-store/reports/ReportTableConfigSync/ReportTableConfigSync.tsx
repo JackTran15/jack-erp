@@ -17,6 +17,7 @@ import {
 import { fetchInventoryReportColumns } from "../_api/inventory-report-v2.api";
 import { fetchDebtReportColumns } from "../_api/debt-report.api";
 import { fetchProfitReportColumns } from "../_api/profit-report.api";
+import { fetchCashFundReportColumns } from "../_api/cash-fund-report.api";
 import {
   mergeTemplateColumnsState,
   useReportColumnTemplate,
@@ -79,6 +80,11 @@ export function ReportTableConfigSync() {
           backendKey as string,
           statBy as "item" | "parent" | "group" | undefined,
         );
+      }
+      if (backendSource === "cash") {
+        // Cột của báo cáo quỹ tiền cố định theo từng báo cáo — không phụ thuộc
+        // chế độ xem hay "Thống kê theo".
+        return fetchCashFundReportColumns(backendKey as string);
       }
       return fetchReportColumns(
         backendKey as string,

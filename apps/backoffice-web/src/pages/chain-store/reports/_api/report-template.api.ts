@@ -13,7 +13,7 @@ import { STORE_TYPE } from "../../../../constants/store.constant";
 import { useBranchStore } from "../../../../store/common/branch/branch.store";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
 
-type TemplateSource = "invoice" | "inventory" | "debt" | "profit";
+type TemplateSource = "invoice" | "inventory" | "debt" | "profit" | "cash";
 
 const TEMPLATES_PATH: Record<
   TemplateSource,
@@ -21,11 +21,13 @@ const TEMPLATES_PATH: Record<
   | "/reports/inventory/templates"
   | "/reports/debts/templates"
   | "/reports/profit/templates"
+  | "/reports/cash-fund/templates"
 > = {
   invoice: "/reports/invoices/templates",
   inventory: "/reports/inventory/templates",
   debt: "/reports/debts/templates",
   profit: "/reports/profit/templates",
+  cash: "/reports/cash-fund/templates",
 };
 
 // Tên template ngầm định (v1: 1 template / reportType, chưa có UI đặt tên).
@@ -82,12 +84,13 @@ async function updateReportTemplate(
  * Template "Hiển thị cột" của report đang mở (v1: template ngầm định đầu tiên
  * theo reportType).
  *
- * Bật cho báo cáo kho + báo cáo bán hàng. Chưa bật cho `debt`/`profit`: bộ cột
- * của hai nguồn đó đổi theo filter "Thống kê theo", trong khi backend dựng
- * catalog để kiểm tra template bằng `buildColumns(actor)` không kèm filter —
- * lưu ở grain khác grain mặc định sẽ bị từ chối "Unknown report columns".
+ * Bật cho báo cáo kho + báo cáo bán hàng + báo cáo quỹ tiền (bộ cột cố định,
+ * AC-21). Chưa bật cho `debt`/`profit`: bộ cột của hai nguồn đó đổi theo filter
+ * "Thống kê theo", trong khi backend dựng catalog để kiểm tra template bằng
+ * `buildColumns(actor)` không kèm filter — lưu ở grain khác grain mặc định sẽ
+ * bị từ chối "Unknown report columns".
  */
-const TEMPLATE_SOURCES: TemplateSource[] = ["inventory", "invoice"];
+const TEMPLATE_SOURCES: TemplateSource[] = ["inventory", "invoice", "cash"];
 
 export function useReportColumnTemplate() {
   const reportType = useReportStore((s) => s.reportType);

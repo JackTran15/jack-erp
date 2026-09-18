@@ -9,7 +9,7 @@ import {
 } from "../../../../constants/reports/report-type.constant";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
 
-type OptionsSource = "invoice" | "inventory" | "debt" | "profit";
+type OptionsSource = "invoice" | "inventory" | "debt" | "profit" | "cash";
 
 const OPTIONS_PATH: Record<
   OptionsSource,
@@ -17,11 +17,13 @@ const OPTIONS_PATH: Record<
   | "/reports/inventory/filter-options"
   | "/reports/debts/filter-options"
   | "/reports/profit/filter-options"
+  | "/reports/cash-fund/filter-options"
 > = {
   invoice: "/reports/invoices/filter-options",
   inventory: "/reports/inventory/filter-options",
   debt: "/reports/debts/filter-options",
   profit: "/reports/profit/filter-options",
+  cash: "/reports/cash-fund/filter-options",
 };
 
 // Gọi API options dropdown dùng chung (phân biệt bằng `type`, hỗ trợ search).

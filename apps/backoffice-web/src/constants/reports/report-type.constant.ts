@@ -22,6 +22,7 @@ import { chain_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, chai
 import { chain_filterRegistryReportProfitByItem, chain_tableRegistryReportProfitByItem, single_filterRegistryReportProfitByItem, single_tableRegistryReportProfitByItem } from "./report-registry/report-profit-by-item.registry";
 import { chain_filterRegistryReportGrossProfitByInvoice, chain_tableRegistryReportGrossProfitByInvoice, single_filterRegistryReportGrossProfitByInvoice, single_tableRegistryReportGrossProfitByInvoice } from "./report-registry/report-gross-profit-by-invoice.registry";
 import { chain_filterRegistryReportBusinessResults, chain_tableRegistryReportBusinessResults, single_filterRegistryReportBusinessResults, single_tableRegistryReportBusinessResults } from "./report-registry/report-business-results.registry";
+import { chain_filterRegistryReportCashInOutSituation, chain_tableRegistryReportCashInOutSituation, single_filterRegistryReportCashInOutSituation, single_tableRegistryReportCashInOutSituation } from "./report-registry/report-cash-in-out-situation.registry";
 import type { ReportBackendSource, ReportTableConfig, ReportTypeMetadata } from "./report.interface";
 
 export enum REPORT_TYPE_SALES {
@@ -447,13 +448,28 @@ export const REPORT_TYPE_DEBTS_METADATA = {
   [REPORT_TYPE_DEBTS.DELIVERY_PARTNER_DEBTS]: { label: 'Công nợ đối tác giao hàng' },
 };
 
+// Nhãn theo đúng MShopKeeper (A-08). Báo cáo chưa có backendKey vẫn hiện trong
+// dropdown nhưng không gọi API (UOW-02/03 bổ sung registry + backendKey).
 export const REPORT_TYPE_CASH_FUND_METADATA = {
+  // Tạm hoãn — chưa có thực thể bàn giao ca (A-06); không đưa vào CASH_FUND_REPORTS.
   [REPORT_TYPE_CASH_FUND.SHIFT_HANDOVER_MINUTES_LIST]: { label: 'Biên bản bàn giao ca' },
-  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_SITUATION]: { label: 'Tình hình thu chi quỹ tiền mặt' },
-  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST]: { label: 'Danh sách thu chi quỹ tiền mặt' },
-  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_CATEGORY]: { label: 'Chi phí theo loại' },
-  [REPORT_TYPE_CASH_FUND.EXPENSE_LIST_BY_CATEGORY]: { label: 'Danh sách chi phí theo loại' },
-  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_TIME]: { label: 'Chi phí theo thời gian' },
+  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_SITUATION]: {
+    label: 'Tình hình thu chi',
+    backendKey: 'cash-in-out-situation',
+    backendSource: 'cash' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportCashInOutSituation,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportCashInOutSituation,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportCashInOutSituation,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportCashInOutSituation,
+    },
+  },
+  [REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST]: { label: 'Bảng kê thu chi' },
+  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_CATEGORY]: { label: 'Chi tiền theo mục chi' },
+  [REPORT_TYPE_CASH_FUND.EXPENSE_LIST_BY_CATEGORY]: { label: 'Bảng kê tiền chi theo mục chi' },
+  [REPORT_TYPE_CASH_FUND.EXPENSES_BY_TIME]: { label: 'Chi tiền theo thời gian' },
 };
 
 // Gộp metadata của mọi category để tra cứu theo giá trị report type (string).
@@ -478,7 +494,7 @@ export function getReportBackendKey(reportType: string): string | undefined {
   return REPORT_TYPE_METADATA[reportType]?.backendKey;
 }
 
-// Domain backend của report type — chọn bộ endpoint (invoice / inventory / debt).
+// Domain backend của report type — chọn bộ endpoint (invoice / inventory / debt / profit / cash).
 export function getReportBackendSource(
   reportType: string,
 ): ReportBackendSource {
