@@ -89,7 +89,8 @@ import {
  *                    tương ứng nằm ngoài kỳ lọc) — đúng về mặt net, để tổng cân bằng.
  *                    Dòng nguồn showroom luôn = 0 (hàng chưa từng vào kho tạm).
  *   - staff        : carrier (`users.first_name + last_name`); với dòng nguồn
- *                    showroom là `invoices.staff_id`.
+ *                    showroom là nhân viên bán hàng (`invoices.salesperson_id`
+ *                    → `employee_profiles.user_id`), trống thì để trống.
  *
  * saleQty / invoice: điền từ liên kết hóa đơn của dòng xuất đã bán
  * (TRANSFERRED-by-sale, mang `invoice_id`/`invoice_number`). Dòng xuất chưa bán
@@ -371,7 +372,11 @@ export class TempWarehouseReportService {
       showroom AS (
         SELECT
           ii.item_id,
-          inv.staff_id AS carrier_user_id,
+          -- "Nhân viên xuất" của dòng trưng bày là NHÂN VIÊN BÁN HÀNG, không phải
+          -- thu ngân lập hóa đơn. salesperson_id là employee_profiles.id nên phải
+          -- đi qua ep.user_id mới join được users. Không có nhân viên bán hàng thì
+          -- để trống (LEFT JOIN users ra NULL → staff = ''), KHÔNG lùi về thu ngân.
+          ep.user_id AS carrier_user_id,
           inv.branch_id,
           -- PHẢI ép về timestamp KHÔNG timezone. temp_warehouse_lines.created_at
           -- là naive-UTC, còn invoices.issued_at là timestamptz; để nguyên thì
@@ -403,6 +408,8 @@ export class TempWarehouseReportService {
         -- và GROUP BY dưới kia mới được phép chọn staff_id/branch_id/code mà
         -- không liệt kê chúng ra.
         JOIN invoices inv ON inv.id = ii.invoice_id
+        LEFT JOIN employee_profiles ep
+          ON ep.id = inv.salesperson_id AND ep.organization_id = inv.organization_id
         JOIN items i
           ON i.id = ii.item_id AND i.organization_id = $1
         LEFT JOIN tw_claimed c
@@ -412,8 +419,9 @@ export class TempWarehouseReportService {
           AND ($5::uuid[] IS NULL OR i.category_id = ANY($5::uuid[]))
           AND ($6::text IS NULL OR i.code ILIKE '%' || $6 || '%' OR i.name ILIKE '%' || $6 || '%')
         -- inv.id là khóa chính nên chọn được staff_id/branch_id/code/issued_at
-        -- mà không phải liệt kê (phụ thuộc hàm).
-        GROUP BY ii.item_id, inv.id
+        -- mà không phải liệt kê (phụ thuộc hàm). ep.id không nằm trong phụ thuộc
+        -- đó nên phải gộp thêm; mỗi hóa đơn có tối đa một ep nên không tách dòng.
+        GROUP BY ii.item_id, inv.id, ep.id
         HAVING SUM(ii.quantity) - COALESCE(MAX(c.qty), 0) > 0
       ),
       -- Danh sách cột khai TƯỜNG MINH: UNION ALL khớp theo vị trí, và nhiều cột
