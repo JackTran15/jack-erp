@@ -25,6 +25,8 @@ import { WarehouseSelectField } from "./WarehouseSelectField/WarehouseSelectFiel
 import { CustomerSearchSelectField } from "./CustomerSearchSelectField/CustomerSearchSelectField";
 import { SupplierSearchSelectField } from "./SupplierSearchSelectField/SupplierSearchSelectField";
 import { StoreInChainOptionalField } from "./StoreInChainOptionalField/StoreInChainOptionalField";
+import { PaymentMethodField } from "./PaymentMethodField/PaymentMethodField";
+import { TimeBucketField } from "./TimeBucketField/TimeBucketField";
 
 interface Props {
   line: REPORT_FILTERS_LINE;
@@ -225,6 +227,47 @@ export function ReportFilterLine({ line }: Props) {
           <SupplierSearchSelectField
             value={filters[REPORT_FILTERS_LINE.SUPPLIER] ?? null}
             onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.SUPPLIER, v)}
+          />
+        );
+      // Quỹ tiền — "Nhân viên" trên phiếu thu/chi; options từ
+      // /reports/cash-fund/filter-options?type=employee (chỉ nhân viên có phiếu).
+      case REPORT_FILTERS_LINE.EMPLOYEE:
+        return (
+          <RemoteSelectField
+            type="employee"
+            value={filters[REPORT_FILTERS_LINE.EMPLOYEE] ?? ""}
+            placeholder="Tất cả"
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.EMPLOYEE, v)}
+          />
+        );
+      case REPORT_FILTERS_LINE.PAYMENT_METHOD:
+        return (
+          <PaymentMethodField
+            value={filters[REPORT_FILTERS_LINE.PAYMENT_METHOD] ?? ""}
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.PAYMENT_METHOD, v)
+            }
+          />
+        );
+      // Quỹ tiền — "Mục chi" (#5, #6): chọn một mục hoặc "Chi khác"
+      // (uncategorized); options từ filter-options type=expenseCategory.
+      case REPORT_FILTERS_LINE.EXPENSE_CATEGORY:
+        return (
+          <RemoteSelectField
+            type="expenseCategory"
+            value={filters[REPORT_FILTERS_LINE.EXPENSE_CATEGORY] ?? ""}
+            placeholder="Tất cả"
+            onChange={(v) =>
+              actions.setFilterValue(REPORT_FILTERS_LINE.EXPENSE_CATEGORY, v)
+            }
+          />
+        );
+      // Quỹ tiền — "Thống kê theo" (#6): bucket thời gian, mặc định Ngày.
+      case REPORT_FILTERS_LINE.TIME_BUCKET:
+        return (
+          <TimeBucketField
+            value={filters[REPORT_FILTERS_LINE.TIME_BUCKET] ?? "day"}
+            onChange={(v) => actions.setFilterValue(REPORT_FILTERS_LINE.TIME_BUCKET, v)}
           />
         );
       case REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL:

@@ -71,6 +71,7 @@ export const PERMISSION_RESOURCE_LABELS_VI: Record<string, string> = {
   "reporting.inventory": "Báo cáo kho",
   "reporting.debts": "Báo cáo công nợ",
   "reporting.profit": "Báo cáo lợi nhuận",
+  "reporting.cash": "Báo cáo quỹ tiền",
 
   // Hệ thống
   "iam.user": "Người dùng",
@@ -191,6 +192,8 @@ export const PERMISSION_SHORT_LABELS_VI: Record<string, string> = {
   "reporting.profit.consolidated.read": "Xem toàn chuỗi cửa hàng",
   "reporting.debts.read": "Mở nhóm báo cáo",
   "reporting.debts.consolidated.read": "Xem toàn chuỗi cửa hàng",
+  "reporting.cash.read": "Mở nhóm báo cáo",
+  "reporting.cash.consolidated.read": "Xem toàn chuỗi cửa hàng",
   "inventory.reports.read": "Mở nhóm báo cáo",
   "reporting.inventory.value.read": "Xem giá trị nhập/xuất",
 
@@ -212,6 +215,12 @@ export const PERMISSION_SHORT_LABELS_VI: Record<string, string> = {
   "reporting.debts.supplier-debts.read": "Công nợ nhà cung cấp",
   "reporting.debts.supplier-debts-detail-by-document-and-product.read":
     "Chi tiết công nợ nhà cung cấp theo chứng từ và mặt hàng",
+  "reporting.cash.cash-in-out-situation.read": "Tình hình thu chi",
+  "reporting.cash.cash-in-out-list.read": "Bảng kê thu chi",
+  "reporting.cash.expenses-by-category.read": "Chi tiền theo mục chi",
+  "reporting.cash.expense-list-by-category.read":
+    "Bảng kê tiền chi theo mục chi",
+  "reporting.cash.expenses-by-time.read": "Chi tiền theo thời gian",
   "reporting.inventory.stock-summary.read": "Tổng hợp nhập xuất tồn kho",
   "reporting.inventory.document-detail.read":
     "Bảng kê chi tiết phiếu nhập xuất kho",

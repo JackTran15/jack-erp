@@ -32,7 +32,10 @@ import {
   type CreateDepositDebtCollectionBody,
 } from "../../bank-vouchers.types";
 import { CashVoucherCategoryDirection } from "../../cash-vouchers.types";
-import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import {
+  formatCategoryOptionLabel,
+  useCashVoucherCategories,
+} from "../../../../hooks/treasury/use-cash-voucher-categories";
 import {
   DebtCollectionPickDialog,
   type DebtCollectionPickResult,
@@ -494,7 +497,7 @@ export function DepositReceiptVoucherDialog({
                 <option value="">-- Chọn --</option>
                 {receiptCategories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {formatCategoryOptionLabel(c)}
                   </option>
                 ))}
               </select>

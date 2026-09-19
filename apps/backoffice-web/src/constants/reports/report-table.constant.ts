@@ -150,6 +150,33 @@ export enum ReportTableColumn {
   PERIOD_CURRENT = 'period_current',
   PERIOD_CHANGE_PERCENT = 'period_change_percent',
   PERIOD_CHANGE_AMOUNT = 'period_change_amount',
+
+  // === Quỹ tiền (5 báo cáo, khai một lần cho cả UOW-01/02/03 — xem
+  // .ai/features/2026091802-cash-fund-reports/00-intent.md bảng cột). Cột trùng
+  // khái niệm với cột đã có thì tái dùng: DOCUMENT_NUMBER, DOCUMENT_TYPE,
+  // DOCUMENT_DESCRIPTION, RUNNING_BALANCE, STORE_CODE, STORE_NAME, DATE. ===
+  // #2 Tình hình thu chi
+  LINE_LABEL = 'line_label',
+  CASH_AMOUNT = 'cash_amount',
+  DEPOSIT_AMOUNT = 'deposit_amount',
+  TOTAL_AMOUNT = 'total_amount',
+  // #3 Bảng kê thu chi / #5 Bảng kê tiền chi theo mục chi
+  DOC_DATE = 'doc_date',
+  REFERENCE = 'reference',
+  AMOUNT_IN = 'amount_in',
+  AMOUNT_OUT = 'amount_out',
+  PAYMENT_METHOD = 'payment_method',
+  DEPOSIT_ACCOUNT = 'deposit_account',
+  STAFF_NAME = 'staff_name',
+  PARTNER_CODE = 'partner_code',
+  PARTNER_NAME = 'partner_name',
+  PAYEE_NAME = 'payee_name',
+  INVOICE_NUMBER = 'invoice_number',
+  // #4 Chi tiền theo mục chi / #6 Chi tiền theo thời gian
+  CATEGORY_ID = 'category_id',
+  CATEGORY_NAME = 'category_name',
+  CATEGORY_KIND = 'category_kind',
+  EXPENSE_AMOUNT = 'expense_amount',
 }
 
 export enum ReportTableColumnGroup {
@@ -325,4 +352,24 @@ export const ReportTableColumnLabel = {
   [ReportTableColumn.PERIOD_CURRENT]: 'Kỳ hiện tại',
   [ReportTableColumn.PERIOD_CHANGE_PERCENT]: 'Thay đổi (%)',
   [ReportTableColumn.PERIOD_CHANGE_AMOUNT]: 'Thay đổi (Số tiền)',
+
+  [ReportTableColumn.LINE_LABEL]: 'Khoản mục',
+  [ReportTableColumn.CASH_AMOUNT]: 'Tiền mặt',
+  [ReportTableColumn.DEPOSIT_AMOUNT]: 'Tiền gửi',
+  [ReportTableColumn.TOTAL_AMOUNT]: 'Tổng cộng',
+  [ReportTableColumn.DOC_DATE]: 'Ngày chứng từ',
+  [ReportTableColumn.REFERENCE]: 'Tham chiếu',
+  [ReportTableColumn.AMOUNT_IN]: 'Tiền thu',
+  [ReportTableColumn.AMOUNT_OUT]: 'Tiền chi',
+  [ReportTableColumn.PAYMENT_METHOD]: 'Phương thức thanh toán',
+  [ReportTableColumn.DEPOSIT_ACCOUNT]: 'Tài khoản ngân hàng',
+  [ReportTableColumn.STAFF_NAME]: 'Nhân viên thu/chi',
+  [ReportTableColumn.PARTNER_CODE]: 'Mã đối tượng',
+  [ReportTableColumn.PARTNER_NAME]: 'Đối tượng nộp/nhận',
+  [ReportTableColumn.PAYEE_NAME]: 'Người nhận',
+  [ReportTableColumn.INVOICE_NUMBER]: 'Số hóa đơn',
+  [ReportTableColumn.CATEGORY_ID]: 'ID Mục chi',
+  [ReportTableColumn.CATEGORY_NAME]: 'Mục chi',
+  [ReportTableColumn.CATEGORY_KIND]: 'Loại Mục chi',
+  [ReportTableColumn.EXPENSE_AMOUNT]: 'Số tiền chi',
 };

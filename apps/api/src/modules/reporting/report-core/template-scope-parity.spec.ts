@@ -37,9 +37,17 @@ import { UpdateProfitReportTemplateHandler } from '../profit-report/commands/upd
 import { UpdateProfitReportTemplateCommand } from '../profit-report/commands/update-profit-report-template.command';
 import { DeleteProfitReportTemplateHandler } from '../profit-report/commands/delete-profit-report-template.handler';
 import { DeleteProfitReportTemplateCommand } from '../profit-report/commands/delete-profit-report-template.command';
+import { ListCashFundReportTemplatesHandler } from '../cash-fund-report/queries/list-cash-fund-report-templates.handler';
+import { ListCashFundReportTemplatesQuery } from '../cash-fund-report/queries/list-cash-fund-report-templates.query';
+import { GetCashFundReportTemplateHandler } from '../cash-fund-report/queries/get-cash-fund-report-template.handler';
+import { GetCashFundReportTemplateQuery } from '../cash-fund-report/queries/get-cash-fund-report-template.query';
+import { UpdateCashFundReportTemplateHandler } from '../cash-fund-report/commands/update-cash-fund-report-template.handler';
+import { UpdateCashFundReportTemplateCommand } from '../cash-fund-report/commands/update-cash-fund-report-template.command';
+import { DeleteCashFundReportTemplateHandler } from '../cash-fund-report/commands/delete-cash-fund-report-template.handler';
+import { DeleteCashFundReportTemplateCommand } from '../cash-fund-report/commands/delete-cash-fund-report-template.command';
 
 /**
- * Four report domains run twenty near-identical handlers over one shared
+ * Five report domains run twenty-five near-identical handlers over one shared
  * `report_templates` table. The risk is not getting one wrong, it is missing
  * one: a domain still scoped to the organization keeps leaking one branch's
  * layout to every other branch, and only shows up on a tenant with more than
@@ -116,6 +124,18 @@ const DOMAINS: Domain[] = [
     UpdateCommand: UpdateProfitReportTemplateCommand,
     Delete: DeleteProfitReportTemplateHandler,
     DeleteCommand: DeleteProfitReportTemplateCommand,
+  },
+  {
+    name: 'cash',
+    reportType: 'cash-in-out-situation',
+    List: ListCashFundReportTemplatesHandler,
+    ListQuery: ListCashFundReportTemplatesQuery,
+    Get: GetCashFundReportTemplateHandler,
+    GetQuery: GetCashFundReportTemplateQuery,
+    Update: UpdateCashFundReportTemplateHandler,
+    UpdateCommand: UpdateCashFundReportTemplateCommand,
+    Delete: DeleteCashFundReportTemplateHandler,
+    DeleteCommand: DeleteCashFundReportTemplateCommand,
   },
 ];
 
@@ -250,6 +270,7 @@ describe('no template handler is still scoped to the organization alone', () => 
     'src/modules/reporting/invoice-report',
     'src/modules/reporting/debt-report',
     'src/modules/reporting/profit-report',
+    'src/modules/reporting/cash-fund-report',
     'src/modules/inventory-reports',
   ];
 
@@ -270,8 +291,8 @@ describe('no template handler is still scoped to the organization alone', () => 
     return found;
   }
 
-  it('finds all twenty handlers', () => {
-    expect(templateHandlers()).toHaveLength(20);
+  it('finds all twenty-five handlers', () => {
+    expect(templateHandlers()).toHaveLength(25);
   });
 
   it.each(templateHandlers())('%s resolves a scope', (file) => {

@@ -18,6 +18,10 @@ import {
   buildProfitColumnFilters,
   buildProfitSearchFilters,
 } from "./profit-report.api";
+import {
+  buildCashFundColumnFilters,
+  buildCashFundSearchFilters,
+} from "./cash-fund-report.api";
 
 /**
  * Excel export for every report domain.
@@ -37,6 +41,7 @@ const EXPORT_PATH: Record<string, string> = {
   inventory: "/reports/inventory/export",
   debt: "/reports/debts/export",
   profit: "/reports/profit/export",
+  cash: "/reports/cash-fund/export",
 };
 
 /** Print-payload endpoint per backend domain — same request body as export. */
@@ -45,6 +50,7 @@ const PRINT_PAYLOAD_PATH: Record<string, string> = {
   inventory: "/reports/inventory/print-payload",
   debt: "/reports/debts/print-payload",
   profit: "/reports/profit/print-payload",
+  cash: "/reports/cash-fund/print-payload",
 };
 
 export interface ReportExportArgs {
@@ -107,6 +113,15 @@ function buildExportBody(
         activeBranchId: args.activeBranchId,
       }),
       columnFilters: buildProfitColumnFilters(args.columnFilters, args.numericCols),
+    };
+  }
+  if (source === "cash") {
+    return {
+      ...base,
+      filters: buildCashFundSearchFilters(args.filters, {
+        activeBranchId: args.activeBranchId,
+      }),
+      columnFilters: buildCashFundColumnFilters(args.columnFilters, args.numericCols),
     };
   }
   return {

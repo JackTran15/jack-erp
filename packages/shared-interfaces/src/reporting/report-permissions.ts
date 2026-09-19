@@ -14,7 +14,7 @@
  */
 
 /** A report domain: one backend registry, one screen, one menu entry. */
-export type ReportDomain = 'sales' | 'inventory' | 'debts' | 'profit';
+export type ReportDomain = 'sales' | 'inventory' | 'debts' | 'profit' | 'cash';
 
 /**
  * Per-domain permissions that are not about a single report.
@@ -33,6 +33,7 @@ export const REPORT_DOMAIN_PERMISSIONS: {
   sales: { floor: string; consolidated: string };
   profit: { floor: string; consolidated: string };
   debts: { floor: string; consolidated: string };
+  cash: { floor: string; consolidated: string };
   inventory: { floor: string };
 } = {
   sales: {
@@ -46,6 +47,10 @@ export const REPORT_DOMAIN_PERMISSIONS: {
   debts: {
     floor: 'reporting.debts.read',
     consolidated: 'reporting.debts.consolidated.read',
+  },
+  cash: {
+    floor: 'reporting.cash.read',
+    consolidated: 'reporting.cash.consolidated.read',
   },
   inventory: {
     floor: 'inventory.reports.read',
@@ -84,6 +89,13 @@ export const REPORT_PERMISSION_KEYS: Record<string, string> = {
   'supplier-debts-detail-by-document-and-product':
     'reporting.debts.supplier-debts-detail-by-document-and-product.read',
 
+  // Quỹ tiền
+  'cash-in-out-situation': 'reporting.cash.cash-in-out-situation.read',
+  'cash-in-out-list': 'reporting.cash.cash-in-out-list.read',
+  'expenses-by-category': 'reporting.cash.expenses-by-category.read',
+  'expense-list-by-category': 'reporting.cash.expense-list-by-category.read',
+  'expenses-by-time': 'reporting.cash.expenses-by-time.read',
+
   // Kho
   'inventory-stock-summary': 'reporting.inventory.stock-summary.read',
   'inventory-document-detail': 'reporting.inventory.document-detail.read',
@@ -114,7 +126,9 @@ export function reportPermissionsOfDomain(domain: ReportDomain): string[] {
         ? 'reporting.profit.'
         : domain === 'debts'
           ? 'reporting.debts.'
-          : 'reporting.inventory.';
+          : domain === 'cash'
+            ? 'reporting.cash.'
+            : 'reporting.inventory.';
   return Object.values(REPORT_PERMISSION_KEYS).filter((key) =>
     key.startsWith(prefix),
   );

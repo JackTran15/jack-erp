@@ -29,6 +29,11 @@ import {
   buildProfitSearchFilters,
   fetchProfitReportData,
 } from "./profit-report.api";
+import {
+  buildCashFundColumnFilters,
+  buildCashFundSearchFilters,
+  fetchCashFundReportData,
+} from "./cash-fund-report.api";
 
 // Tham số chuẩn hóa truyền cho mọi fetcher data của report.
 export interface ReportDataArgs {
@@ -140,8 +145,28 @@ const profitDataFetcher: ReportDataFetcher = async (args) => {
   };
 };
 
+// Báo cáo quỹ tiền: cùng contract nhưng qua bộ endpoint /reports/cash-fund/*.
+const cashFundDataFetcher: ReportDataFetcher = async (args) => {
+  const backendKey = getReportBackendKey(args.reportType) as string;
+  const res = await fetchCashFundReportData({
+    reportType: backendKey,
+    columns: args.columns,
+    filters: buildCashFundSearchFilters(args.filters, {
+      activeBranchId: args.activeBranchId,
+    }),
+    columnFilters: buildCashFundColumnFilters(args.columnFilters, args.numericCols),
+    page: args.page,
+    limit: args.limit,
+  });
+  return {
+    rows: res.rows,
+    totals: res.totals ?? {},
+    total: res.total ?? 0,
+  };
+};
+
 // Chọn nguồn data theo report type: backendKey quyết định BE có hỗ trợ không,
-// backendSource quyết định bộ endpoint (invoice vs inventory vs debt vs profit).
+// backendSource quyết định bộ endpoint (invoice vs inventory vs debt vs profit vs cash).
 export function getReportDataFetcher(
   reportType: string,
 ): ReportDataFetcher | undefined {
@@ -150,5 +175,6 @@ export function getReportDataFetcher(
   if (source === "inventory") return inventoryDataFetcher;
   if (source === "debt") return debtDataFetcher;
   if (source === "profit") return profitDataFetcher;
+  if (source === "cash") return cashFundDataFetcher;
   return invoiceDataFetcher;
 }

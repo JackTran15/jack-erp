@@ -656,6 +656,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/cash-voucher-categories/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** List cash voucher categories (Mục thu / Mục chi) as a parent → child tree */
+        post: operations["CashVoucherCategoryTreeController_tree_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/cash-receipts": {
         parameters: {
             query?: never;
@@ -6598,6 +6615,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/cash-fund/columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashFundReportController_getColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/filter-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Shared dropdown options for the report filters (store, employee, paymentMethod, expenseCategory). */
+        get: operations["CashFundReportController_getFilterOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["CashFundReportController_search"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashFundReportController_listTemplates"];
+        put?: never;
+        post: operations["CashFundReportController_createTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CashFundReportController_getTemplate"];
+        put?: never;
+        post?: never;
+        delete: operations["CashFundReportController_deleteTemplate"];
+        options?: never;
+        head?: never;
+        patch: operations["CashFundReportController_updateTemplate"];
+        trace?: never;
+    };
+    "/reports/cash-fund/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Export one cash-fund report as an .xlsx workbook */
+        post: operations["CashFundReportController_export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/cash-fund/print-payload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Print-ready payload for one cash-fund report */
+        post: operations["CashFundReportController_printPayload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reports/profit/columns": {
         parameters: {
             query?: never;
@@ -9699,6 +9831,34 @@ export interface components {
             amountIn?: components["schemas"]["CompareFilterDto"];
             /** @description Money-out column; also constrains the row to outbound movements. */
             amountOut?: components["schemas"]["CompareFilterDto"];
+        };
+        SearchCashVoucherCategoryTreeDto: {
+            /** @description Match on category name or code */
+            search?: string;
+            /** @enum {string} */
+            direction?: "IN" | "OUT";
+            /** @description Only active (true) or only inactive (false) categories */
+            isActive?: boolean;
+        };
+        CashVoucherCategoryTreeNodeDto: {
+            id: string;
+            code: string;
+            name: string;
+            description: string | null;
+            /** @enum {string} */
+            direction: "IN" | "OUT";
+            isActive: boolean;
+            displayOrder: number;
+            parentGroupId: string | null;
+            /**
+             * Format: date-time
+             * @description Kept so the admin table's "Ngày tạo" column has a value in tree mode.
+             */
+            createdAt: string;
+            children: components["schemas"]["CashVoucherCategoryTreeNodeDto"][];
+        };
+        SearchCashVoucherCategoryTreeResponseDto: {
+            data: components["schemas"]["CashVoucherCategoryTreeNodeDto"][];
         };
         CashReceiptLineDto: {
             /** Format: uuid */
@@ -15563,6 +15723,94 @@ export interface components {
                 [key: string]: string;
             };
         };
+        CashFundReportFilterDto: {
+            /**
+             * @description Phương thức thanh toán = which fund: cash vouchers or deposit vouchers.
+             * @enum {string}
+             */
+            paymentMethod?: "cash" | "deposit";
+            /**
+             * @description Drill-down from a "Tiền cuối kỳ" cell of "Tình hình thu chi" into one fund's ledger.
+             * @enum {string}
+             */
+            fundKind?: "cash" | "deposit";
+            /**
+             * @description "Thống kê theo" of "Chi tiền theo thời gian"; defaults to `day`.
+             * @enum {string}
+             */
+            timeBucket?: "day" | "week" | "month" | "quarter" | "year";
+            /** @description Report period on the voucher date (ADR-02). */
+            period?: components["schemas"]["DateRangeFilterDto"];
+            /**
+             * Format: uuid
+             * @description The header branch — reports that have no store picker.
+             */
+            branchId?: string;
+            /** @description Multi-store scope — "Bảng kê thu chi" and "Bảng kê tiền chi theo mục chi". */
+            store?: components["schemas"]["StoreScopeDto"];
+            /** @description Nhân viên thu/chi (`staff_id` on the voucher) — "Bảng kê thu chi". */
+            employeeIds?: string[];
+            /**
+             * @description Mục chi filter for the expense reports. Category ids, or the literal
+             *     `uncategorized` (CASH_FUND_UNCATEGORIZED) for lines without a category.
+             */
+            categoryIds?: string[];
+        };
+        CashFundReportSearchDto: {
+            /** @description Which backend report definition to run (CASH_FUND_REPORT_KEYS). */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys only — cash-fund reports have no dynamic columns). */
+            columns: string[];
+            filters: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @default 1 */
+            page: number;
+            /** @default 50 */
+            limit: number;
+        };
+        CreateCashFundReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
+            reportType: string;
+            name: string;
+            description?: string;
+            columns: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        UpdateCashFundReportTemplateDto: {
+            /**
+             * @description Which tier to write to. Must be declared by the client: the backoffice sends
+             *     `X-Branch-Id` even in chain view, so the server cannot tell the two apart
+             *     (ADR-02). Omitted ⇒ branch tier when the actor has a branch.
+             * @enum {string}
+             */
+            scope?: "chain" | "branch";
+            name?: string;
+            description?: string;
+            columns?: components["schemas"]["ReportTemplateColumnDto"][];
+            filters?: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            sortOrder?: number;
+        };
+        CashFundReportExportDto: {
+            /** @description Which backend report definition to run (CASH_FUND_REPORT_KEYS). */
+            reportType: string;
+            /** @description Selected column keys (fixed registry keys only — cash-fund reports have no dynamic columns). */
+            columns: string[];
+            filters: components["schemas"]["CashFundReportFilterDto"];
+            columnFilters?: components["schemas"]["ColumnFilterDto"][];
+            /** @description Per-column display names the user renamed, keyed by column key. Columns left out keep their catalog label. */
+            columnLabels?: {
+                [key: string]: string;
+            };
+        };
         ProfitReportFilterDto: {
             /**
              * @description profit-by-item only — row grain (default item). "Hàng hoá" = PARENT, "Mẫu mã" = ITEM, "Nhóm hàng hóa" = GROUP.
@@ -19924,6 +20172,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashVoucherCategoryTreeController_tree_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchCashVoucherCategoryTreeDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchCashVoucherCategoryTreeResponseDto"];
                 };
             };
         };
@@ -30184,6 +30455,235 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["DebtReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_getColumns: {
+        parameters: {
+            query: {
+                reportType: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_getFilterOptions: {
+        parameters: {
+            query: {
+                type: "store" | "employee" | "paymentMethod" | "expenseCategory";
+                /** @description Optional case-insensitive partial search. */
+                search?: string;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_search: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashFundReportSearchDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_listTemplates: {
+        parameters: {
+            query?: {
+                reportType?: string;
+                scope?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_createTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCashFundReportTemplateDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_getTemplate: {
+        parameters: {
+            query?: {
+                scope?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_deleteTemplate: {
+        parameters: {
+            query?: {
+                scope?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_updateTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCashFundReportTemplateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    CashFundReportController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashFundReportExportDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CashFundReportController_printPayload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CashFundReportExportDto"];
             };
         };
         responses: {

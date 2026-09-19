@@ -4,6 +4,7 @@ import type {
   PaginatedResponse,
 } from "@erp/shared-interfaces";
 import { erpApi, requireErpData, requireErpSuccess } from "../../lib/erp-api";
+import { CRUD_TREE_ENTITIES } from "./crudTree";
 
 interface FetchRecordsParams {
   page: number;
@@ -112,8 +113,9 @@ export function useCrudCreate(entityKey: string) {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
       void qc.invalidateQueries({ queryKey: ["crud-v2", entityKey] });
-      if (entityKey === "inventory-item-categories") {
-        void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
+      const tree = CRUD_TREE_ENTITIES[entityKey];
+      if (tree) {
+        void qc.invalidateQueries({ queryKey: [tree.queryKey] });
       }
     },
   });
@@ -139,8 +141,9 @@ export function useCrudUpdate(entityKey: string) {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
       void qc.invalidateQueries({ queryKey: ["crud-v2", entityKey] });
-      if (entityKey === "inventory-item-categories") {
-        void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
+      const tree = CRUD_TREE_ENTITIES[entityKey];
+      if (tree) {
+        void qc.invalidateQueries({ queryKey: [tree.queryKey] });
       }
     },
   });
@@ -158,8 +161,9 @@ export function useCrudDelete(entityKey: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "records"] });
       void qc.invalidateQueries({ queryKey: ["crud", entityKey, "record"] });
-      if (entityKey === "inventory-item-categories") {
-        void qc.invalidateQueries({ queryKey: ["item-category-tree"] });
+      const tree = CRUD_TREE_ENTITIES[entityKey];
+      if (tree) {
+        void qc.invalidateQueries({ queryKey: [tree.queryKey] });
       }
     },
   });

@@ -24,7 +24,10 @@ import { fetchVoucherPrintPayload } from "../../../../lib/print/voucher-print.ap
 import { renderVoucherHtml } from "../../../../lib/print/render-voucher-html";
 import { printHtmlDocument } from "../../../../lib/print/print-html-document";
 import { downloadVoucherExcel } from "../../../../lib/print/voucher-export.api";
-import { useCashVoucherCategories } from "../../../../hooks/treasury/use-cash-voucher-categories";
+import {
+  formatCategoryOptionLabel,
+  useCashVoucherCategories,
+} from "../../../../hooks/treasury/use-cash-voucher-categories";
 import {
   CashPaymentPurpose,
   CashPaymentReferenceType,
@@ -597,7 +600,7 @@ export function PaymentVoucherDialog({
                 <option value="">-- Chọn --</option>
                 {paymentCategories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name}
+                    {formatCategoryOptionLabel(c)}
                   </option>
                 ))}
               </select>

@@ -24,6 +24,7 @@ const CONSOLIDATED_KEYS = [
   REPORT_DOMAIN_PERMISSIONS.sales.consolidated,
   REPORT_DOMAIN_PERMISSIONS.profit.consolidated,
   REPORT_DOMAIN_PERMISSIONS.debts.consolidated,
+  REPORT_DOMAIN_PERMISSIONS.cash.consolidated,
   'reporting.dashboard.consolidated.read',
 ];
 
@@ -62,11 +63,12 @@ describe('report permission catalogue', () => {
     expect(new Set(seededKeys).size).toBe(seededKeys.length);
   });
 
-  it('covers all 22 reports', () => {
-    expect(reportPermissions).toHaveLength(22);
+  it('covers all 27 reports', () => {
+    expect(reportPermissions).toHaveLength(27);
     expect(reportPermissionsOfDomain('sales')).toHaveLength(4);
     expect(reportPermissionsOfDomain('profit')).toHaveLength(3);
     expect(reportPermissionsOfDomain('debts')).toHaveLength(4);
+    expect(reportPermissionsOfDomain('cash')).toHaveLength(5);
     expect(reportPermissionsOfDomain('inventory')).toHaveLength(11);
   });
 

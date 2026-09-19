@@ -1,0 +1,472 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: cash-fund-reports
+slug: 2026091802-cash-fund-reports
+profile: none
+created: 2026-09-18T08:43:12
+ruleset: 6
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-18T08:44:45
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-18T08:50:48
+    by: Akenzy
+    evidence: 20 assumptions, none blocking-and-pending; 21 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-18T08:52:52
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-18T09:03:57
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:29:28
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T09:29:59
+    by: Akenzy
+    reason: report-permissions.contract.spec.ts ties keys to iam label catalogues, PERMISSION_SEEDS and role grants in one assertion set; T-01-01 cannot pass its own test without T-01-02's files — merge them into one 4h ticket and declare the two iam/*.ts paths the map omitted
+  - gate: G3
+    action: passed
+    at: 2026-09-18T09:30:40
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-18T09:36:15
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T09:36:26
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session, undeclared there); this ticket did not touch it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T09:36:26
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session, undeclared there); this ticket did not touch it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:36:48
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T09:56:19
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts and any cash-voucher-categories/* changes belong to the concurrent feature 2026091801-cash-voucher-category-tree (another session); this ticket did not touch them
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T09:56:19
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts and any cash-voucher-categories/* changes belong to the concurrent feature 2026091801-cash-voucher-category-tree (another session); this ticket did not touch them
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:56:51
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:56:51
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T09:56:51
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:06:07
+    by: Akenzy
+    reason: T-01-04 - template handlers are verified repo-wide by report-core/template-scope-parity.spec.ts (4 domains x 5 handlers) — declare it on the ticket and extend it to cash; ADR-04 wrongly claimed XlsxStreamWriter bolds rows carrying bold=1 — it only bolds header/totals; report_templates has no domain column
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:06:07
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:07:21
+    by: Akenzy
+    reason: T-01-06 - ReportTableConfigSync.tsx is a fifth backendSource dispatch point the plan missed (columns fetch); the ADR-02 title tooltip has no home in ReportTypeMetadata — dropped; sortable -false does not exist on ReportColumnTableConfig
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:07:22
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:09:05
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:09:05
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-04
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:09:27
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:09:27
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:09:36
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:14:30
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:14:30
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:15:06
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:15:06
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:23:06
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:23:06
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-03-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:29:05
+    by: Akenzy
+    reason: T-01-07 (backend e2e + openapi regen) was declared to depend on T-01-06 (frontend) for no data or contract reason; the FE ticket's browser boxes in fact need T-01-07's fixture data — drop the edge so the e2e can run first
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:29:05
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:29:32
+    by: Akenzy
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:29:32
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:33:18
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:33:18
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:33:26
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:38:26
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:38:26
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:45:25
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:45:25
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:48:30
+    by: Akenzy
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:48:30
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-07
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T10:49:22
+    by: Akenzy
+    reason: e2e (T-01-07) exposed two defects - deposit opening_balance added regardless of opening_date (violates confirmed A-03, breaks AC-06), and header-branch reports fall back to actor.branchId so chain mode never consolidates (AC-07) — add fix ticket T-01-08
+  - gate: G3
+    action: passed
+    at: 2026-09-18T10:49:23
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T10:49:23
+    by: Akenzy
+    ticket: T-01-08
+  - gate: G4
+    action: scope
+    at: 2026-09-18T10:52:24
+    by: Akenzy
+    ticket: T-01-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T10:52:24
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-08
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:06:40
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:06:40
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-01-06
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:07:34
+    by: Akenzy
+    reason: T-02-03 - FE fetchReportFilterOptions is typed on the shared ReportFilterOptionType which lacks employee/paymentMethod/expenseCategory — declare _api/report-filter-options.api.ts on T-02-03 (and T-03-04) for the type widening
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:07:34
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:07:34
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:07:51
+    by: Akenzy
+    reason: same as previous reopen - the touches edit had not applied; adding _api/report-filter-options.api.ts to T-02-03 and T-03-04 now
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:07:51
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 18 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:15:47
+    by: Akenzy
+    reason: T-02-03 found - RemoteSelectField re-declares the option type; mapHeadersToTableConfig hard-codes visible -true so registry visible -false (AC-11 hidden-by-default) never applies — both join T-02-03 touches; the filter subtitle (AC-09) has no FE mechanism — new ticket T-02-06
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:15:56
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 19 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:22:24
+    by: Akenzy
+    reason: browser check of T-02-03 found docDate one day early in cash-in-out-list and expense-list-by-category - pg parses DATE as local-midnight Date and isoDate() uses toISOString(); add fix ticket T-02-07 (select  - -text as expenses-by-time does) and make T-02-05's fixture carry staff_id + employee_profiles
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:22:24
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 20 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:24:10
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:24:10
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:24:48
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:24:48
+    by: Akenzy
+    ticket: T-02-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:24:48
+    by: Akenzy
+    ticket: T-02-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:24:48
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:29:56
+    by: Akenzy
+    ticket: T-02-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:29:56
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-07
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:32:01
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:32:01
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:32:09
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:34:51
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:34:51
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:34:57
+    by: Akenzy
+    ticket: T-03-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:42:27
+    by: Akenzy
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:42:27
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-05
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:43:53
+    by: Akenzy
+    ticket: T-03-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:43:53
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-03-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:43:53
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:50:46
+    by: Akenzy
+    ticket: T-02-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:50:46
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-06
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:51:55
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:51:55
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-03-06
+  - gate: G3
+    action: reopened
+    at: 2026-09-18T11:53:49
+    by: Akenzy
+    reason: full API unit run - rbac/employee-listing-surfaces.spec.ts guards every file that queries users/employee_profiles against employee-branch-scope.md — the T-02-02 handler must be documented there; add chore ticket T-02-08
+  - gate: G3
+    action: passed
+    at: 2026-09-18T11:53:49
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 21 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-18T11:53:50
+    by: Akenzy
+    ticket: T-02-08
+  - gate: G4
+    action: scope
+    at: 2026-09-18T11:54:53
+    by: Akenzy
+    ticket: T-02-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-18T11:54:53
+    by: Akenzy
+    reason: apps/api/test/e2e/cash-voucher-category-tree.e2e-spec.ts belongs to the concurrent feature 2026091801-cash-voucher-category-tree (another session); untouched here
+    ticket: T-02-08

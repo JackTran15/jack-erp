@@ -4,7 +4,7 @@ import {
   type ReportDomain,
 } from "@erp/shared-interfaces";
 import { STORE_TYPE } from "../store.constant";
-import { REPORT_TYPE_DEBTS, REPORT_TYPE_INVENTORY, REPORT_TYPE_PROFIT, REPORT_TYPE_SALES } from "./report-type.constant";
+import { REPORT_TYPE_CASH_FUND, REPORT_TYPE_DEBTS, REPORT_TYPE_INVENTORY, REPORT_TYPE_PROFIT, REPORT_TYPE_SALES } from "./report-type.constant";
 import type { ReportCategoryMetadata } from "./report.interface";
 
 /**
@@ -48,6 +48,17 @@ const PROFIT_REPORTS = [
   REPORT_TYPE_PROFIT.BUSINESS_RESULTS,
   REPORT_TYPE_PROFIT.PROFIT_BY_PRODUCT,
   REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE,
+];
+
+// 5 báo cáo quỹ tiền theo đúng thứ tự dropdown MShopKeeper — xem
+// .ai/features/2026091802-cash-fund-reports/00-intent.md. "Bảng kê biên bản bàn
+// giao ca" tạm hoãn (chưa có thực thể bàn giao ca, A-06), không đưa vào danh sách.
+const CASH_FUND_REPORTS = [
+  REPORT_TYPE_CASH_FUND.CASH_IN_OUT_SITUATION,
+  REPORT_TYPE_CASH_FUND.CASH_IN_OUT_LIST,
+  REPORT_TYPE_CASH_FUND.EXPENSES_BY_CATEGORY,
+  REPORT_TYPE_CASH_FUND.EXPENSE_LIST_BY_CATEGORY,
+  REPORT_TYPE_CASH_FUND.EXPENSES_BY_TIME,
 ];
 
 // 8 báo cáo kho theo thứ tự hiển thị trong dropdown.
@@ -108,10 +119,15 @@ export const REPORT_CATEGORY_METADATA: Partial<Record<REPORT_CATEGORY, ReportCat
       [STORE_TYPE.CHAIN]: { listReport: DEBT_REPORTS },
     },
   },
-  // [REPORT_CATEGORY.CASH_FUND]: {
-  //   label: "Quỹ tiền mặt",
-  //   url: "/reports/cash-fund",
-  // },
+  [REPORT_CATEGORY.CASH_FUND]: {
+    label: "Quỹ tiền",
+    url: "/reports/cash-fund",
+    permission: categoryPermissions("cash"),
+    configs: {
+      [STORE_TYPE.SINGLE]: { listReport: CASH_FUND_REPORTS },
+      [STORE_TYPE.CHAIN]: { listReport: CASH_FUND_REPORTS },
+    },
+  },
   [REPORT_CATEGORY.PROFIT]: {
     label: "Lợi nhuận",
     url: "/reports/profit",

@@ -439,6 +439,11 @@ export const navConfig: NavModule[] = [
             label: "Tài khoản thanh toán",
             permission: "accounting.payment_account.read",
           },
+          {
+            to: "/admin/cash-voucher-categories",
+            label: "Danh mục thu chi",
+            permission: "accounting.cash_voucher_category.read",
+          },
           // Chính sách thanh toán tiền gửi / Phải trả / Phải thu / Chi phí đã được
           // ẩn khỏi menu theo yêu cầu nghiệp vụ; route và CRUD backend vẫn giữ nguyên.
         ],
