@@ -42253,9 +42253,39 @@
           "createdBy"
         ]
       },
+      "AppliedInvoicePromotionLineDto": {
+        "type": "object",
+        "properties": {
+          "lineId": {
+            "type": "string",
+            "description": "`invoice_items.id` of the line this share belongs to"
+          },
+          "discountAmount": {
+            "type": "number"
+          },
+          "unitPriceAfter": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "lineId",
+          "discountAmount",
+          "unitPriceAfter"
+        ]
+      },
       "AppliedInvoicePromotionDto": {
         "type": "object",
         "properties": {
+          "programId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
           "type": {
             "enum": [
               "INVOICE_DISCOUNT",
@@ -42266,13 +42296,28 @@
             ],
             "type": "string"
           },
+          "priority": {
+            "type": "number",
+            "description": "Lower ran first (BR-001)"
+          },
           "discountAmount": {
             "type": "number"
+          },
+          "lineDiscounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedInvoicePromotionLineDto"
+            }
           }
         },
         "required": [
+          "programId",
+          "code",
+          "name",
           "type",
-          "discountAmount"
+          "priority",
+          "discountAmount",
+          "lineDiscounts"
         ]
       },
       "DraftInvoiceResponseDto": {

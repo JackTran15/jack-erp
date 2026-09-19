@@ -119,7 +119,9 @@ export function renderInvoiceHtml(
             l.discountLabel
               ? `<div class="line-sub">${escapeHtml(l.discountLabel)}</div>`
               : ""
-          }${
+          }${(l.promotionLabels ?? [])
+            .map((label) => `<div class="line-sub">${escapeHtml(label)}</div>`)
+            .join("")}${
             l.note ? `<div class="line-sub">Ghi chú: ${escapeHtml(l.note)}</div>` : ""
           }</td>
           <td class="col-qty">${formatVnd(l.qty)}</td>

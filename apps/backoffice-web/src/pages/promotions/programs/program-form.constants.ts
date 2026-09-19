@@ -206,7 +206,9 @@ export function buildInitialFormState(): ProgramFormState {
     endTime: "",
     storeScope: StoreScope.ALL_CHAIN,
     storeIds: [],
-    applyScope: ApplyScope.ALL_ITEMS,
+    // BR-002: một CTKM hóa đơn mới mặc định KHÔNG chồng lên hàng đã được giảm.
+    // Mặc định nằm ở đây chứ không ở mapper (ADR-03) — xem ApplyScopePromotionSection.
+    applyScope: ApplyScope.NON_PROMO_ONLY,
     accruePoints: false,
     discountType: DiscountType.PERCENT,
     discountPercent: 0,

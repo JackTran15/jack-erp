@@ -306,9 +306,14 @@ describe('Checkout Saga v2 — promotions (E2E, T-04-07)', () => {
         .get(`/invoices/${invoiceId}`)
         .set(fx.headers())
         .expect(200);
-      expect(getRes.body.appliedPromotions).toEqual([
-        { type: 'ITEM_DISCOUNT', discountAmount: preview.body.promotionDiscount },
-      ]);
+      // Since pos-line-promotion-breakdown the row also carries programId/code/
+      // name/priority/lineDiscounts (covered by invoice-applied-promotions.e2e);
+      // this test only cares that the T-08-01 pair is still there.
+      expect(getRes.body.appliedPromotions).toHaveLength(1);
+      expect(getRes.body.appliedPromotions[0]).toMatchObject({
+        type: 'ITEM_DISCOUNT',
+        discountAmount: preview.body.promotionDiscount,
+      });
     });
 
     /**

@@ -34,8 +34,15 @@ export class InvoiceDiscountStrategy implements PromotionStrategy {
       return { status: 'not_met' };
     }
 
+    // NON_PROMO_ONLY excludes lines already discounted by a line-level program
+    // *and* lines the cashier discounted by hand (BR-002). ALL_ITEMS — and an
+    // unset scope, which is how every pre-2026-08 programme is stored — keeps
+    // billing the whole cart: ADR-04 forbids flipping that default, because it
+    // would silently re-price programmes nobody asked us to touch.
     const base =
-      program.invoiceScope === PromotionInvoiceScope.NON_PROMO_ONLY ? state.unclaimedLines(cart) : cart.lines;
+      program.invoiceScope === PromotionInvoiceScope.NON_PROMO_ONLY
+        ? state.discountFreeLines(cart)
+        : cart.lines;
     const baseTotal = sumLines(base);
     if (base.length === 0 || baseTotal <= 0) {
       return { status: 'not_met' };

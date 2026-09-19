@@ -108,9 +108,28 @@ export interface InvoiceRow {
   /**
    * CTKM đã chạy lúc checkout, đọc từ snapshot `invoice_checkout_promotions`
    * (T-08-01) — chỉ có ở `GET /invoices/:id`. Dùng cho breakdown "KM theo hoá
-   * đơn"/"KM theo mặt hàng" khi in lại (T-08-04), qua `groupPromotionsForPrint`.
+   * đơn"/"KM theo mặt hàng" khi in lại (T-08-04), qua `groupPromotionsForPrint`;
+   * `name` + `lineDiscounts` (lineId = `invoice_items.id`) cho nhãn từng dòng ở
+   * chi tiết hóa đơn và in lại (pos-line-promotion-breakdown, ADR-04).
    */
-  appliedPromotions?: { type: PromotionProgramType; discountAmount: number }[];
+  appliedPromotions?: AppliedInvoicePromotion[];
+}
+
+export interface AppliedInvoicePromotionLine {
+  /** `invoice_items.id` của dòng nhận phần giảm này. */
+  lineId: string;
+  discountAmount: number;
+  unitPriceAfter: number;
+}
+
+export interface AppliedInvoicePromotion {
+  programId: string;
+  code: string;
+  name: string;
+  type: PromotionProgramType;
+  priority: number;
+  discountAmount: number;
+  lineDiscounts: AppliedInvoicePromotionLine[];
 }
 
 /** Một dòng thanh toán theo phương thức, dùng để dựng biên lai chi tiết. */

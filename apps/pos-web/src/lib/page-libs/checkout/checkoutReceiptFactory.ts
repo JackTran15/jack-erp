@@ -8,6 +8,12 @@ import type {
 } from "@erp/pos/interfaces/checkout.interface";
 import { deriveInvoiceTotals } from "./checkoutSettlement";
 import {
+  buildLinePromotionIndex,
+  formatPromotionLabel,
+  itemDiscountOfLine,
+  type AppliedProgramLike,
+} from "./linePromotionIndex";
+import {
   formatLineDiscountLabel,
   effectiveUnitPrice,
   lineDiscountAmount,
@@ -103,8 +109,19 @@ interface BuildCheckoutInvoicePayloadInput {
    * tab đang checkout (T-08-03). Gom bằng `groupPromotionsForPrint` thành
    * "KM theo mặt hàng"/"KM theo hoá đơn", tách biệt hoàn toàn khỏi giảm giá
    * tay của thu ngân (A-17) — không cộng vào `itemDiscountTotal` cũ.
+   *
+   * Khi phần tử mang đủ `programId`/`name`/`lineDiscounts` (chính là
+   * `AppliedProgram`), từng dòng in thêm nhãn CTKM và `lineTotal` trừ phần
+   * CTKM hàng hóa (pos-line-promotion-breakdown). Chỉ `{type, discountAmount}`
+   * thì vẫn ra hai bucket tổng như trước.
    */
-  promotionEngineDiscounts?: PromotionAmount[];
+  promotionEngineDiscounts?: Array<PromotionAmount & Partial<AppliedProgramLike>>;
+}
+
+function isAppliedProgramLike(
+  p: PromotionAmount & Partial<AppliedProgramLike>,
+): p is PromotionAmount & AppliedProgramLike {
+  return typeof p.programId === "string" && Array.isArray(p.lineDiscounts);
 }
 
 /** Trim + rỗng → undefined, cho các field info ẩn được trên bản in. */
@@ -169,6 +186,11 @@ export function buildCheckoutInvoicePayload({
     0,
   );
   const engineBuckets = groupPromotionsForPrint(promotionEngineDiscounts ?? []);
+  // Nhãn + phần trừ theo dòng (lineId = id dòng client, engine echo lại).
+  const lineIndex = buildLinePromotionIndex(
+    (promotionEngineDiscounts ?? []).filter(isAppliedProgramLike),
+    new Set(purchaseOnly.map((l) => l.lineId)),
+  );
   // Khối "Tiền hàng trả lại / KM / Giá trị trả lại" — độ lớn dương.
   const returnGross = returnOnly.reduce(
     (sum, l) => sum + l.unitPrice * Math.abs(l.qty),
@@ -224,13 +246,20 @@ export function buildCheckoutInvoicePayload({
       // quick-exchange phải đảo tay để in số âm như hàng trả.
       const signedTotal =
         isReturnLine(l) && !l.isReturnCredit ? -lineTotal(l) : lineTotal(l);
+      // Dòng bán: trừ tiếp CTKM hàng hóa như màn hình (ADR-02/03); dòng trả
+      // không có CTKM (preview chỉ đánh giá giỏ mua).
+      const promotions = isReturnLine(l) ? [] : (lineIndex.byLine.get(l.lineId) ?? []);
+      const printedTotal = isReturnLine(l)
+        ? signedTotal
+        : Math.max(0, signedTotal - itemDiscountOfLine(lineIndex, l.lineId));
       return {
         index: i + 1,
         name: l.name,
         qty: isReturnLine(l) ? -Math.abs(l.qty) : l.qty,
         unitPrice: l.unitPrice,
-        lineTotal: signedTotal,
+        lineTotal: printedTotal,
         discountLabel: l.lineDiscount ? formatLineDiscountLabel(l) : undefined,
+        promotionLabels: promotions.length > 0 ? promotions.map(formatPromotionLabel) : undefined,
         note: l.note?.trim() ? l.note.trim() : undefined,
       };
     }),

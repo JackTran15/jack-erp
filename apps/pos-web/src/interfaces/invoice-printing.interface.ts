@@ -51,6 +51,12 @@ export interface InvoiceLineData {
   lineTotal?: number;
   /** Nhãn KM in dưới tên hàng, vd "KM 10 % (10.000) - Khách quen". */
   discountLabel?: string;
+  /**
+   * Nhãn CTKM engine áp cho dòng, in sau `discountLabel`, mỗi nhãn một dòng:
+   * "Tên CTKM (68.500)". Gồm cả CTKM hóa đơn phân bổ xuống dòng — nhãn thôi,
+   * `lineTotal` chỉ trừ phần CTKM hàng hóa (ADR-02 pos-line-promotion-breakdown).
+   */
+  promotionLabels?: string[];
   /** Ghi chú dòng in dưới tên hàng. */
   note?: string;
 }

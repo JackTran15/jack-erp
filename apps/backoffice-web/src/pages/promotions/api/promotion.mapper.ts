@@ -521,7 +521,7 @@ function commonFromDetail(detail: PromotionProgramDetail): ProgramFormState {
 function invoiceDiscountToDto(form: ProgramFormState): Partial<CreatePromotionRequest> {
   const { condition, conditionLines } = buildCondition(form);
   return {
-    invoiceScope: PromotionInvoiceScope.ALL_ITEMS,
+    invoiceScope: applyScopeToApi(form.applyScope),
     accruePoints: form.accruePoints,
     discountMode: form.discountType === DiscountType.PERCENT ? PromotionDiscountMode.PERCENT : PromotionDiscountMode.AMOUNT,
     discountValue:

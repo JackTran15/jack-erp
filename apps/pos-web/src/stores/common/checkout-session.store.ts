@@ -33,6 +33,11 @@ import {
 } from "@erp/pos/lib/page-libs/checkout/checkoutDraft";
 import { netSessionGrandTotal } from "@erp/pos/lib/page-libs/checkout/checkoutSessionTotals";
 import { getOversellSaleLines } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import {
+  buildLinePromotionIndex,
+  type LinePromotionBucket,
+  type LinePromotionIndex,
+} from "@erp/pos/lib/page-libs/checkout/linePromotionIndex";
 
 const STORAGE_KEY = "pos-checkout-sessions";
 // v2: thêm `InvoiceSession.draft` (state soạn thảo per-tab). Session lưu ở v1
@@ -986,6 +991,55 @@ export function selectPromotionDiscountAmount(
   const preview = selectPromotionPreview(state);
   if (preview.status !== "ready" || !preview.data) return 0;
   return preview.data.promotionDiscount;
+}
+
+// Index dòng ↔ CTKM của tab hiện tại (ADR-01 pos-line-promotion-breakdown).
+// Memo theo cặp (preview.data, purchaseCart): zustand v5 so sánh kết quả
+// selector bằng Object.is, nên trả một Map mới mỗi lần gọi là vòng lặp render
+// vô hạn. Hai tham chiếu đó chỉ đổi khi store thật sự đổi.
+const EMPTY_LINE_PROMOTION_INDEX: LinePromotionIndex = buildLinePromotionIndex([]);
+let linePromotionIndexCache: {
+  data: CheckoutPromotionPreview["data"];
+  cart: CartLine[];
+  index: LinePromotionIndex;
+} | null = null;
+
+/**
+ * "Dòng này được CTKM nào giảm bao nhiêu" cho giỏ mua của tab hiện tại. Chỉ
+ * có nội dung khi preview `ready` — `loading`/`unavailable`/`idle` trả index
+ * rỗng, cùng kỷ luật với `selectPromotionDiscountAmount`: không đoán số.
+ * `knownLineIds` = lineId của giỏ mua, để id lạ không lọt vào `byLine`.
+ */
+export function selectLinePromotionIndex(
+  state: PosCheckoutSessionState,
+): LinePromotionIndex {
+  const preview = selectPromotionPreview(state);
+  if (preview.status !== "ready" || !preview.data) return EMPTY_LINE_PROMOTION_INDEX;
+  const cart = selectPurchaseCart(state);
+  if (
+    linePromotionIndexCache &&
+    linePromotionIndexCache.data === preview.data &&
+    linePromotionIndexCache.cart === cart
+  ) {
+    return linePromotionIndexCache.index;
+  }
+  const index = buildLinePromotionIndex(
+    preview.data.appliedPrograms,
+    new Set(cart.map((l) => l.lineId)),
+  );
+  linePromotionIndexCache = { data: preview.data, cart, index };
+  return index;
+}
+
+/**
+ * Tổng CTKM theo nhóm: `item` trừ vào Thành tiền từng dòng (và do đó vào
+ * "Tổng tiền" hiển thị), `invoice` là dòng "Khuyến mại" của panel phải
+ * (ADR-02). `item + invoice` luôn bằng `selectPromotionDiscountAmount`.
+ */
+export function selectPromotionBucketTotals(
+  state: PosCheckoutSessionState,
+): Record<LinePromotionBucket, number> {
+  return selectLinePromotionIndex(state).totals;
 }
 
 export function selectLabelsDraft(

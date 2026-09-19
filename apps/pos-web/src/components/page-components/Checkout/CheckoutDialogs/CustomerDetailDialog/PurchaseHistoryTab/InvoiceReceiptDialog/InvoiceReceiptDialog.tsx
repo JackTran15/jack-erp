@@ -18,6 +18,11 @@ import { buildStoreInfoFromBranch } from "@erp/pos/lib/page-libs/checkout/checko
 import { usePosBranchStore } from "@erp/pos/stores/common/branch.store";
 import { useMyBranchesQuery } from "@erp/pos/hooks/react-query/use-query-branch";
 import { formatDiscountLabel } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
+import {
+  buildLinePromotionIndex,
+  formatPromotionLabel,
+  itemDiscountOfLine,
+} from "@erp/pos/lib/page-libs/checkout/linePromotionIndex";
 import { INVOICE_PAYMENT_METHOD_LABEL } from "@erp/pos/constants/checkout.constant";
 import { formatViDateTime } from "@erp/pos/lib/common/dateTime";
 import { getInvoiceSignedTotal } from "@erp/pos/lib/common/invoiceAmount";
@@ -202,6 +207,13 @@ export function InvoiceReceiptDialog({
   };
 
   const items = invoice?.items ?? [];
+  // CTKM từng dòng từ snapshot `appliedPromotions` (lineId = `invoice_items.id`)
+  // — nhãn dưới tên như màn hình bán; Thành tiền dòng trừ CTKM hàng hóa, CTKM
+  // hóa đơn chỉ là nhãn (pos-line-promotion-breakdown ADR-02/ADR-04).
+  const lineIndex = buildLinePromotionIndex(
+    invoice?.appliedPromotions ?? [],
+    new Set(items.filter((it) => it.direction !== "IN").map((it) => it.id)),
+  );
   // "Thành tiền" = tổng các dòng ĐANG hiện trên bảng, tức đã trừ hàng trả (và
   // trừ khuyến mãi phân bổ của dòng trả). `invoice.subtotal` chỉ cộng hàng bán
   // nên trên phiếu đổi trả nó không khớp với những gì người dùng nhìn thấy.
@@ -277,6 +289,12 @@ export function InvoiceReceiptDialog({
                 ) : (
                   items.map((it) => {
                     const isReturn = it.direction === "IN";
+                    const linePromotions = isReturn
+                      ? []
+                      : (lineIndex.byLine.get(it.id) ?? []);
+                    const promotionItemDiscount = isReturn
+                      ? 0
+                      : itemDiscountOfLine(lineIndex, it.id);
                     return (
                     <tr key={it.id} className="align-top">
                       <td className="px-3 py-2.5">
@@ -303,6 +321,15 @@ export function InvoiceReceiptDialog({
                             })}
                           </div>
                         ) : null}
+                        {linePromotions.map((p) => (
+                          <div
+                            key={p.programId}
+                            className="text-[12px] italic text-[#E5403A]"
+                            data-promotion-label={p.bucket}
+                          >
+                            {formatPromotionLabel(p)}
+                          </div>
+                        ))}
                         {isReturn && Number(it.promotionDiscount) > 0 ? (
                           <div className="text-[12px] italic text-[#E5403A]">
                             Trừ khuyến mãi theo hóa đơn gốc:{" "}
@@ -354,18 +381,26 @@ export function InvoiceReceiptDialog({
                             }
                             return formatVnd(-Math.abs(finalTotal));
                           }
-                          // Dòng bán có KM: gạch giá gốc, hiển thị giá sau giảm.
-                          if (Number(it.lineDiscount) > 0 && gross > finalTotal) {
+                          // Dòng bán có KM (giảm tay và/hoặc CTKM hàng hóa):
+                          // gạch giá gốc, hiển thị giá sau giảm.
+                          const displayTotal = Math.max(
+                            0,
+                            finalTotal - promotionItemDiscount,
+                          );
+                          if (
+                            (Number(it.lineDiscount) > 0 && gross > finalTotal) ||
+                            promotionItemDiscount > 0
+                          ) {
                             return (
                               <div className="flex flex-col items-end leading-tight">
                                 <span className="text-[12px] text-[#9CA3AF] line-through">
                                   {formatVnd(gross)}
                                 </span>
-                                <span>{formatVnd(finalTotal)}</span>
+                                <span>{formatVnd(displayTotal)}</span>
                               </div>
                             );
                           }
-                          return formatVnd(finalTotal);
+                          return formatVnd(displayTotal);
                         })()}
                       </td>
                     </tr>

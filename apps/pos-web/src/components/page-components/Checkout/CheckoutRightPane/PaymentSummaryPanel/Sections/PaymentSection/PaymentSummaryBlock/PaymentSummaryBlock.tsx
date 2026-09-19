@@ -12,6 +12,7 @@ import { useCheckoutExcludePreview } from "@erp/pos/hooks/page-hooks/checkout/us
 import { PROMOTION_EXCLUDE_CONFIRM } from "@erp/pos/constants/checkout-messages.constant";
 import {
   buildPromotionRowLabel,
+  invoiceLevelPrograms,
   shouldShowPromotionRow,
 } from "@erp/pos/lib/page-libs/checkout/promotionPresentation";
 import {
@@ -19,6 +20,7 @@ import {
   selectIsReturnExchangeInvoice,
   selectItemCountForPayment,
   selectPointsDiscountAmount,
+  selectPromotionBucketTotals,
   selectPromotionPreview,
   usePosCheckoutSessionStore,
 } from "@erp/pos/stores/common/checkout-session.store";
@@ -36,7 +38,14 @@ export function PaymentSummaryBlock({
   const isReturnExchange = usePosCheckoutSessionStore(
     selectIsReturnExchangeInvoice,
   );
-  const total = useCheckoutGrandTotal();
+  const grandTotal = useCheckoutGrandTotal();
+  const bucketTotals = usePosCheckoutSessionStore(selectPromotionBucketTotals);
+  // "Tổng tiền" = Σ Thành tiền đang hiển thị = grandTotal (sau giảm tay) trừ
+  // CTKM hàng hóa; dòng "Khuyến mại" bên dưới chỉ còn CTKM hóa đơn (ADR-02
+  // pos-line-promotion-breakdown). Chỉ đổi số HIỂN THỊ: `deriveSettlement`
+  // vẫn trừ `promotionDiscount` toàn phần khỏi grandTotal, nên "Còn phải thu"
+  // và payload checkout không đổi (ADR-03).
+  const total = Math.max(0, grandTotal - bucketTotals.item);
   const pointsRedeemed = usePosCheckoutSessionStore(
     selectEffectivePointsRedeemed,
   );
@@ -47,8 +56,9 @@ export function PaymentSummaryBlock({
   const { previewExcluding } = useCheckoutExcludePreview();
   const { deposit, returnFee } = useCheckoutPayment();
   const promotionPreview = usePosCheckoutSessionStore(selectPromotionPreview);
-  // T-09-04 — X ở dòng tổng giờ bỏ HẾT mọi CTKM đang áp (không chỉ CTKM tùy
-  // chọn thu ngân từng tick, xem AskUserQuestion 12/08/2026), nên cần hỏi xác
+  // T-09-04 bỏ HẾT mọi CTKM đang áp qua X này; từ pos-line-promotion-breakdown
+  // (ADR-05) dòng "Khuyến mại" chỉ đại diện CTKM hóa đơn nên X chỉ loại nhóm
+  // đó — CTKM hàng hóa bỏ trong modal "Chương trình khuyến mãi". Vẫn hỏi xác
   // nhận trước (đổi số tiền phải thu). `afterAmount: null` = đang chờ
   // `previewExcluding` HOẶC gọi lỗi — cả hai hiện hộp không kèm số tiền.
   // Không suy ra "sau" bằng `subtotal` ở client: loại hết CTKM đang áp có thể
@@ -66,13 +76,14 @@ export function PaymentSummaryBlock({
     if (previewingExcludeAll || promotionPreview.status !== "ready" || !promotionPreview.data) {
       return;
     }
-    const { appliedPrograms, amountAfterPromotion } = promotionPreview.data;
-    const programIds = appliedPrograms.map((p) => p.programId);
+    const { amountAfterPromotion } = promotionPreview.data;
+    const invoicePrograms = invoiceLevelPrograms(promotionPreview.data);
+    const programIds = invoicePrograms.map((p) => p.programId);
     setPreviewingExcludeAll(true);
     const result = await previewExcluding(programIds);
     setPreviewingExcludeAll(false);
     setConfirmExcludeAll({
-      programNames: appliedPrograms.map((p) => p.name),
+      programNames: invoicePrograms.map((p) => p.name),
       programIds,
       beforeAmount: amountAfterPromotion,
       afterAmount: result?.amountAfterPromotion ?? null,
@@ -106,7 +117,7 @@ export function PaymentSummaryBlock({
         shouldShowPromotionRow(promotionPreview.data) ? (
         <PosSummaryRow
           label={
-            promotionPreview.data.appliedPrograms.length > 0 ? (
+            invoiceLevelPrograms(promotionPreview.data).length > 0 ? (
               <span className="inline-flex items-center gap-1.5">
                 {buildPromotionRowLabel(promotionPreview.data)}
                 <button
@@ -122,7 +133,7 @@ export function PaymentSummaryBlock({
               buildPromotionRowLabel(promotionPreview.data)
             )
           }
-          value={`-${formatVnd(promotionPreview.data.promotionDiscount)}`}
+          value={`-${formatVnd(bucketTotals.invoice)}`}
         />
       ) : promotionPreview.status === "unavailable" ? (
         <p className="text-[13px] text-gray-400">Chưa tính được khuyến mại</p>

@@ -14167,10 +14167,23 @@ export interface components {
             /** @description UUID of the user who created this record. */
             createdBy: string;
         };
+        AppliedInvoicePromotionLineDto: {
+            /** @description `invoice_items.id` of the line this share belongs to */
+            lineId: string;
+            discountAmount: number;
+            unitPriceAfter: number;
+        };
         AppliedInvoicePromotionDto: {
+            /** Format: uuid */
+            programId: string;
+            code: string;
+            name: string;
             /** @enum {string} */
             type: "INVOICE_DISCOUNT" | "ITEM_DISCOUNT" | "TIERED_DISCOUNT" | "GIFT_ITEM" | "BUY_M_GET_N";
+            /** @description Lower ran first (BR-001) */
+            priority: number;
             discountAmount: number;
+            lineDiscounts: components["schemas"]["AppliedInvoicePromotionLineDto"][];
         };
         DraftInvoiceResponseDto: {
             /** @description Line items belonging to this draft, ordered by sortOrder. */
