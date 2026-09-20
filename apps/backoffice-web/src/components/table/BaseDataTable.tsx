@@ -310,6 +310,14 @@ export function BaseDataTable<T>({
   const hasGroups = groupSpans.some((g) => g.group);
   const leadingWidth = typeof leadingColumn?.width === "number" ? leadingColumn.width : 0;
   const { offsets: frozenOffsets, lastFrozenKey } = computeFrozenOffsets(columns, leadingWidth);
+  // Offset trái của các cột ghim được tính từ `leadingWidth`, nên ô đầu dòng
+  // phải tự ghim ở left:0 — nếu không nó trôi khi cuộn ngang và để lộ một dải
+  // rộng đúng bằng nó ở mép trái. Chỉ bật khi bảng thật sự có cột ghim: bảng
+  // không ghim cột nào render y như trước.
+  const hasFrozen = columns.some((col) => col.frozen);
+  const leadingFrozenStyle: React.CSSProperties | undefined = hasFrozen
+    ? { position: "sticky", left: 0 }
+    : undefined;
   // Pixel offsets for the compact sticky header rows.
   const TOP_TITLE = 0;
   const TOP_SUB = hasGroups ? HEADER_ROW_HEIGHT : 0;
@@ -355,7 +363,11 @@ export function BaseDataTable<T>({
                     "sticky top-0 h-8 bg-muted px-1 py-0 text-center",
                     leadingColumn.headerClassName,
                   )}
-                  style={{ top: TOP_TITLE, zIndex: 25 }}
+                  style={{
+                    top: TOP_TITLE,
+                    ...(leadingFrozenStyle ?? {}),
+                    zIndex: hasFrozen ? 35 : 25,
+                  }}
                 >
                   {leadingColumn.header}
                 </th>
@@ -436,8 +448,12 @@ export function BaseDataTable<T>({
               <tr>
                 {leadingColumn ? (
                   <th
-                    className="sticky z-20 h-8 bg-background p-0 text-left text-xs text-muted-foreground"
-                    style={{ top: TOP_FILTER }}
+                    className="sticky h-8 bg-background p-0 text-left text-xs text-muted-foreground"
+                    style={{
+                      top: TOP_FILTER,
+                      ...(leadingFrozenStyle ?? {}),
+                      zIndex: hasFrozen ? 30 : 20,
+                    }}
                   >
                     {leadingColumn.filterHeader}
                   </th>
@@ -617,7 +633,22 @@ export function BaseDataTable<T>({
                   onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(row) : undefined}
                 >
                   {leadingColumn ? (
-                    <td className={cn("h-8 px-1 py-0 text-center align-middle", leadingColumn.cellClassName)}>
+                    <td
+                      className={cn(
+                        "h-8 px-1 py-0 text-center align-middle",
+                        hasFrozen && FROZEN_BG,
+                        leadingColumn.cellClassName,
+                      )}
+                      style={
+                        leadingFrozenStyle
+                          ? {
+                              ...leadingFrozenStyle,
+                              zIndex: 5,
+                              backgroundColor: frozenBodyBackground(index % 2 !== 0),
+                            }
+                          : undefined
+                      }
+                    >
                       {leadingColumn.cell(row, index)}
                     </td>
                   ) : null}
@@ -658,7 +689,12 @@ export function BaseDataTable<T>({
                 {leadingColumn ? (
                   <td
                     className="border-t border-border bg-muted px-2 py-2"
-                    style={{ position: "sticky", bottom: 0, zIndex: 5 }}
+                    style={{
+                      position: "sticky",
+                      bottom: 0,
+                      ...(leadingFrozenStyle ? { left: 0 } : {}),
+                      zIndex: hasFrozen ? 7 : 5,
+                    }}
                   />
                 ) : null}
                 {columns.map((column) => {
@@ -667,9 +703,11 @@ export function BaseDataTable<T>({
                     <td
                       key={`${column.key}-footer`}
                       className={cn(
+                        // Không thêm FROZEN_BG ở đây: `bg-muted` đã đục sẵn, còn
+                        // FROZEN_BG (`bg-background`) sẽ khiến phần hàng Tổng nằm
+                        // dưới cột ghim trắng lệch hẳn so với phần còn lại.
                         "h-8 border-t border-border bg-muted px-2 py-0 text-sm font-semibold",
                         column.className,
-                        column.frozen && FROZEN_BG,
                       )}
                       style={{
                         position: "sticky",

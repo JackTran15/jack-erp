@@ -13,8 +13,8 @@ import {
   ColumnConfigTable,
   type ColumnConfigRow,
   type TriState,
-} from "./ColumnConfigTable/ColumnConfigTable";
-import { ReorderButtonGroup } from "./ReorderButtonGroup/ReorderButtonGroup";
+} from "../../../../../../components/table/column-config/ColumnConfigTable/ColumnConfigTable";
+import { ReorderButtonGroup } from "../../../../../../components/table/column-config/ReorderButtonGroup/ReorderButtonGroup";
 
 interface Props {
   open: boolean;

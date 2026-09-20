@@ -129,6 +129,19 @@ export const navConfig: NavModule[] = [
     ],
   },
   {
+    id: "orders",
+    label: "Đơn hàng",
+    icon: Receipt,
+    defaultPath: "/orders",
+    views: [STORE_TYPE.SINGLE],
+    sections: [
+      {
+        id: "orders-main",
+        children: [{ to: "/orders", label: "Danh sách đơn hàng", end: true }],
+      },
+    ],
+  },
+  {
     id: "inventory",
     label: "Kho hàng",
     icon: Warehouse,
