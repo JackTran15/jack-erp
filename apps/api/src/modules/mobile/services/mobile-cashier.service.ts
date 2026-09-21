@@ -791,6 +791,8 @@ export class MobileCashierService {
                 quantity: l.quantity,
                 unitPrice: l.unitPrice,
                 lineDiscount: l.lineDiscount,
+                // `computeLineDiscount` giữ lý do ở nhánh số tiền, nên dòng mua ghi đúng như phiếu đổi trả của web.
+                lineDiscountReason: l.lineDiscountReason,
                 note: l.note,
               })),
             },

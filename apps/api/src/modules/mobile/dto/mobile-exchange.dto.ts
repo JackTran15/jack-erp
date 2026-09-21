@@ -24,6 +24,11 @@ export class MobileExtraLineDto {
   @IsNumber() @Min(0.01) quantity: number;
   @IsNumber() @Min(0) unitPrice: number;
   @IsOptional() @IsNumber() @Min(0) lineDiscount?: number;
+  /**
+   * Lý do giảm giá TAY của dòng — `invoice_items.line_discount_reason`, cùng chỗ POS web ghi. App bắt buộc nhập khi có
+   * `lineDiscount` (như `LineDiscountDialog` của web); thiếu trường này thì lý do rơi mất khi lưu phiếu.
+   */
+  @IsOptional() @IsString() @MaxLength(255) lineDiscountReason?: string;
   /** Ghi chú của RIÊNG dòng này — `invoice_items.note`, cùng chỗ mà dòng giỏ bán ghi vào. */
   @IsOptional() @IsString() @MaxLength(255) note?: string;
 }

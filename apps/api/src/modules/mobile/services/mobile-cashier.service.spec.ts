@@ -571,7 +571,17 @@ describe('MobileCashierService', () => {
           originalInvoiceId: 'inv-1',
           returnLines: [{ originalInvoiceItemId: 'it-1', quantity: 1 }],
           newLines: [
-            { itemId: 'i-9', itemCode: 'C', itemName: 'Áo C', unit: 'Cái', quantity: 1, unitPrice: 1000000, lineDiscount: 250000, note: 'Khách dặn gói riêng' },
+            {
+              itemId: 'i-9',
+              itemCode: 'C',
+              itemName: 'Áo C',
+              unit: 'Cái',
+              quantity: 1,
+              unitPrice: 1000000,
+              lineDiscount: 250000,
+              lineDiscountReason: 'Khách quen',
+              note: 'Khách dặn gói riêng',
+            },
           ],
           refundMethod: 'cash' as never,
           payments: [{ method: 'cash' as never, amount: 300000 }],
@@ -580,13 +590,14 @@ describe('MobileCashierService', () => {
       );
       const [dto] = createExchange.create.mock.calls[0] as unknown as [Record<string, unknown>];
       expect(dto).toMatchObject({ sessionId: 'ses-1', originalInvoiceId: 'inv-1' });
-      // Khoản giảm khuyến mại và ghi chú của DÒNG phải đi trọn xuống lệnh tạo
-      // hoá đơn đổi — app bày một mức giảm rồi máy chủ thu giá gốc là một lời
-      // hứa bị nuốt giữa hai tầng.
+      // Khoản giảm tay, LÝ DO của nó và ghi chú của DÒNG phải đi trọn xuống lệnh
+      // tạo hoá đơn đổi — app bày một mức giảm rồi máy chủ thu giá gốc, hay lưu
+      // khoản giảm mà mất lý do, là một lời hứa bị nuốt giữa hai tầng.
       expect((dto.newLines as Array<Record<string, unknown>>)[0]).toMatchObject({
         itemId: 'i-9',
         unitPrice: 1000000,
         lineDiscount: 250000,
+        lineDiscountReason: 'Khách quen',
         note: 'Khách dặn gói riêng',
       });
       const [, checkoutDto] = checkoutReturn.checkout.mock.calls[0] as unknown as [string, { payments: Array<Record<string, unknown>> }];
