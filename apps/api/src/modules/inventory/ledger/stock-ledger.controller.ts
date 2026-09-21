@@ -122,6 +122,15 @@ export class BalanceQueryDto extends PaginationQueryDto {
   excludeShowroom?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'Chỉ lấy kho nhập mặc định của chi nhánh (storages.is_default_receiving).',
+  })
+  @IsOptional()
+  @Transform(({ value }) => parseBool(value))
+  @IsBoolean()
+  defaultReceivingOnly?: boolean;
+
+  @ApiPropertyOptional({
     description: 'Lọc theo trạng thái hoạt động của vị trí (locations.is_active). Bỏ trống = tất cả.',
   })
   @IsOptional()

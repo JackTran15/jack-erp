@@ -114,6 +114,8 @@ export interface BalanceQuery extends PaginationQuery {
   locationIsActive?: boolean;
   /** Loại trừ kho showroom (storages.is_main_storage = true) khỏi kết quả. */
   excludeShowroom?: boolean;
+  /** Chỉ lấy kho nhập mặc định của chi nhánh (storages.is_default_receiving). */
+  defaultReceivingOnly?: boolean;
   organizationId: string;
 
   // Per-column string filters (server-side)
@@ -488,6 +490,12 @@ export class StockLedgerService {
     }
     if (query.excludeShowroom) {
       qb.andWhere('storage.is_main_storage = false');
+    }
+    // Branch scope đã áp ở `storage.branch_id` phía trên, và partial unique
+    // index `UQ_storages_default_receiving_per_branch` giữ tối đa một kho nhập
+    // mặc định mỗi chi nhánh, nên predicate phẳng này là đủ.
+    if (query.defaultReceivingOnly) {
+      qb.andWhere('storage.is_default_receiving = true');
     }
     if (query.unassigned) {
       qb.andWhere('loc.is_unassigned = true');
