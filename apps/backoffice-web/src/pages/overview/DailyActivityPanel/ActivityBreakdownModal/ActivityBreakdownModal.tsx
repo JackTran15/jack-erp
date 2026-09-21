@@ -1,5 +1,5 @@
 import { AppModal } from "@erp/ui";
-import type { BreakdownItem } from "../../_mock/dailyActivity.mock";
+import type { BreakdownItem } from "../../_api/overview.interface";
 import { BreakdownRow } from "./BreakdownRow/BreakdownRow";
 
 interface Props {

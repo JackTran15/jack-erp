@@ -11,7 +11,7 @@ import {
 } from "../../../_lib/echarts/baseOption";
 import type { Granularity } from "../../../_lib/granularity";
 import { timeAxisRotate, timeAxisTitle } from "../../../_lib/timeBuckets";
-import type { ProductProfitPoint } from "../../../_mock/productProfit.mock";
+import type { ProductProfitPoint } from "../../../_api/overview.interface";
 
 const DIVISOR = 1000;
 

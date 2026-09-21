@@ -1,7 +1,7 @@
 /**
  * Cấu hình 9 modal chi tiết của row 1: tiêu đề và các dòng breakdown.
  *
- * Khoá tra cứu là `key` của card/dòng trong `_mock/dailyActivity.mock.ts`, nên
+ * Khoá tra cứu là `key` của card/dòng dựng trong `_api/overview.api.ts`, nên
  * nơi bấm và nơi mở modal dùng chung một định danh.
  */
 
@@ -19,11 +19,11 @@ export interface BreakdownConfig {
   withCount?: boolean;
 }
 
-/** Ba hình thức thanh toán dùng lại ở "Tiền thu trong ngày" và "Bán hàng". */
+/** Ba phương thức thu tiền thật (`invoice_payments` / `debt_payments` / phiếu thu). */
 const PAYMENT_LINES: BreakdownLine[] = [
   { key: "cash", label: "Tiền mặt" },
-  { key: "voucher", label: "Voucher" },
-  { key: "point", label: "Điểm" },
+  { key: "transfer", label: "Chuyển khoản" },
+  { key: "card", label: "Thẻ" },
 ];
 
 const CASH_ONLY: BreakdownLine[] = [{ key: "cash", label: "Tiền mặt" }];
@@ -33,9 +33,9 @@ export const BREAKDOWN_CONFIG: Record<string, BreakdownConfig> = {
   cash_in: { title: "Tiền thu trong ngày", lines: PAYMENT_LINES },
   sales: { title: "Bán hàng", lines: PAYMENT_LINES },
   // Dấu "/" viết liền, không có dấu cách — spec nhấn mạnh.
-  debt: { title: "Thu nợ/Thu COD", lines: CASH_ONLY },
+  debt: { title: "Thu nợ/Thu COD", lines: PAYMENT_LINES },
   deposit: { title: "Khách đặt cọc", lines: CASH_ONLY },
-  other: { title: "Thu khác", lines: CASH_ONLY },
+  other: { title: "Thu khác", lines: PAYMENT_LINES },
 
   // ── Card 2: Doanh thu ước tính ─────────────────────────────────────────
   completed: {

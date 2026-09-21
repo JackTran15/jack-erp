@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { CHART_COLOR } from "../../../../_lib/echarts/baseOption";
-import type { ShareSlice } from "../../../../_mock/productShare.mock";
+import type { ShareSlice } from "../../../../_api/overview.interface";
 
 interface Props {
   slices: ShareSlice[];

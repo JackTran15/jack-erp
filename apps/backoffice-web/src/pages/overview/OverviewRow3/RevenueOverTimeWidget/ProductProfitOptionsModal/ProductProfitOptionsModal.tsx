@@ -1,4 +1,5 @@
 import { SingleSelect } from "@erp/ui";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import type { Row3RightState } from "../../../../../store/page-stores/overview/overview.interface";
 import {
@@ -10,7 +11,12 @@ import {
 } from "../../../_lib/granularity";
 import { periodOptions, type OverviewPeriod } from "../../../_lib/period";
 import { useCategoryOptions } from "../../../_lib/useCategoryOptions";
-import { mockProducts, mockVariants } from "../../../_mock/catalog.mock";
+import {
+  fetchProductGroups,
+  fetchProductVariants,
+  productGroupsQueryKey,
+  productVariantsQueryKey,
+} from "../../../../../components/shared/product-select/useProductSearch";
 import { AllOrManySelect } from "../../../WidgetOptionsModal/AllOrManySelect/AllOrManySelect";
 import { OptionsFormRow } from "../../../WidgetOptionsModal/OptionsFormRow/OptionsFormRow";
 import { OptionsRadioGroup } from "../../../WidgetOptionsModal/OptionsRadioGroup/OptionsRadioGroup";
@@ -49,16 +55,31 @@ export function ProductProfitOptionsModal({ open, state, onClose, onConfirm }: P
   );
 
   // Mẫu mã lọc theo nhóm đầu tiên đang chọn; hàng hóa lọc theo mẫu mã đầu tiên.
-  const variantScope = draft.productGroupIds[0] ?? "__all__";
+  // Chưa chọn mẫu mã → không có danh sách hàng hóa: lọc hàng hóa theo nhóm chưa
+  // có endpoint (pending).
+  const variantParams = { page: 1, pageSize: 100, categoryId: draft.productGroupIds[0] };
+  const variants = useQuery({
+    queryKey: productGroupsQueryKey(variantParams),
+    queryFn: () => fetchProductGroups(variantParams),
+    enabled: open,
+  });
   const variantOptions = useMemo(
-    () => mockVariants(variantScope).map((v) => ({ value: v.value, label: v.label })),
-    [variantScope],
+    () => (variants.data?.data ?? []).map((v) => ({ value: v.id, label: v.name })),
+    [variants.data],
   );
 
-  const productScope = `${variantScope}|${draft.variantIds[0] ?? "__all__"}`;
+  const productParams = { productId: draft.variantIds[0] ?? "", page: 1, pageSize: 100 };
+  const products = useQuery({
+    queryKey: productVariantsQueryKey(productParams),
+    queryFn: () => fetchProductVariants(productParams),
+    enabled: open && !!productParams.productId,
+  });
   const productOptions = useMemo(
-    () => mockProducts(productScope).map((p) => ({ value: p.value, label: p.label })),
-    [productScope],
+    () =>
+      productParams.productId
+        ? (products.data?.data ?? []).map((p) => ({ value: p.id, label: p.code }))
+        : [],
+    [products.data, productParams.productId],
   );
 
   const allowedPeriods = PRODUCT_PROFIT_PERIODS[draft.granularity] ?? [];

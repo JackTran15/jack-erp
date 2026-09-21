@@ -5,7 +5,7 @@ import { CHART_COLOR } from "../../_lib/echarts/baseOption";
 import { CASH_FLOW_PERIODS } from "../../_lib/granularity";
 import type { TimeBucketGranularity } from "../../_lib/timeBuckets";
 import { useOverviewScope } from "../../_lib/useOverviewScope";
-import { fetchCashFlow } from "../../_mock/cashFlow.mock";
+import { fetchCashFlow } from "../../_api/overview.api";
 import { ChartWidgetPanel } from "../../ChartWidgetPanel/ChartWidgetPanel";
 import { HeaderPeriodSelect } from "../../ChartWidgetPanel/WidgetHeader/HeaderPeriodSelect/HeaderPeriodSelect";
 import { SummaryStatChipGroup } from "../../SummaryStatChipGroup/SummaryStatChipGroup";
@@ -28,7 +28,7 @@ export function CashFlowOverTimeWidget() {
     queryKey: ["overview", "cash-flow", scope.key, granularity, period],
     queryFn: () =>
       fetchCashFlow({
-        scopeKey: scope.key,
+        branchIds: scope.branchIds,
         period,
         granularity: bucketGranularity,
       }),

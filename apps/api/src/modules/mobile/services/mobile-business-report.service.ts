@@ -193,7 +193,7 @@ export class MobileBusinessReportService {
  *    `reference_type` là tài sản/công nợ chứ không phải chi phí.
  * 6. Phiếu chi tiền gửi POSTED có `affect_expense`, loại REVERSAL.
  */
-function cellsSql(branchClause: (alias: string) => string): string {
+export function cellsSql(branchClause: (alias: string) => string): string {
   const invoiceWhere = `
       i.organization_id = $1
       AND i.issued_at >= $2::date

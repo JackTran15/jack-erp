@@ -55,6 +55,9 @@ import { MobileRevenueTimeUnit } from '../dto/mobile-revenue-report.query.dto';
  * item đã bị xoá khỏi catalogue vẫn có dòng hoá đơn, và web vẫn tính nó (rơi
  * về grain item với mã/tên snapshot trên dòng). Không lọc `is_active` — hàng
  * đã ngừng bán vẫn có doanh thu trong kỳ.
+ *
+ * `cost` = giá vốn của dòng (`quantity × cost_price`, cùng dấu `direction`) —
+ * chỉ "Lợi nhuận hàng hoá" của Tổng quan web đọc; các màn mobile bỏ qua cột này.
  */
 export function revenueLinesSql(params: {
   fromParam: string;
@@ -114,7 +117,9 @@ export function revenueLinesSql(params: {
       (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
         * li.quantity                                          AS qty,
       (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
-        * (li.line_total - li.promotion_discount)              AS amount
+        * (li.line_total - li.promotion_discount)              AS amount,
+      (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
+        * li.quantity * li.cost_price                          AS cost
     FROM invoice_items li
     JOIN invoices i ON i.id = li.invoice_id
     LEFT JOIN items it ON it.id = li.item_id AND it.organization_id = $1

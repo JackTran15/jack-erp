@@ -1,4 +1,5 @@
 import { SingleSelect } from "@erp/ui";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import type {
   DisplayMode,
@@ -12,7 +13,10 @@ import {
   type OverviewPeriod,
 } from "../../../_lib/period";
 import { useCategoryOptions } from "../../../_lib/useCategoryOptions";
-import { mockVariants } from "../../../_mock/catalog.mock";
+import {
+  fetchProductGroups,
+  productGroupsQueryKey,
+} from "../../../../../components/shared/product-select/useProductSearch";
 import { OptionsFormRow } from "../../../WidgetOptionsModal/OptionsFormRow/OptionsFormRow";
 import { OptionsRadioGroup } from "../../../WidgetOptionsModal/OptionsRadioGroup/OptionsRadioGroup";
 import { WidgetOptionsModal } from "../../../WidgetOptionsModal/WidgetOptionsModal";
@@ -72,15 +76,24 @@ export function ProductShareOptionsModal({ open, state, onClose, onConfirm }: Pr
   // "Nhóm hàng hóa": chỉ nhóm cha khi thống kê theo nhóm, ngược lại cả cha+con.
   const categories = useCategoryOptions(draft.dimension === "product_group", open);
 
+  // Mẫu mã thật, lọc theo nhóm đang chọn (API trả tối đa 100 dòng / trang).
+  const variantParams = {
+    page: 1,
+    pageSize: 100,
+    categoryId: draft.categoryId === ALL_VALUE ? undefined : draft.categoryId,
+  };
+  const variants = useQuery({
+    queryKey: productGroupsQueryKey(variantParams),
+    queryFn: () => fetchProductGroups(variantParams),
+    enabled: open && showVariant,
+  });
+
   const variantOptions = useMemo(
     () => [
       { value: ALL_VALUE, label: "Tất cả" },
-      ...mockVariants(draft.categoryId).map((v) => ({
-        value: v.value,
-        label: v.label,
-      })),
+      ...(variants.data?.data ?? []).map((v) => ({ value: v.id, label: v.name })),
     ],
-    [draft.categoryId],
+    [variants.data],
   );
 
   const patch = (next: Partial<Draft>) => setDraft((d) => ({ ...d, ...next }));
