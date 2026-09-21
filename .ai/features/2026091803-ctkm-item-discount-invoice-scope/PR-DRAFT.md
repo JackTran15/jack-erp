@@ -69,3 +69,9 @@ Giỏ 685.000 + 100.000 = **785.000**, CTKM hàng hóa 10% trên dòng 685.000, 
 - `.ai/aidlc.yaml` có hai env `required` (`local-backoffice-bm`, `local-backoffice-wh`) thiếu credentials → `aidlc-verify` trả `rung: skipped` cho **mọi** feature.
 - **POS chạy luồng checkout v1 khi `VITE_CHECKOUT_V2` không đặt — và v1 không áp CTKM**: màn hình bảo thu 706.500, `POST /invoices/:id/checkout` tính từ `invoice.discountAmount` của draft (= 0) nên đòi 785.000 và trả 400 *"must have a customer when there is a remaining debt balance"*. Chỉ `/v2/pos/checkout` ghi đúng. Production đã bật cờ; PR này chỉ ghi mẫu vào `.env.example`. Gỡ hẳn nhánh v1 + endpoint `/invoices/:id/checkout` (để không còn cấu hình nào tắt được CTKM) là việc riêng.
 - Màn hình thu ngân POS không cho thấy CTKM nào đang giảm bao nhiêu: một dòng *Khuyến mại* gộp, dòng hàng không hiện giá sau CTKM (`InvoiceLineItemRow` chỉ vẽ giảm tay), modal *Chương trình khuyến mãi* có tên nhưng không có số tiền. Chỉ hóa đơn **in** mới tách *KM theo mặt hàng* / *KM theo hóa đơn*. Dữ liệu từng dòng đã có trong `appliedPrograms[].lineDiscounts` của preview — vẽ lên dòng hàng là feature UI riêng.
+
+## Đính chính 2026-09-21
+
+Việc để sau *"Gỡ hẳn nhánh v1 + endpoint `/invoices/:id/checkout`"*: **mobile không còn phụ thuộc v1** kể từ
+feature `2026092101-erp-sales-promotion-points-v2` (mobile repo) — `MobileCashierService.checkout` gọi `CheckoutSagaRunner`. Người gọi v1 duy nhất
+còn lại là fallback của web POS khi `VITE_CHECKOUT_V2` tắt (`InvoiceController` L74/L172).

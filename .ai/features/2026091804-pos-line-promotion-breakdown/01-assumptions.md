@@ -31,3 +31,10 @@ của Akenzy gặp nhau và cần một quy ước để số học còn khớp 
 | --- | --- | --- |
 | R-01 | Panel phải giữ nguyên (*Tổng tiền* 785.000 / *Khuyến mại* −78.500), chỉ thêm nhãn trên dòng | Akenzy 2026-09-18: "Khuyến mãi bên panel chỉ là khuyến mãi trên hóa đơn; không có thì không hiển thị" |
 | R-02 | Dòng *Khuyến mại* panel gộp mọi loại CTKM như hiện nay | Cùng lý do R-01 |
+
+## Đính chính 2026-09-21
+
+A-11 loại `modules/mobile` khỏi phạm vi. Follow-up đã mở ở mobile repo, feature `2026092101-erp-sales-promotion-points-v2`: mobile thu tiền qua
+checkout v2 saga (`CheckoutSagaRunner`, route `POST /mobile/cashier/drafts/:id/checkout` + `/checkout/preview`),
+hoá đơn nháp chỉ mang giảm tay, và app đọc `appliedPromotions` theo đúng luật cấp dòng / cấp hoá đơn của ADR-02.
+Nhánh backend: `feat/mobile-checkout-v2-saga`.
