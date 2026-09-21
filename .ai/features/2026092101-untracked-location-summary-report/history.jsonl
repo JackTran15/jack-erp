@@ -11,3 +11,6 @@
 {"action": "ticket in_progress", "at": "2026-09-21T21:03:21", "base": "73d47b3a16f3007333dfd1cd7e5e8fe87b3ccbf8", "by": "Akenzy", "gate": "G4", "id": "34d8fbdafe5e", "ticket": "T-01-02", "ts": "2026-09-21T21:03:21.476341"}
 {"action": "scope", "at": "2026-09-21T21:08:49", "base": "73d47b3a16f3007333dfd1cd7e5e8fe87b3ccbf8", "by": "Akenzy", "gate": "G4", "id": "eda673b46145", "ticket": "T-01-02", "ts": "2026-09-21T21:08:49.707208", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-21T21:08:49", "by": "Akenzy", "gate": "G4", "id": "42fe572931b9", "ticket": "T-01-02", "ts": "2026-09-21T21:08:49.709624"}
+{"action": "ticket in_progress", "at": "2026-09-21T21:08:49", "base": "fa142add52ced4390e0b4476ed5ce961d5a8d4a5", "by": "Akenzy", "gate": "G4", "id": "3aa70f202991", "ticket": "T-02-02", "ts": "2026-09-21T21:08:49.959037"}
+{"action": "scope", "at": "2026-09-21T21:21:26", "base": "fa142add52ced4390e0b4476ed5ce961d5a8d4a5", "by": "Akenzy", "gate": "G4", "id": "c3ef219a4e4b", "ticket": "T-02-02", "ts": "2026-09-21T21:21:26.159216", "verdict": "clean"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-21T21:21:26", "by": "Akenzy", "gate": "G4", "id": "c5fca3ce0c41", "ticket": "T-02-02", "ts": "2026-09-21T21:21:26.161852"}
