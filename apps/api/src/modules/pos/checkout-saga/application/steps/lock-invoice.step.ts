@@ -11,6 +11,16 @@ import { InvoiceEntity, InvoiceStatus } from '../../../entities/invoice.entity';
  * concurrent requests on the same invoice both pass that read and both
  * write. This step is the re-guard — `SELECT ... FOR UPDATE`, then the exact
  * same check `load-draft` already did.
+ *
+ * Swapping in the locked row must not undo what preflight already decided on
+ * the in-memory draft: `clamp-points` lowers `pointsRedeemed` /
+ * `pointsDiscountAmount` there, and `compute-totals` priced `amountDue` from
+ * those clamped numbers. `persist-invoice` and `redeem-points` read
+ * `ctx.invoice`, so the clamp is carried onto the locked row — otherwise the
+ * card is debited (and the invoice stores) the full requested points while
+ * the sale was priced on fewer. Only the points are carried: the voucher that
+ * `resolve-funds` folds into `discountAmount` does not need it, because
+ * `persist-invoice` rewrites `discountAmount` from `ctx.totals` anyway.
  */
 @Injectable()
 export class LockInvoiceStep implements CheckoutStep {
@@ -37,6 +47,11 @@ export class LockInvoiceStep implements CheckoutStep {
       });
     }
 
+    const preflight = ctx.invoice;
+    if (preflight) {
+      invoice.pointsRedeemed = preflight.pointsRedeemed;
+      invoice.pointsDiscountAmount = preflight.pointsDiscountAmount;
+    }
     ctx.invoice = invoice;
   }
 }

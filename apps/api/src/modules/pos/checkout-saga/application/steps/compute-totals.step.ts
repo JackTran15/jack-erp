@@ -7,6 +7,107 @@ import { CheckoutContext, CheckoutStep } from '../checkout-step';
 
 const round = (v: number): number => Math.round(v * 100) / 100;
 
+/** What `computeAmounts` returns — the payment-independent part of `CheckoutTotals`. */
+export interface CheckoutAmounts {
+  subtotal: number;
+  manualDiscountAmount: number;
+  promotionDiscount: number;
+  pointsDiscountAmount: number;
+  depositAmount: number;
+  amountDue: number;
+  /** Before the customer/pointsBlocked gates — persist-invoice applies those. */
+  pointsEarned: number;
+  pointsBlocked: boolean;
+}
+
+/**
+ * The money half of `compute-totals`, with no payment/debt guard in it — the
+ * numbers a sale is worth before anyone has said how it will be paid.
+ *
+ * Exported on its own so `CheckoutSagaRunner.preview` can show the cashier
+ * the amount due without running the guards: with `payments = []` and a
+ * walk-in customer, the "remaining debt needs a customer" guard would throw
+ * `PAYMENT_INVALID` for a sale that is perfectly checkoutable once paid.
+ * `ComputeTotalsStep.execute` calls this same function and only then runs
+ * the guards, so preview and checkout cannot drift apart numerically.
+ *
+ * Pure: reads the context, writes nothing (not even onto `ctx`). The only
+ * throws are defects — a missing load-draft, or a promotion line discount
+ * larger than its line — never a business rule about payment.
+ */
+export function computeAmounts(ctx: CheckoutContext): CheckoutAmounts {
+  const invoice = ctx.invoice;
+  const items = ctx.items;
+  if (!invoice || !items) {
+    // Programming error, not a user-facing failure: some earlier step must
+    // populate ctx.invoice/ctx.items before this one runs. Not an
+    // HttpException on purpose — the orchestrator maps it to 500
+    // CHECKOUT_FAILED rather than inventing a business error code for it.
+    throw new Error(
+      'compute-totals ran before load-draft populated the context',
+    );
+  }
+
+  const subtotal = items.reduce(
+    (sum, item) => sum + Number(item.lineTotal),
+    0,
+  );
+  const manualDiscountAmount = Number(invoice.discountAmount ?? 0);
+  const promotionDiscount = ctx.promotion?.promotionDiscount ?? 0;
+  const discountAmount = manualDiscountAmount + promotionDiscount;
+  const pointsDiscountAmount = Number(invoice.pointsDiscountAmount ?? 0);
+  const depositAmount = Number(invoice.depositAmount ?? 0);
+
+  // The promotion engine already guarantees no line's discount exceeds its
+  // own gross amount (AC-29 of the promotion-programs-engine feature), but
+  // this is money — a cheap re-check here costs nothing and catches a
+  // corrupted/forged response before it reaches computeAmountDue. Combines
+  // the same two sources as invoice.discountAmount does for the whole
+  // invoice (see persist-invoice.step.ts): the manual per-line discount
+  // already on the draft, plus whatever the engine assigned to that line.
+  const promotionLineDiscounts = (ctx.promotion?.lineDiscounts ?? []) as LineDiscount[];
+  const promotionDiscountByLineId = new Map(
+    promotionLineDiscounts.map((ld) => [ld.lineId, ld.discountAmount]),
+  );
+  for (const item of items) {
+    const lineGross = Number(item.quantity) * Number(item.unitPrice);
+    const totalLineDiscount =
+      Number(item.lineDiscount ?? 0) + (promotionDiscountByLineId.get(item.id) ?? 0);
+    if (totalLineDiscount > lineGross) {
+      throw new Error(
+        `Line ${item.id} total discount (${totalLineDiscount}) exceeds its gross amount (${lineGross})`,
+      );
+    }
+  }
+
+  const amountDue = computeAmountDue({
+    subtotal,
+    discountAmount,
+    pointsDiscountAmount,
+    depositAmount,
+  });
+  const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
+
+  // ADR-02: computed exactly once, here — persist-invoice and enqueue-outbox both
+  // read ctx.totals.pointsBlocked rather than re-deriving it. Does not need to filter
+  // by type === INVOICE_DISCOUNT: T-03-01 already guarantees accruePoints is undefined
+  // (never false) on every non-invoice-discount applied program, so this check is
+  // naturally correct without an extra type guard.
+  const appliedPrograms = (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[];
+  const pointsBlocked = appliedPrograms.some((p) => p.accruePoints === false);
+
+  return {
+    subtotal,
+    manualDiscountAmount,
+    promotionDiscount,
+    pointsDiscountAmount,
+    depositAmount,
+    amountDue,
+    pointsEarned,
+    pointsBlocked,
+  };
+}
+
 /**
  * Computes every amount checkout needs, via the same `computeAmountDue` helper
  * `checkout-invoice.service.ts` uses, so v2 can never drift from v1 on
@@ -17,6 +118,10 @@ const round = (v: number): number => Math.round(v * 100) / 100;
  * the stub (T-01-06, always 0) or the real engine (T-04-03) — it defaults to 0
  * either way, so this file works correctly in isolation of that step.
  *
+ * The arithmetic lives in `computeAmounts` (above); this step adds only what
+ * depends on the payments — totalPaid, remainder, kept change, status — and
+ * the guards on them.
+ *
  * Parity target: checkout-invoice.service.ts:141-172, 215-220.
  */
 @Injectable()
@@ -25,70 +130,24 @@ export class ComputeTotalsStep implements CheckoutStep {
   readonly phase = 'preflight' as const;
 
   async execute(ctx: CheckoutContext): Promise<void> {
-    const invoice = ctx.invoice;
-    const items = ctx.items;
-    if (!invoice || !items) {
-      // Programming error, not a user-facing failure: some earlier step must
-      // populate ctx.invoice/ctx.items before this one runs. Not an
-      // HttpException on purpose — the orchestrator maps it to 500
-      // CHECKOUT_FAILED rather than inventing a business error code for it.
-      throw new Error(
-        'compute-totals ran before load-draft populated the context',
-      );
-    }
-
-    const subtotal = items.reduce(
-      (sum, item) => sum + Number(item.lineTotal),
-      0,
-    );
-    const manualDiscountAmount = Number(invoice.discountAmount ?? 0);
-    const promotionDiscount = ctx.promotion?.promotionDiscount ?? 0;
-    const discountAmount = manualDiscountAmount + promotionDiscount;
-    const pointsDiscountAmount = Number(invoice.pointsDiscountAmount ?? 0);
-    const depositAmount = Number(invoice.depositAmount ?? 0);
-
-    // The promotion engine already guarantees no line's discount exceeds its
-    // own gross amount (AC-29 of the promotion-programs-engine feature), but
-    // this is money — a cheap re-check here costs nothing and catches a
-    // corrupted/forged response before it reaches computeAmountDue. Combines
-    // the same two sources as invoice.discountAmount does for the whole
-    // invoice (see persist-invoice.step.ts): the manual per-line discount
-    // already on the draft, plus whatever the engine assigned to that line.
-    const promotionLineDiscounts = (ctx.promotion?.lineDiscounts ?? []) as LineDiscount[];
-    const promotionDiscountByLineId = new Map(
-      promotionLineDiscounts.map((ld) => [ld.lineId, ld.discountAmount]),
-    );
-    for (const item of items) {
-      const lineGross = Number(item.quantity) * Number(item.unitPrice);
-      const totalLineDiscount =
-        Number(item.lineDiscount ?? 0) + (promotionDiscountByLineId.get(item.id) ?? 0);
-      if (totalLineDiscount > lineGross) {
-        throw new Error(
-          `Line ${item.id} total discount (${totalLineDiscount}) exceeds its gross amount (${lineGross})`,
-        );
-      }
-    }
-
-    const amountDue = computeAmountDue({
+    const amounts = computeAmounts(ctx);
+    // computeAmounts has already thrown if load-draft never ran.
+    const invoice = ctx.invoice!;
+    const {
       subtotal,
-      discountAmount,
+      manualDiscountAmount,
+      promotionDiscount,
       pointsDiscountAmount,
       depositAmount,
-    });
+      amountDue,
+      pointsEarned,
+      pointsBlocked,
+    } = amounts;
 
     const totalPaid = round(
       ctx.input.payments.reduce((sum, p) => sum + p.amount, 0),
     );
     const remainder = round(amountDue - totalPaid);
-    const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
-
-    // ADR-02: computed exactly once, here — persist-invoice and enqueue-outbox both
-    // read ctx.totals.pointsBlocked rather than re-deriving it. Does not need to filter
-    // by type === INVOICE_DISCOUNT: T-03-01 already guarantees accruePoints is undefined
-    // (never false) on every non-invoice-discount applied program, so this check is
-    // naturally correct without an extra type guard.
-    const appliedPrograms = (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[];
-    const pointsBlocked = appliedPrograms.some((p) => p.accruePoints === false);
 
     if (totalPaid > amountDue) {
       throw new BadRequestException({
