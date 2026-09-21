@@ -6,10 +6,10 @@ import { CashAccountEntity, CashAccountType } from '../../accounting/cash/cash-a
 import { PosSessionEntity } from '../../pos/entities/pos-session.entity';
 import { PosSessionService } from '../../pos/services/pos-session.service';
 import { InvoiceService } from '../../pos/services/invoice.service';
-import { CheckoutInvoiceService } from '../../pos/services/checkout-invoice.service';
+import { CheckoutSagaRunner } from '../../pos/checkout-saga/application/checkout-saga.runner';
 import { InvoiceEntity } from '../../pos/entities/invoice.entity';
 import { PaymentAccountEntity } from '../../accounting/payment-accounts/payment-account.entity';
-import { MobileCheckoutDto } from '../dto/mobile-checkout.dto';
+import { MobileCheckoutDto, MobileCheckoutPreviewDto } from '../dto/mobile-checkout.dto';
 import { MobileCollectDebtDto, MobileDebtPaymentMethod, MobileDebtorsQueryDto } from '../dto/mobile-debt.dto';
 import { PartnerLookupService } from '../../accounting/cash-vouchers/shared/partner-lookup.service';
 import { DebtCollectionSagaService } from '../../accounting/cash-vouchers/debt-collection/debt-collection-saga.service';
@@ -31,7 +31,7 @@ import { RefundMethod } from '../../pos/entities/invoice.entity';
 import { MobileExchangeDto, MobileRefundMethod, MobileReturnableQueryDto } from '../dto/mobile-exchange.dto';
 import { GetPosDailySummaryQuery } from '../../reporting/pos-daily-report/queries/get-pos-daily-summary.query';
 import { PosDailySummaryDto } from '../../reporting/pos-daily-report/dto/pos-daily-summary.dto';
-import type { PosDailySummaryResult } from '@erp/shared-interfaces';
+import type { AppliedProgram, LineDiscount, PosDailySummaryResult } from '@erp/shared-interfaces';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { SalesOrderEntity } from '../../sales-order/entities/sales-order.entity';
 import { MobileCreateDraftDto, MobileUpdateDraftDto } from '../dto/mobile-cashier-draft.dto';
@@ -50,6 +50,12 @@ export interface MobileDraftView {
   salesChannel: string | null;
   note: string | null;
   lines: Array<{
+    /**
+     * `invoice_items.id` — khoá để app ghép `lineDiscounts[].lineId` của preview
+     * saga vào đúng dòng giỏ. `itemId` không dùng được: một mã hàng có thể nằm
+     * trên hai dòng (khác giá / khác ghi chú).
+     */
+    id: string;
     itemId: string;
     itemCode: string;
     itemName: string;
@@ -76,6 +82,13 @@ export interface MobileDraftView {
   pointsRedeemed: number;
   pointsDiscountAmount: number;
   amountDue: number;
+  /**
+   * Lựa chọn CTKM tư vấn đã chốt trên ĐƠN gốc (ADR-52) — giỏ nạp làm trạng thái
+   * ban đầu rồi gửi theo preview/checkout. Nháp giỏ tự dựng (không có đơn) → `[]`.
+   * Thu ngân sửa trong giỏ KHÔNG ghi ngược lại đơn (A-97).
+   */
+  selectedProgramIds: string[];
+  excludedProgramIds: string[];
 }
 
 export interface MobileCashierSessionView {
@@ -101,7 +114,7 @@ export interface MobileCashAccountView {
  * Vai THU NGÂN của erp_sales (`/mobile/cashier/*`, feature `erp-sales-cashier`).
  *
  * Mọi thứ ở đây BỌC service POS đã có (`PosSessionService`, `InvoiceService`,
- * `CheckoutInvoiceService`, saga thu nợ, `CheckoutReturnService`) với hai điều
+ * checkout saga v2 qua `CheckoutSagaRunner`, saga thu nợ, `CheckoutReturnService`) với hai điều
  * mà đường POS web không có: phiên POS tự tra theo chi nhánh (ADR-31) và số
  * trả về là `number` chứ không phải chuỗi `numeric` của TypeORM — bài học
  * `numbersOf` của `mobile-invoice.service`.
@@ -126,7 +139,7 @@ export class MobileCashierService {
     @InjectRepository(SalesOrderEntity)
     private readonly salesOrders: Repository<SalesOrderEntity>,
     private readonly dataSource: DataSource,
-    private readonly checkoutService: CheckoutInvoiceService,
+    private readonly checkoutRunner: CheckoutSagaRunner,
     @InjectRepository(PaymentAccountEntity)
     private readonly paymentAccountRepo: Repository<PaymentAccountEntity>,
     private readonly partnerLookup: PartnerLookupService,
@@ -250,7 +263,7 @@ export class MobileCashierService {
     const order = invoice.salesOrderId
       ? await this.salesOrders.findOne({
           where: { id: invoice.salesOrderId, organizationId: actor.organizationId },
-          select: ['id', 'documentNumber', 'salesChannel'],
+          select: ['id', 'documentNumber', 'salesChannel', 'selectedProgramIds', 'excludedProgramIds'],
         })
       : null;
 
@@ -268,6 +281,7 @@ export class MobileCashierService {
     const lines = [...invoice.items]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((item) => ({
+        id: item.id,
         itemId: item.itemId,
         modelId: modelByItem.get(item.itemId) ?? null,
         itemCode: item.itemCode,
@@ -306,6 +320,8 @@ export class MobileCashierService {
       pointsRedeemed: Number(invoice.pointsRedeemed ?? 0),
       pointsDiscountAmount: Number(invoice.pointsDiscountAmount ?? 0),
       amountDue: Number(invoice.amountDue),
+      selectedProgramIds: order?.selectedProgramIds ?? [],
+      excludedProgramIds: order?.excludedProgramIds ?? [],
     };
   }
 
@@ -431,11 +447,26 @@ export class MobileCashierService {
   }
 
   /**
-   * Thu tiền hoá đơn nháp (T-16-01). Đi ĐÚNG `CheckoutInvoiceService.checkout`
-   * của POS — số hoá đơn, sổ quỹ, công nợ, điểm — không dựng đường thứ hai.
-   * Kênh bán (nếu gửi) ghi trước để tờ hoá đơn phát hành mang kênh.
+   * Thu tiền hoá đơn nháp. Từ T-03-02 đi checkout saga v2 — ĐÚNG đường POS web
+   * đang chạy (ADR-49) — qua `CheckoutSagaRunner`, không qua v1
+   * (`CheckoutInvoiceService`) nữa: v1 không ghi `invoice_checkout_promotions`,
+   * nên hoá đơn mobile thiếu CTKM đã áp. Số hoá đơn, sổ quỹ, công nợ, điểm, kho,
+   * outbox đều do saga làm; ở đây không có tác dụng phụ nào sau commit — v1
+   * cũng không có cái nào riêng cho mobile (không đụng đơn tư vấn).
+   *
+   * Kênh bán (nếu gửi) vẫn ghi TRƯỚC, ngoài transaction của saga, để tờ hoá
+   * đơn phát hành mang kênh — như trước.
+   *
+   * `idempotencyKey` mặc định là `invoiceId`, giống controller web: gửi lại
+   * cùng một lượt thu (mất phản hồi) không bao giờ thành hai lần thu.
+   *
+   * Hình dạng trả về GIỮ NGUYÊN như thời v1 (`CheckoutResultModel` của app đọc
+   * đúng các khoá này). Đọc lại hoá đơn sau commit thay vì dựng từ
+   * `result.totals`: `salesOrderId` không có trong kết quả saga, và cột đã
+   * lưu là thứ app sẽ thấy lại ở `GET /mobile/invoices/:id` — trả cùng một
+   * nguồn thì hai màn không thể lệch nhau.
    */
-  async checkout(invoiceId: string, dto: MobileCheckoutDto, actor: ActorContext) {
+  async checkout(invoiceId: string, dto: MobileCheckoutDto, idempotencyKey: string | undefined, actor: ActorContext) {
     const invoice = await this.invoices.findOne(invoiceId, actor);
     if (!invoice.isDraft) {
       throw new BadRequestException(`Hoá đơn ${invoice.code} đã thu tiền rồi`);
@@ -447,19 +478,25 @@ export class MobileCashierService {
       );
     }
 
-    const issued = await this.checkoutService.checkout(
-      invoiceId,
+    const key = idempotencyKey || invoiceId;
+    await this.checkoutRunner.run(
       {
+        invoiceId,
         payments: dto.payments.map((line) => ({
           paymentMethod: line.method,
           amount: line.amount,
           paymentAccountId: line.paymentAccountId,
         })),
         dueDate: dto.dueDate,
+        keptChangeAmount: dto.keptChangeAmount,
+        selectedProgramIds: dto.selectedProgramIds,
+        excludedProgramIds: dto.excludedProgramIds,
       },
+      { idempotencyKey: key, correlationId: key },
       actor,
     );
 
+    const issued = await this.invoices.findOne(invoiceId, actor);
     return {
       invoiceId: issued.id,
       invoiceCode: issued.code,
@@ -468,6 +505,41 @@ export class MobileCashierService {
       totalPaid: Number(issued.totalPaid),
       remainder: Number(issued.amountDue) - Number(issued.totalPaid),
       salesOrderId: issued.salesOrderId ?? null,
+    };
+  }
+
+  /**
+   * Số phải thu của hoá đơn nháp theo saga, trước khi thu (ADR-51) — màn Thu
+   * tiền đọc `amountDue` từ đây thay vì tự cộng trừ (A-95: giảm tay % lệch).
+   * Không mở transaction, không ghi gì (xem `CheckoutSagaRunner.preview`).
+   *
+   * Tổng phẳng ở cấp gốc; `appliedPrograms` cắt còn đúng thứ app bày — bỏ
+   * `gifts`/`priority`/`discountMode` của engine để hợp đồng với app nhỏ và
+   * không đổi theo engine. `lineDiscounts[].lineId` là `invoice_items.id`.
+   */
+  async previewCheckout(invoiceId: string, dto: MobileCheckoutPreviewDto, actor: ActorContext) {
+    const preview = await this.checkoutRunner.preview(
+      {
+        invoiceId,
+        selectedProgramIds: dto.selectedProgramIds,
+        excludedProgramIds: dto.excludedProgramIds,
+      },
+      actor,
+    );
+
+    return {
+      ...preview.totals,
+      appliedPrograms: (preview.appliedPrograms as AppliedProgram[]).map((p) => ({
+        programId: p.programId,
+        code: p.code,
+        name: p.name,
+        type: p.type,
+        discountAmount: Number(p.discountAmount),
+        lineDiscounts: (p.lineDiscounts ?? []).map((ld: LineDiscount) => ({
+          lineId: ld.lineId,
+          discountAmount: Number(ld.discountAmount),
+        })),
+      })),
     };
   }
   /** Khách còn nợ — cùng truy vấn với phiếu thu của web, thêm SĐT và sắp xếp (T-17-01). */
@@ -719,6 +791,8 @@ export class MobileCashierService {
                 quantity: l.quantity,
                 unitPrice: l.unitPrice,
                 lineDiscount: l.lineDiscount,
+                // `computeLineDiscount` giữ lý do ở nhánh số tiền, nên dòng mua ghi đúng như phiếu đổi trả của web.
+                lineDiscountReason: l.lineDiscountReason,
                 note: l.note,
               })),
             },

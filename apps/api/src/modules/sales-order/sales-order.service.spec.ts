@@ -147,13 +147,57 @@ describe('SalesOrderService', () => {
     const [mgr, dto, draftActor] = invoiceService.createDraftIn.mock.calls[0] as [unknown, { sessionId: string; customerId?: string; salespersonId: string; items: Array<Record<string, unknown>> }, { branchId?: string }];
     expect(mgr).toBe(manager);
     expect(dto).toMatchObject({ sessionId: 'ses-1', customerId: 'c-1', salespersonId: 'sp-1' });
-    // Giảm tay + KM của dòng gộp thành MỘT khoản giảm dòng của hoá đơn.
-    expect(dto.items[0]).toMatchObject({ itemId: 'i-1', quantity: 2, unitPrice: 800000, lineDiscount: 592000 });
+    // CHỈ giảm tay (ADR-50): 160.000, không phải 592.000 = tay + KM 432.000 như
+    // trước — saga tính lại KM lúc thu, gộp vào đây là trừ KM hai lần (A-87).
+    expect(dto.items[0]).toMatchObject({ itemId: 'i-1', quantity: 2, unitPrice: 800000, lineDiscount: 160000 });
+    expect(dto.items[0].lineDiscountReason).toBeUndefined();
     // Hoá đơn thuộc chi nhánh của ĐƠN.
     expect(draftActor.branchId).toBe('br-1');
     expect(updates.some((u) => u.salesOrderId === 'so-1')).toBe(true);
     expect(updates.some((u) => u.status === SalesOrderStatus.PROCESSED && u.invoiceId === 'inv-1')).toBe(true);
     expect(view.invoiceCode).toBe('2609060002');
+  });
+
+  it('approve: lý do giảm dòng CHỈ là lý do giảm tay — không mang tên CTKM của đơn', async () => {
+    const { service, manager, invoiceService } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' } });
+    manager.find.mockResolvedValueOnce([
+      { ...lineA, manualDiscountReason: 'Khách quen', salesOrderId: 'so-1', lineNo: 1 },
+      { ...lineB, manualDiscount: 0, manualDiscountReason: null, promotionName: 'Mua 2 tặng 1', salesOrderId: 'so-1', lineNo: 2 },
+    ] as never);
+
+    await service.approve('so-1', actor);
+
+    const [, dto] = invoiceService.createDraftIn.mock.calls[0] as [unknown, { items: Array<Record<string, unknown>> }];
+    expect(dto.items[0]).toMatchObject({ lineDiscount: 160000, lineDiscountReason: 'Khách quen' });
+    expect(dto.items[1]).toMatchObject({ lineDiscount: 0, lineDiscountReason: undefined });
+    for (const item of dto.items) {
+      expect(String(item.lineDiscountReason ?? '')).not.toMatch(/Giảm giá 30%|Mua 2 tặng 1/);
+    }
+  });
+
+  it('lựa chọn CTKM ghi lên đơn lúc tạo VÀ lúc sửa; vắng khoá khi sửa = xoá lựa chọn (thay trọn đơn)', async () => {
+    const sel = ['7f1c2b8e-4a3d-4c5e-9f10-2b3c4d5e6f70'];
+    const exc = ['0b1c2d3e-4f50-4a6b-8c7d-8e9f0a1b2c3d'];
+
+    const created = build();
+    await created.service.create({ lines: [lineB], selectedProgramIds: sel, excludedProgramIds: exc }, actor);
+    expect(created.saved[0]).toMatchObject({ selectedProgramIds: sel, excludedProgramIds: exc });
+
+    const edited = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', createdBy: 'u-1' } });
+    await edited.service.update('so-1', { lines: [lineB], excludedProgramIds: exc }, actor);
+    expect(edited.updates[0]).toMatchObject({ selectedProgramIds: [], excludedProgramIds: exc });
+
+    const bare = build();
+    await bare.service.create({ lines: [lineB] }, actor);
+    expect(bare.saved[0]).toMatchObject({ selectedProgramIds: [], excludedProgramIds: [] });
+  });
+
+  it('view của đơn trả lựa chọn CTKM để app nạp lại khi sửa; đơn cũ không có cột → []', async () => {
+    const withSel = build({ current: { selectedProgramIds: ['p-1'], excludedProgramIds: ['p-2'] } });
+    await expect(withSel.service.getById('so-1', actor)).resolves.toMatchObject({ selectedProgramIds: ['p-1'], excludedProgramIds: ['p-2'] });
+
+    const legacy = build();
+    await expect(legacy.service.getById('so-1', actor)).resolves.toMatchObject({ selectedProgramIds: [], excludedProgramIds: [] });
   });
 
   it('approve khi chi nhánh CHƯA mở ca → 409 NO_OPEN_SESSION, đơn KHÔNG đổi trạng thái, không tạo nháp', async () => {

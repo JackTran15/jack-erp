@@ -1,6 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { CheckoutSagaController } from './checkout-saga.controller';
 import { CheckoutSagaOrchestrator } from '../application/checkout-saga.orchestrator';
+import { CheckoutSagaRunner } from '../application/checkout-saga.runner';
 import { CheckoutContext, CheckoutStep, CheckoutTrace } from '../application/checkout-step';
 import { CheckoutSagaStatus } from '../infrastructure/checkout-saga.entity';
 import { CheckoutV2Dto } from './dto/checkout-v2.dto';
@@ -13,6 +14,10 @@ import { CheckoutV2Dto } from './dto/checkout-v2.dto';
  * sequencing and dryRun short-circuiting — this file only proves the
  * controller wires the right 19 steps, in the right order, into
  * `orchestrator.run`, and shapes the response correctly.
+ *
+ * Since T-03-01 the step list lives in `CheckoutSagaRunner`; the controller is
+ * handed a *real* runner built from the same mocked orchestrator and steps, so
+ * every assertion below still covers the whole HTTP → saga path unchanged.
  */
 
 const actor = { userId: 'u1', organizationId: 'o1', branchId: 'b1', roles: [] };
@@ -79,7 +84,7 @@ describe('CheckoutSagaController', () => {
     orchestrator = { run: jest.fn() };
     sagaRepo = { findOne: jest.fn() };
     sagaStepRepo = { find: jest.fn() };
-    controller = new CheckoutSagaController(
+    const runner = new CheckoutSagaRunner(
       orchestrator as unknown as CheckoutSagaOrchestrator,
       steps.loadDraft as any,
       steps.evaluatePromotion as any,
@@ -101,9 +106,8 @@ describe('CheckoutSagaController', () => {
       steps.postDeposit as any,
       steps.enqueueOutbox as any,
       steps.closeSaga as any,
-      sagaRepo as any,
-      sagaStepRepo as any,
     );
+    controller = new CheckoutSagaController(runner, sagaRepo as any, sagaStepRepo as any);
   });
 
   describe('POST /v2/pos/checkout', () => {

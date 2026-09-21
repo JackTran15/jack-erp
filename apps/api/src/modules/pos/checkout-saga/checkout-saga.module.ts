@@ -24,6 +24,7 @@ import {
   CHECKOUT_WS_EMITTER,
 } from './application/checkout-step';
 import { CheckoutSagaOrchestrator } from './application/checkout-saga.orchestrator';
+import { CheckoutSagaRunner } from './application/checkout-saga.runner';
 import { LoadDraftStep } from './application/steps/load-draft.step';
 import { EvaluatePromotionStep } from './application/steps/evaluate-promotion.step';
 import { ClampPointsStep } from './application/steps/clamp-points.step';
@@ -47,8 +48,16 @@ import { CloseSagaStep } from './application/steps/close-saga.step';
 import { CheckoutSagaController } from './interface/checkout-saga.controller';
 
 /**
- * Wires the v2 checkout saga into the app. A leaf module — nothing here is
- * exported, since nothing outside this feature needs to reach into it.
+ * Wires the v2 checkout saga into the app. Exports exactly one thing,
+ * `CheckoutSagaRunner` (T-03-01): the mobile cashier path must run the same
+ * saga as the web controller, and the runner is the only door into it — the
+ * steps and the orchestrator stay private, so no caller can assemble its own
+ * partial step list.
+ *
+ * Exporting it adds no new cycle: `PosModule` ↔ this module is already the
+ * forwardRef pair described below, and `PosModule` does not inject the
+ * runner. A future importer (MobileModule) must not itself be imported by
+ * anything this module imports, or it joins that cycle.
  *
  * `StockLedgerModule` is not used by any provider yet (that lands in UOW-03)
  * but is imported now so that `pos.module.ts` — the one existing file this
@@ -106,6 +115,7 @@ import { CheckoutSagaController } from './interface/checkout-saga.controller';
     { provide: CHECKOUT_FAILURE_RECORDER, useClass: CheckoutSagaFailureRecorder },
     { provide: CHECKOUT_WS_EMITTER, useClass: CheckoutWsNotifier },
     CheckoutSagaOrchestrator,
+    CheckoutSagaRunner,
     LoadDraftStep,
     EvaluatePromotionStep,
     ClampPointsStep,
@@ -127,5 +137,6 @@ import { CheckoutSagaController } from './interface/checkout-saga.controller';
     EnqueueOutboxStep,
     CloseSagaStep,
   ],
+  exports: [CheckoutSagaRunner],
 })
 export class CheckoutSagaModule {}

@@ -80,6 +80,9 @@ export interface SalesOrderView {
   cancelReason: string | null;
   /** Điểm tích luỹ DỰ KIẾN dùng — chưa trừ; thu ngân chốt lúc *Nhận xử lý*. */
   pointsRedeemed: number;
+  /** Lựa chọn CTKM của tư vấn (ADR-52) — app nạp lại khi sửa đơn. */
+  selectedProgramIds: string[];
+  excludedProgramIds: string[];
   /** Hoá đơn nháp do `approve` tạo (ADR-32); null khi chưa nhận xử lý. */
   invoiceId: string | null;
   invoiceCode: string | null;
@@ -142,6 +145,9 @@ export class SalesOrderService {
         // `update` thay TRỌN đơn, và một con số điểm sống sót qua một lượt sửa
         // không nhắc tới nó là một ưu đãi không ai còn nhớ đã đặt.
         pointsRedeemed: dto.pointsRedeemed ?? 0,
+        // Cùng luật "thay TRỌN": vắng khoá = không chọn gì, không giữ lựa chọn cũ.
+        selectedProgramIds: dto.selectedProgramIds ?? [],
+        excludedProgramIds: dto.excludedProgramIds ?? [],
         ...prepared.totals,
       });
       const persisted = await manager.save(SalesOrderEntity, order);
@@ -198,6 +204,9 @@ export class SalesOrderService {
         // `update` thay TRỌN đơn, và một con số điểm sống sót qua một lượt sửa
         // không nhắc tới nó là một ưu đãi không ai còn nhớ đã đặt.
         pointsRedeemed: dto.pointsRedeemed ?? 0,
+        // Cùng luật "thay TRỌN": vắng khoá = không chọn gì, không giữ lựa chọn cũ.
+        selectedProgramIds: dto.selectedProgramIds ?? [],
+        excludedProgramIds: dto.excludedProgramIds ?? [],
         ...prepared.totals,
       });
     });
@@ -394,9 +403,12 @@ export class SalesOrderService {
           unit: line.unit,
           quantity: Number(line.quantity),
           unitPrice: Number(line.unitPrice),
-          // Giảm tay + khuyến mại đã chốt trên đơn → một khoản giảm dòng của hoá đơn.
-          lineDiscount: Number(line.manualDiscount) + Number(line.promotionDiscount),
-          lineDiscountReason: [line.promotionName, line.manualDiscountReason].filter(Boolean).join(' · ') || undefined,
+          // CHỈ giảm tay (ADR-50). Checkout saga coi `lineDiscount` là giảm tay
+          // rồi tự chạy engine KM lại lúc thu; gộp KM của đơn vào đây là trừ KM
+          // hai lần (A-87). KM của đơn chỉ còn là con số tư vấn XEM lúc lập đơn —
+          // lựa chọn CTKM đi theo đơn qua `selected/excludedProgramIds`.
+          lineDiscount: Number(line.manualDiscount),
+          lineDiscountReason: line.manualDiscountReason || undefined,
           note: line.note ?? undefined,
           sortOrder: index,
         })),
@@ -626,6 +638,8 @@ export class SalesOrderService {
       discount: Number(order.discount),
       amountDue: Number(order.amountDue),
       pointsRedeemed: Number(order.pointsRedeemed ?? 0),
+      selectedProgramIds: order.selectedProgramIds ?? [],
+      excludedProgramIds: order.excludedProgramIds ?? [],
       note: order.note,
       rejectReason: order.rejectReason,
       cancelReason: order.cancelReason,

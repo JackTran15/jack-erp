@@ -103,6 +103,22 @@ export class CreateSalesOrderDto {
   @MaxLength(1000)
   note?: string;
 
+  /**
+   * CTKM tư vấn bật thêm (ADR-52). Cùng validator với `CheckoutV2Dto` của saga,
+   * vì đây chính là thứ sẽ được gửi sang saga lúc thu. Vắng = `[]`: `PATCH` thay
+   * TRỌN đơn, như `pointsRedeemed`.
+   */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  selectedProgramIds?: string[];
+
+  /** CTKM tư vấn gỡ khỏi đơn — thắng `selectedProgramIds` khi trùng (luật của engine). */
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  excludedProgramIds?: string[];
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SalesOrderLineDto)

@@ -19,28 +19,7 @@ import { RequirePermission, RequireBranchScope } from '../../../auth/decorators'
 import { PermissionGuard } from '../../../rbac/permission.guard';
 import { BranchScopeGuard } from '../../../rbac/branch-scope.guard';
 import { AuditInterceptor } from '../../../crud/audit.interceptor';
-import { CheckoutSagaOrchestrator } from '../application/checkout-saga.orchestrator';
-import { CheckoutContext, CheckoutStep, CheckoutTrace } from '../application/checkout-step';
-import { LoadDraftStep } from '../application/steps/load-draft.step';
-import { EvaluatePromotionStep } from '../application/steps/evaluate-promotion.step';
-import { ClampPointsStep } from '../application/steps/clamp-points.step';
-import { ResolveAccountsStep } from '../application/steps/resolve-accounts.step';
-import { ResolveFundsStep } from '../application/steps/resolve-funds.step';
-import { ComputeTotalsStep } from '../application/steps/compute-totals.step';
-import { OpenSagaStep } from '../application/steps/open-saga.step';
-import { LockInvoiceStep } from '../application/steps/lock-invoice.step';
-import { NextDocumentNumberStep } from '../application/steps/next-document-number.step';
-import { RedeemVoucherStep } from '../application/steps/redeem-voucher.step';
-import { PersistInvoiceStep } from '../application/steps/persist-invoice.step';
-import { PersistPaymentsStep } from '../application/steps/persist-payments.step';
-import { CreateDebtStep } from '../application/steps/create-debt.step';
-import { RedeemPointsStep } from '../application/steps/redeem-points.step';
-import { DeductStockStep } from '../application/steps/deduct-stock.step';
-import { PostJournalStep } from '../application/steps/post-journal.step';
-import { PostCashStep } from '../application/steps/post-cash.step';
-import { PostDepositStep } from '../application/steps/post-deposit.step';
-import { EnqueueOutboxStep } from '../application/steps/enqueue-outbox.step';
-import { CloseSagaStep } from '../application/steps/close-saga.step';
+import { CheckoutSagaRunner } from '../application/checkout-saga.runner';
 import { CheckoutSagaEntity } from '../infrastructure/checkout-saga.entity';
 import { CheckoutSagaStepEntity } from '../infrastructure/checkout-saga-step.entity';
 import { CheckoutV2Dto } from './dto/checkout-v2.dto';
@@ -54,6 +33,11 @@ import { CheckoutV2Dto } from './dto/checkout-v2.dto';
  * `orchestrator.run` only ever sees the steps actually wired at each slice,
  * so its absence here is not a gap to fill, it is this slice's honest scope.
  * Steps 14-18 (inline stock/GL/cash/deposit, outbox) landed in T-03-06.
+ *
+ * The step list and the run itself live in `CheckoutSagaRunner` (T-03-01) so
+ * the mobile cashier path runs the exact same saga; this controller only owns
+ * the HTTP contract — route, permission, and how headers become the
+ * idempotency key and correlation id.
  */
 @ApiTags('pos-checkout-v2')
 @Controller('pos/checkout')
@@ -62,27 +46,7 @@ import { CheckoutV2Dto } from './dto/checkout-v2.dto';
 @RequireBranchScope()
 export class CheckoutSagaController {
   constructor(
-    private readonly orchestrator: CheckoutSagaOrchestrator,
-    private readonly loadDraft: LoadDraftStep,
-    private readonly evaluatePromotion: EvaluatePromotionStep,
-    private readonly resolveAccounts: ResolveAccountsStep,
-    private readonly resolveFunds: ResolveFundsStep,
-    private readonly clampPoints: ClampPointsStep,
-    private readonly computeTotals: ComputeTotalsStep,
-    private readonly openSaga: OpenSagaStep,
-    private readonly lockInvoice: LockInvoiceStep,
-    private readonly nextDocumentNumber: NextDocumentNumberStep,
-    private readonly redeemVoucher: RedeemVoucherStep,
-    private readonly persistInvoice: PersistInvoiceStep,
-    private readonly persistPayments: PersistPaymentsStep,
-    private readonly createDebt: CreateDebtStep,
-    private readonly redeemPoints: RedeemPointsStep,
-    private readonly deductStock: DeductStockStep,
-    private readonly postJournal: PostJournalStep,
-    private readonly postCash: PostCashStep,
-    private readonly postDeposit: PostDepositStep,
-    private readonly enqueueOutbox: EnqueueOutboxStep,
-    private readonly closeSaga: CloseSagaStep,
+    private readonly runner: CheckoutSagaRunner,
     @InjectRepository(CheckoutSagaEntity)
     private readonly sagaRepo: Repository<CheckoutSagaEntity>,
     @InjectRepository(CheckoutSagaStepEntity)
@@ -104,33 +68,11 @@ export class CheckoutSagaController {
     const idempotencyKey = idempotencyKeyHeader || dto.invoiceId;
     const correlationId = requestId ?? idempotencyKey;
 
-    const ctx: CheckoutContext = {
+    return this.runner.run(
+      dto,
+      { idempotencyKey, correlationId, dryRun: dto.dryRun === true },
       actor,
-      input: dto,
-      correlationId,
-      idempotencyKey,
-      dryRun: dto.dryRun === true,
-    };
-    const trace = new CheckoutTrace();
-    const steps = this.allSteps();
-
-    await this.orchestrator.run(steps, ctx, trace, steps.length);
-
-    return {
-      committed: !ctx.dryRun,
-      invoiceId: ctx.invoice?.id,
-      sagaId: ctx.sagaId,
-      documentNumber: ctx.documentNumber,
-      totals: ctx.totals,
-      appliedPrograms: ctx.promotion?.appliedPrograms ?? [],
-      steps: trace.entries.map((entry) => ({
-        seq: entry.seq,
-        name: entry.name,
-        phase: entry.phase,
-        status: entry.status,
-        durationMs: entry.durationMs,
-      })),
-    };
+    );
   }
 
   @Get('sagas/:id')
@@ -156,35 +98,5 @@ export class CheckoutSagaController {
     });
 
     return { saga, steps };
-  }
-
-  /**
-   * Registration order === execution order (the orchestrator does not
-   * reorder). All 20 steps are now wired — never renumber a step already
-   * here so the trail stays comparable across slices.
-   */
-  private allSteps(): CheckoutStep[] {
-    return [
-      this.loadDraft,
-      this.evaluatePromotion,
-      this.resolveAccounts,
-      this.resolveFunds,
-      this.clampPoints,
-      this.computeTotals,
-      this.openSaga,
-      this.lockInvoice,
-      this.nextDocumentNumber,
-      this.redeemVoucher,
-      this.persistInvoice,
-      this.persistPayments,
-      this.createDebt,
-      this.redeemPoints,
-      this.deductStock,
-      this.postJournal,
-      this.postCash,
-      this.postDeposit,
-      this.enqueueOutbox,
-      this.closeSaga,
-    ];
   }
 }
