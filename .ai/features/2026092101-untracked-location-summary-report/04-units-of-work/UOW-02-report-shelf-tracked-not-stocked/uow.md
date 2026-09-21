@@ -52,7 +52,7 @@ rollback: revert the one commit — `sb.quantity > 0` returns to the resolver an
 
 ## Definition of done
 
-- [ ] AC-06, AC-07 pass end-to-end (`revenue-detail-location-tracked-empty.e2e-spec.ts` green)
-- [ ] AC-08 pinned by the resolver unit spec (shared function, same arguments in all four callers)
-- [ ] Existing resolver spec cases AC-01..06 / AC-14 / AC-16 / A-06 / A-08 / A-11 of `2026091002` still green unchanged
+- [x] AC-06, AC-07 pass end-to-end (`revenue-detail-location-tracked-empty.e2e-spec.ts` green)
+- [x] AC-08 pinned by the resolver unit spec (shared function, same arguments in all four callers)
+- [x] Existing resolver spec cases AC-01..06 / AC-14 / AC-16 / A-06 / A-08 / A-11 of `2026091002` still green unchanged (assertions untouched; their `balances` fixture rows gained the now-required `quantity: 1`)
 - [ ] Demoed and accepted at gate G4

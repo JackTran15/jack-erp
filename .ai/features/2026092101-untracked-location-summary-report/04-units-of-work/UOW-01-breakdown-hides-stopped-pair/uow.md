@@ -50,7 +50,7 @@ rollback: revert the one commit — the ledger arm of `cells` loses its `NOT EXI
 
 ## Definition of done
 
-- [ ] AC-01..05 pass (e2e `sku-breakdown-untracked.e2e-spec.ts` green)
-- [ ] `pnpm --filter @erp/api test -- stock-summary-detail.service.spec.ts` green, including the existing `getLedgerCard` cases
-- [ ] `getLedgerCard` untouched (diff confined to the `cells` CTE and the new spec/e2e files)
+- [x] AC-01..05 pass (e2e `sku-breakdown-untracked.e2e-spec.ts` green)
+- [x] `pnpm --filter @erp/api test -- stock-summary-detail.service.spec.ts` green, including the existing `getLedgerCard` cases
+- [x] `getLedgerCard` untouched (diff confined to the `cells` CTE and the new spec/e2e files)
 - [ ] Demoed and accepted at gate G4
