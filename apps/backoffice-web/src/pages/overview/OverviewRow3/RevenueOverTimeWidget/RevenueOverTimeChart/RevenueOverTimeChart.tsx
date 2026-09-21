@@ -11,7 +11,7 @@ import {
 } from "../../../_lib/echarts/baseOption";
 import type { Granularity } from "../../../_lib/granularity";
 import { timeAxisRotate, timeAxisTitle } from "../../../_lib/timeBuckets";
-import type { RevenuePoint } from "../../../_mock/revenueOverTime.mock";
+import type { RevenuePoint } from "../../../_api/overview.interface";
 
 /** Chia triệu — trục Y ghi "Số tiền (triệu)". */
 const DIVISOR = 1_000_000;

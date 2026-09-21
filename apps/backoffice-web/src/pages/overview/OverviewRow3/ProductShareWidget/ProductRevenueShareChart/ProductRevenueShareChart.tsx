@@ -3,7 +3,7 @@ import type { EChartsOption } from "echarts";
 import { EChart } from "../../../_lib/echarts/EChart";
 import { CHART_COLOR, PIE_COLORS, TOOLTIP } from "../../../_lib/echarts/baseOption";
 import { formatViNumber } from "../../../_lib/format";
-import type { ShareSlice } from "../../../_mock/productShare.mock";
+import type { ShareSlice } from "../../../_api/overview.interface";
 import { PieLegend } from "./PieLegend/PieLegend";
 
 /** Lát nhỏ hơn mức này thì ẩn nhãn % cho khỏi chồng chữ. */

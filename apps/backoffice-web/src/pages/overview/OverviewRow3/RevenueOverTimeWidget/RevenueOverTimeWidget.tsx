@@ -17,9 +17,11 @@ import {
 } from "../../_lib/granularity";
 import type { OverviewPeriod } from "../../_lib/period";
 import { useOverviewScope } from "../../_lib/useOverviewScope";
-import { fetchProductProfit } from "../../_mock/productProfit.mock";
-import { fetchRevenueCostProfitTime } from "../../_mock/revenueCostProfitTime.mock";
-import { fetchRevenueOverTime } from "../../_mock/revenueOverTime.mock";
+import {
+  fetchProductProfit,
+  fetchRevenueCostProfitTime,
+  fetchRevenueOverTime,
+} from "../../_api/overview.api";
 import { ChartWidgetPanel } from "../../ChartWidgetPanel/ChartWidgetPanel";
 import { HeaderPeriodSelect } from "../../ChartWidgetPanel/WidgetHeader/HeaderPeriodSelect/HeaderPeriodSelect";
 import { WidgetTypeSelect } from "../../ChartWidgetPanel/WidgetHeader/WidgetTypeSelect/WidgetTypeSelect";
@@ -90,7 +92,7 @@ export function RevenueOverTimeWidget() {
     queryKey: ["overview", "revenue-over-time", scope.key, state.granularity, state.period],
     queryFn: () =>
       fetchRevenueOverTime({
-        scopeKey: scope.key,
+        branchIds: scope.branchIds,
         period: state.period,
         granularity: state.granularity,
       }),
@@ -110,7 +112,7 @@ export function RevenueOverTimeWidget() {
     ],
     queryFn: () =>
       fetchProductProfit({
-        scopeKey: scope.key,
+        branchIds: scope.branchIds,
         period: state.period,
         granularity: state.granularity,
         productGroupIds: state.productGroupIds,
@@ -130,7 +132,7 @@ export function RevenueOverTimeWidget() {
     ],
     queryFn: () =>
       fetchRevenueCostProfitTime({
-        scopeKey: scope.key,
+        branchIds: scope.branchIds,
         period: state.period,
         granularity: state.granularity,
       }),

@@ -1,6 +1,6 @@
 import { cn } from "@erp/ui";
 import { ChevronRight } from "lucide-react";
-import type { DailyActivityCardData } from "../../_mock/dailyActivity.mock";
+import type { DailyActivityCardData } from "../../_api/overview.interface";
 import { formatViNumber } from "../../_lib/format";
 import { DailyActivityRow } from "./DailyActivityRow/DailyActivityRow";
 

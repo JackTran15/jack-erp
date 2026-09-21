@@ -7876,6 +7876,15 @@
             }
           },
           {
+            "name": "defaultReceivingOnly",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy kho nhập mặc định của chi nhánh (storages.is_default_receiving).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "locationIsActive",
             "required": false,
             "in": "query",
@@ -27087,6 +27096,617 @@
         "summary": "Lệnh điều chuyển đang chờ cửa hàng hiện tại nhập, phân trang",
         "tags": [
           "mobile"
+        ]
+      }
+    },
+    "/reports/overview/daily-activity": {
+      "get": {
+        "operationId": "OverviewReportController_getDailyActivity",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewDailyActivityResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hoạt động trong kỳ: tiền thu, doanh thu đã/chưa thanh toán, hoá đơn huỷ",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/revenue-cost-profit": {
+      "get": {
+        "operationId": "OverviewReportController_getRevenueCostProfit",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewRevenueCostProfitResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu, chi phí, lợi nhuận theo cửa hàng (công thức KQKD)",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/cash-flow": {
+      "get": {
+        "operationId": "OverviewReportController_getCashFlow",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "unit",
+            "required": true,
+            "in": "query",
+            "description": "BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "weekday",
+                "day",
+                "week",
+                "month",
+                "year"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewCashFlowResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thu/chi quỹ tiền mặt theo mốc thời gian",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/revenue-timeline": {
+      "get": {
+        "operationId": "OverviewReportController_getRevenueTimeline",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "unit",
+            "required": true,
+            "in": "query",
+            "description": "BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "weekday",
+                "day",
+                "week",
+                "month",
+                "year"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewRevenueTimelineResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu theo mốc thời gian",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/revenue-cost-profit-timeline": {
+      "get": {
+        "operationId": "OverviewReportController_getRevenueCostProfitTimeline",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewRevenueCostProfitTimelineResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu, chi phí, lợi nhuận theo tháng (công thức KQKD)",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/product-profit": {
+      "get": {
+        "operationId": "OverviewReportController_getProductProfit",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "unit",
+            "required": true,
+            "in": "query",
+            "description": "BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "hour",
+                "weekday",
+                "day",
+                "week",
+                "month",
+                "year"
+              ]
+            }
+          },
+          {
+            "name": "categoryIds",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "productIds",
+            "required": false,
+            "in": "query",
+            "description": "Mẫu mã (`products.id`).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "itemIds",
+            "required": false,
+            "in": "query",
+            "description": "Hàng hoá (`items.id`).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewProductProfitResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu, giá vốn, lợi nhuận hàng hoá theo mốc thời gian",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/product-share": {
+      "get": {
+        "operationId": "OverviewReportController_getProductShare",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "description": "Mẫu mã (`products.id`).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "dimension",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "product_group",
+                "variant",
+                "product"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewSubjectListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Doanh thu gộp theo nhóm hàng / mẫu mã / hàng hoá",
+        "tags": [
+          "reports-overview"
+        ]
+      }
+    },
+    "/reports/overview/top-products": {
+      "get": {
+        "operationId": "OverviewReportController_getTopProducts",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày.",
+            "schema": {
+              "example": "2026-09-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó.",
+            "schema": {
+              "example": "2026-09-30",
+              "type": "string"
+            }
+          },
+          {
+            "name": "branchIds",
+            "required": false,
+            "in": "query",
+            "description": "Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          {
+            "name": "categoryId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": false,
+            "in": "query",
+            "description": "Mẫu mã (`products.id`).",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "sortBy",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "revenue",
+                "quantity"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OverviewSubjectListResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Hàng hoá bán chạy theo doanh thu hoặc số lượng",
+        "tags": [
+          "reports-overview"
         ]
       }
     },
@@ -53983,6 +54603,356 @@
           "total",
           "page",
           "limit"
+        ]
+      },
+      "OverviewCashInDto": {
+        "type": "object",
+        "properties": {
+          "sales": {
+            "description": "Thanh toán trên hoá đơn trong kỳ (RETURN âm) — `SALES_PAYMENTS_SQL`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobilePaymentSplitDto"
+              }
+            ]
+          },
+          "debt": {
+            "description": "Thu nợ sau bán theo `paid_at` — `DEBT_PAYMENTS_SQL`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobilePaymentSplitDto"
+              }
+            ]
+          },
+          "other": {
+            "description": "Thu khác: phiếu thu tiền mặt (→ `cash`) và tiền gửi (→ `transfer`) POSTED, vế \"thu khác\" của KQKD.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MobilePaymentSplitDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sales",
+          "debt",
+          "other"
+        ]
+      },
+      "OverviewRevenueSplitDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "invoiceCount": {
+            "type": "number"
+          },
+          "paidAmount": {
+            "type": "number"
+          },
+          "paidCount": {
+            "type": "number"
+          },
+          "unpaidAmount": {
+            "type": "number"
+          },
+          "unpaidCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "total",
+          "invoiceCount",
+          "paidAmount",
+          "paidCount",
+          "unpaidAmount",
+          "unpaidCount"
+        ]
+      },
+      "OverviewCancelledDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "amount"
+        ]
+      },
+      "OverviewDailyActivityResponseDto": {
+        "type": "object",
+        "properties": {
+          "cashIn": {
+            "$ref": "#/components/schemas/OverviewCashInDto"
+          },
+          "revenue": {
+            "description": "Doanh thu trên CTE `lines` (loại huỷ, nháp), tách đã/chưa thanh toán — như chi tiết cửa hàng mobile.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OverviewRevenueSplitDto"
+              }
+            ]
+          },
+          "cancelled": {
+            "$ref": "#/components/schemas/OverviewCancelledDto"
+          }
+        },
+        "required": [
+          "cashIn",
+          "revenue",
+          "cancelled"
+        ]
+      },
+      "OverviewResultTotalsDto": {
+        "type": "object",
+        "properties": {
+          "revenue": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "revenue",
+          "cost",
+          "profit"
+        ]
+      },
+      "OverviewStoreResultDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "branchId",
+          "name",
+          "revenue",
+          "cost",
+          "profit"
+        ]
+      },
+      "OverviewRevenueCostProfitResponseDto": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "$ref": "#/components/schemas/OverviewResultTotalsDto"
+          },
+          "stores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewStoreResultDto"
+            }
+          }
+        },
+        "required": [
+          "totals",
+          "stores"
+        ]
+      },
+      "OverviewCashFlowPointDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "cashIn": {
+            "type": "number"
+          },
+          "cashOut": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bucket",
+          "cashIn",
+          "cashOut"
+        ]
+      },
+      "OverviewCashFlowResponseDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewCashFlowPointDto"
+            }
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "OverviewRevenuePointDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bucket",
+          "revenue"
+        ]
+      },
+      "OverviewRevenueTimelineResponseDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewRevenuePointDto"
+            }
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "OverviewResultPointDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string",
+            "description": "Đầu tháng `yyyy-MM-01T00:00:00` — client tự gộp quý/năm."
+          },
+          "revenue": {
+            "type": "number"
+          },
+          "cost": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bucket",
+          "revenue",
+          "cost",
+          "profit"
+        ]
+      },
+      "OverviewRevenueCostProfitTimelineResponseDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewResultPointDto"
+            }
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "OverviewProductProfitPointDto": {
+        "type": "object",
+        "properties": {
+          "bucket": {
+            "type": "string"
+          },
+          "revenue": {
+            "type": "number"
+          },
+          "cogs": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "bucket",
+          "revenue",
+          "cogs",
+          "profit"
+        ]
+      },
+      "OverviewProductProfitResponseDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewProductProfitPointDto"
+            }
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "OverviewSubjectRowDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "revenue": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "unit",
+          "quantity",
+          "revenue"
+        ]
+      },
+      "OverviewSubjectListResponseDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewSubjectRowDto"
+            }
+          }
+        },
+        "required": [
+          "rows"
         ]
       },
       "SalesOrderLineDto": {

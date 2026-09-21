@@ -11,7 +11,7 @@ import {
 } from "../../../_lib/echarts/baseOption";
 import type { TimeBucketGranularity } from "../../../_lib/timeBuckets";
 import { timeAxisTitle } from "../../../_lib/timeBuckets";
-import type { CashFlowPoint } from "../../../_mock/cashFlow.mock";
+import type { CashFlowPoint } from "../../../_api/overview.interface";
 
 const DIVISOR = 1000;
 

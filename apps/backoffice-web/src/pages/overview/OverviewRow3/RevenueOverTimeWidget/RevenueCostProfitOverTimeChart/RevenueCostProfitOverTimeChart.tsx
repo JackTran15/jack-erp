@@ -9,7 +9,7 @@ import {
   xAxis,
   yAxis,
 } from "../../../_lib/echarts/baseOption";
-import type { RevenueCostProfitPoint } from "../../../_mock/revenueCostProfitTime.mock";
+import type { RevenueCostProfitPoint } from "../../../_api/overview.interface";
 
 const DIVISOR = 1_000_000;
 

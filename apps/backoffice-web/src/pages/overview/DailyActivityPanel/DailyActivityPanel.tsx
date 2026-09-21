@@ -6,7 +6,7 @@ import { BREAKDOWN_CONFIG } from "./_breakdownConfig";
 import {
   DAILY_ACTIVITY_PLACEHOLDER,
   fetchDailyActivity,
-} from "../_mock/dailyActivity.mock";
+} from "../_api/overview.api";
 import { DailyActivityCard } from "./DailyActivityCard/DailyActivityCard";
 import { DailyActivityHeader } from "./DailyActivityHeader/DailyActivityHeader";
 
@@ -16,7 +16,7 @@ export function DailyActivityPanel() {
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["overview", "daily-activity", scope.key],
-    queryFn: () => fetchDailyActivity(scope.key),
+    queryFn: () => fetchDailyActivity(scope.branchIds),
   });
 
   // `key` của card/dòng đang mở modal. State phù du của panel nên không đưa vào store.

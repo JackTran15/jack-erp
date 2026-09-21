@@ -9,7 +9,7 @@ import {
   xAxis,
   yAxis,
 } from "../../../_lib/echarts/baseOption";
-import type { StoreRevenuePoint } from "../../../_mock/revenueCostProfit.mock";
+import type { StoreRevenuePoint } from "../../../_api/overview.interface";
 
 /** Chia nghìn — trục Y ghi "Số tiền (K)". */
 const DIVISOR = 1000;

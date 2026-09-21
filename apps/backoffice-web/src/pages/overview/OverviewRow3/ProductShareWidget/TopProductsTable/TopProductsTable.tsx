@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { formatViNumber } from "../../../_lib/format";
-import type { TopProductRow } from "../../../_mock/topProducts.mock";
+import type { TopProductRow } from "../../../_api/overview.interface";
 
 const COLUMNS = "grid-cols-[minmax(0,1fr)_128px_104px_120px]";
 

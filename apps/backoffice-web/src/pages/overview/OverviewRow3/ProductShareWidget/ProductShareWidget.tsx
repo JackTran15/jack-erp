@@ -1,12 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { TOP_PRODUCTS_LIMIT } from "../../../../store/page-stores/overview/overview.constant";
 import type { ProductShareReport } from "../../../../store/page-stores/overview/overview.interface";
 import { useOverviewStore } from "../../../../store/page-stores/overview/overview.store";
 import { PRODUCT_SHARE_PERIODS } from "../../_lib/period";
-import { useCategoryOptions } from "../../_lib/useCategoryOptions";
 import { useOverviewScope } from "../../_lib/useOverviewScope";
-import { fetchProductShare } from "../../_mock/productShare.mock";
-import { fetchTopProducts } from "../../_mock/topProducts.mock";
+import { fetchProductShare, fetchTopProducts } from "../../_api/overview.api";
 import { ChartWidgetPanel } from "../../ChartWidgetPanel/ChartWidgetPanel";
 import { HeaderPeriodSelect } from "../../ChartWidgetPanel/WidgetHeader/HeaderPeriodSelect/HeaderPeriodSelect";
 import { WidgetTypeSelect } from "../../ChartWidgetPanel/WidgetHeader/WidgetTypeSelect/WidgetTypeSelect";
@@ -30,8 +29,6 @@ export function ProductShareWidget() {
   const [hiddenKeys, setHiddenKeys] = useState<string[]>([]);
 
   const isTable = state.reportType === "top_products";
-  // Nhãn nhóm gốc dùng làm lát pie khi "Thống kê theo" = Nhóm hàng hóa.
-  const categories = useCategoryOptions(true);
 
   const shareQuery = useQuery({
     queryKey: [
@@ -43,13 +40,11 @@ export function ProductShareWidget() {
       state.variantId,
       state.displayMode,
       state.period,
-      categories.rootLabels.length,
     ],
     queryFn: () =>
       fetchProductShare({
-        scopeKey: scope.key,
+        branchIds: scope.branchIds,
         dimension: state.dimension,
-        categoryLabels: categories.rootLabels,
         categoryKey: state.categoryId,
         variantKey: state.variantId,
         displayMode: state.displayMode,
@@ -71,12 +66,13 @@ export function ProductShareWidget() {
     ],
     queryFn: () =>
       fetchTopProducts({
-        scopeKey: scope.key,
+        branchIds: scope.branchIds,
         categoryKey: state.categoryId,
         variantKey: state.variantId,
         displayMode: state.displayMode,
         period: state.period,
         sortBy: state.sortBy,
+        limit: TOP_PRODUCTS_LIMIT,
       }),
     enabled: isTable,
   });

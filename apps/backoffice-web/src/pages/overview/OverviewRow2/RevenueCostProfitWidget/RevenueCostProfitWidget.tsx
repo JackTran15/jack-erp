@@ -4,7 +4,7 @@ import { useOverviewStore } from "../../../../store/page-stores/overview/overvie
 import { CHART_COLOR } from "../../_lib/echarts/baseOption";
 import { REVENUE_WIDGET_PERIODS } from "../../_lib/period";
 import { useOverviewScope } from "../../_lib/useOverviewScope";
-import { fetchRevenueCostProfit } from "../../_mock/revenueCostProfit.mock";
+import { fetchRevenueCostProfit } from "../../_api/overview.api";
 import { ChartWidgetPanel } from "../../ChartWidgetPanel/ChartWidgetPanel";
 import { HeaderPeriodSelect } from "../../ChartWidgetPanel/WidgetHeader/HeaderPeriodSelect/HeaderPeriodSelect";
 import { SummaryStatChipGroup } from "../../SummaryStatChipGroup/SummaryStatChipGroup";
@@ -24,8 +24,7 @@ export function RevenueCostProfitWidget() {
     queryKey: ["overview", "revenue-cost-profit", scope.key, period],
     queryFn: () =>
       fetchRevenueCostProfit({
-        scopeKey: scope.key,
-        scopeLabel: scope.label,
+        branchIds: scope.branchIds,
         period,
       }),
   });

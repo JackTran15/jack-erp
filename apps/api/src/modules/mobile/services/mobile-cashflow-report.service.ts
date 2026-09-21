@@ -57,7 +57,7 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
  * `m.type` là enum Postgres nên so với literal `'TRANSFER'`, không bind
  * `$n::text` — cùng cách `CashLedgerService` viết.
  */
-const LEGS_CTE = `
+export const LEGS_CTE = `
   WITH legs AS (
     SELECT ca.branch_id,
            m.id                                    AS movement_id,

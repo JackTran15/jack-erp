@@ -43,7 +43,7 @@ interface CountRow {
   count: number;
 }
 
-interface PaymentRow {
+export interface PaymentRow {
   method: string;
   amount: number;
 }
@@ -189,7 +189,7 @@ export class MobileStoreDetailService {
 }
 
 /** Doanh thu tách theo trạng thái thanh toán — trên CTE `lines`. */
-function revenueSql(lines: string): string {
+export function revenueSql(lines: string): string {
   return `
     WITH ${lines}
     SELECT
@@ -224,7 +224,7 @@ const CANCELLED_SQL = `
  * TRẢ khách nên mang dấu âm; EXCHANGE giữ dấu dương (khách bù thêm) — chép
  * `invoiceTypeSign` của web. Lọc org/chi nhánh qua `invoices` (xem doc class).
  */
-const SALES_PAYMENTS_SQL = `
+export const SALES_PAYMENTS_SQL = `
   SELECT
     p.payment_method::text AS method,
     COALESCE(SUM(p.amount * CASE WHEN i.type = '${InvoiceType.RETURN}' THEN -1 ELSE 1 END), 0)::float AS amount
@@ -240,7 +240,7 @@ const SALES_PAYMENTS_SQL = `
 `;
 
 /** Thu nợ sau bán trong kỳ, theo phương thức — mốc là `paid_at`, không phải ngày hoá đơn. */
-const DEBT_PAYMENTS_SQL = `
+export const DEBT_PAYMENTS_SQL = `
   SELECT
     d.payment_method::text AS method,
     COALESCE(SUM(d.amount), 0)::float AS amount
@@ -309,7 +309,7 @@ function newCustomerTotalsSql(lines: string): string {
  * Gộp các dòng `(method, amount)` về ba ô. Phương thức lạ (enum mở rộng sau
  * này) bị BỎ QUA chứ không ném: tổng thiếu một ô còn hơn màn hình trắng.
  */
-function splitOf(rows: PaymentRow[]): MobilePaymentSplitDto {
+export function splitOf(rows: PaymentRow[]): MobilePaymentSplitDto {
   const split: MobilePaymentSplitDto = { cash: 0, card: 0, transfer: 0 };
   for (const row of rows) {
     const amount = round2(row.amount);

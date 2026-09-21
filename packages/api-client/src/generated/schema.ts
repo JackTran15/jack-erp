@@ -9159,6 +9159,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports/overview/daily-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hoạt động trong kỳ: tiền thu, doanh thu đã/chưa thanh toán, hoá đơn huỷ */
+        get: operations["OverviewReportController_getDailyActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/revenue-cost-profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu, chi phí, lợi nhuận theo cửa hàng (công thức KQKD) */
+        get: operations["OverviewReportController_getRevenueCostProfit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/cash-flow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thu/chi quỹ tiền mặt theo mốc thời gian */
+        get: operations["OverviewReportController_getCashFlow"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/revenue-timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu theo mốc thời gian */
+        get: operations["OverviewReportController_getRevenueTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/revenue-cost-profit-timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu, chi phí, lợi nhuận theo tháng (công thức KQKD) */
+        get: operations["OverviewReportController_getRevenueCostProfitTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/product-profit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu, giá vốn, lợi nhuận hàng hoá theo mốc thời gian */
+        get: operations["OverviewReportController_getProductProfit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/product-share": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Doanh thu gộp theo nhóm hàng / mẫu mã / hàng hoá */
+        get: operations["OverviewReportController_getProductShare"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/overview/top-products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Hàng hoá bán chạy theo doanh thu hoặc số lượng */
+        get: operations["OverviewReportController_getTopProducts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/sales-orders": {
         parameters: {
             query?: never;
@@ -18645,6 +18781,93 @@ export interface components {
             page: number;
             limit: number;
         };
+        OverviewCashInDto: {
+            /** @description Thanh toán trên hoá đơn trong kỳ (RETURN âm) — `SALES_PAYMENTS_SQL`. */
+            sales: components["schemas"]["MobilePaymentSplitDto"];
+            /** @description Thu nợ sau bán theo `paid_at` — `DEBT_PAYMENTS_SQL`. */
+            debt: components["schemas"]["MobilePaymentSplitDto"];
+            /** @description Thu khác: phiếu thu tiền mặt (→ `cash`) và tiền gửi (→ `transfer`) POSTED, vế "thu khác" của KQKD. */
+            other: components["schemas"]["MobilePaymentSplitDto"];
+        };
+        OverviewRevenueSplitDto: {
+            total: number;
+            invoiceCount: number;
+            paidAmount: number;
+            paidCount: number;
+            unpaidAmount: number;
+            unpaidCount: number;
+        };
+        OverviewCancelledDto: {
+            count: number;
+            amount: number;
+        };
+        OverviewDailyActivityResponseDto: {
+            cashIn: components["schemas"]["OverviewCashInDto"];
+            /** @description Doanh thu trên CTE `lines` (loại huỷ, nháp), tách đã/chưa thanh toán — như chi tiết cửa hàng mobile. */
+            revenue: components["schemas"]["OverviewRevenueSplitDto"];
+            cancelled: components["schemas"]["OverviewCancelledDto"];
+        };
+        OverviewResultTotalsDto: {
+            revenue: number;
+            cost: number;
+            profit: number;
+        };
+        OverviewStoreResultDto: {
+            branchId: string;
+            name: string;
+            revenue: number;
+            cost: number;
+            profit: number;
+        };
+        OverviewRevenueCostProfitResponseDto: {
+            totals: components["schemas"]["OverviewResultTotalsDto"];
+            stores: components["schemas"]["OverviewStoreResultDto"][];
+        };
+        OverviewCashFlowPointDto: {
+            bucket: string;
+            cashIn: number;
+            cashOut: number;
+        };
+        OverviewCashFlowResponseDto: {
+            points: components["schemas"]["OverviewCashFlowPointDto"][];
+        };
+        OverviewRevenuePointDto: {
+            bucket: string;
+            revenue: number;
+        };
+        OverviewRevenueTimelineResponseDto: {
+            points: components["schemas"]["OverviewRevenuePointDto"][];
+        };
+        OverviewResultPointDto: {
+            /** @description Đầu tháng `yyyy-MM-01T00:00:00` — client tự gộp quý/năm. */
+            bucket: string;
+            revenue: number;
+            cost: number;
+            profit: number;
+        };
+        OverviewRevenueCostProfitTimelineResponseDto: {
+            points: components["schemas"]["OverviewResultPointDto"][];
+        };
+        OverviewProductProfitPointDto: {
+            bucket: string;
+            revenue: number;
+            cogs: number;
+            profit: number;
+        };
+        OverviewProductProfitResponseDto: {
+            points: components["schemas"]["OverviewProductProfitPointDto"][];
+        };
+        OverviewSubjectRowDto: {
+            id: string;
+            code: string;
+            name: string;
+            unit: string;
+            quantity: number;
+            revenue: number;
+        };
+        OverviewSubjectListResponseDto: {
+            rows: components["schemas"]["OverviewSubjectRowDto"][];
+        };
         SalesOrderLineDto: {
             /** Format: uuid */
             itemId: string;
@@ -23904,6 +24127,8 @@ export interface operations {
                 isTracked?: boolean;
                 /** @description Loại trừ kho showroom (storages.is_main_storage) khỏi kết quả. */
                 excludeShowroom?: boolean;
+                /** @description Chỉ lấy kho nhập mặc định của chi nhánh (storages.is_default_receiving). */
+                defaultReceivingOnly?: boolean;
                 /** @description Lọc theo trạng thái hoạt động của vị trí (locations.is_active). Bỏ trống = tất cả. */
                 locationIsActive?: boolean;
                 locationCode?: string;
@@ -35046,6 +35271,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MobileTransferOrderPageDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getDailyActivity: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewDailyActivityResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getRevenueCostProfit: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewRevenueCostProfitResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getCashFlow: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                /** @description BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ. */
+                unit: "hour" | "weekday" | "day" | "week" | "month" | "year";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewCashFlowResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getRevenueTimeline: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                /** @description BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ. */
+                unit: "hour" | "weekday" | "day" | "week" | "month" | "year";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewRevenueTimelineResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getRevenueCostProfitTimeline: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewRevenueCostProfitTimelineResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getProductProfit: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                /** @description BẮT BUỘC, không mặc định: mức là thứ người dùng vừa chọn ở bộ lọc, server không đoán hộ. */
+                unit: "hour" | "weekday" | "day" | "week" | "month" | "year";
+                categoryIds?: string[];
+                /** @description Mẫu mã (`products.id`). */
+                productIds?: string[];
+                /** @description Hàng hoá (`items.id`). */
+                itemIds?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewProductProfitResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getProductShare: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                categoryId?: string;
+                /** @description Mẫu mã (`products.id`). */
+                productId?: string;
+                dimension: "product_group" | "variant" | "product";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewSubjectListResponseDto"];
+                };
+            };
+        };
+    };
+    OverviewReportController_getTopProducts: {
+        parameters: {
+            query: {
+                /** @description Đầu kỳ, `YYYY-MM-DD`, tính theo ngày ghi sổ `issued_at`. Bao gồm trọn ngày. */
+                from: string;
+                /** @description Cuối kỳ, `YYYY-MM-DD`. Bao gồm TRỌN ngày cuối, không phải 00:00 của nó. */
+                to: string;
+                /** @description Thu hẹp theo cửa hàng. Vắng = mọi cửa hàng được xem. */
+                branchIds?: string[];
+                categoryId?: string;
+                /** @description Mẫu mã (`products.id`). */
+                productId?: string;
+                sortBy: "revenue" | "quantity";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OverviewSubjectListResponseDto"];
                 };
             };
         };
