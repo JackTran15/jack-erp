@@ -40,8 +40,43 @@ describe('MobileCashierService', () => {
       ],
       payments: [],
     };
+    // Hàng hoá đơn SAU khi saga commit — `checkout` đọc lại hoá đơn để trả
+    // đúng cột đã lưu, nên `findOne` trả nháp trước khi runner chạy, hàng đã
+    // phát hành sau đó.
+    const issuedInvoice = {
+      id: 'inv-1',
+      code: 'HD00012',
+      isDraft: false,
+      status: options.partial ? 'partial_debt' : 'paid',
+      amountDue: '1400000.00',
+      totalPaid: options.partial ? '1000000.00' : '1400000.00',
+      salesOrderId: 'so-1',
+    };
+    const checkoutRunner = {
+      run: jest.fn(async () => ({ committed: true, invoiceId: 'inv-1', sagaId: 'saga-1', documentNumber: 'HD00012', totals: {}, appliedPrograms: [], steps: [] })),
+      preview: jest.fn(async () => ({
+        totals: {
+          subtotal: 1500000,
+          manualDiscountAmount: 100000,
+          promotionDiscount: 150000,
+          pointsRedeemed: 2,
+          pointsDiscountAmount: 1000,
+          depositAmount: 0,
+          amountDue: 1249000,
+          pointsEarned: 124,
+        },
+        appliedPrograms: [
+          {
+            programId: 'p-1', code: 'KM10', name: 'Giảm 10%', type: 'ITEM_DISCOUNT', priority: 1,
+            discountAmount: 150000, gifts: [], accruePoints: undefined,
+            lineDiscounts: [{ lineId: 'line-1', discountAmount: 150000, unitPriceAfter: 425000 }],
+          },
+        ],
+        lineDiscounts: [{ lineId: 'line-1', discountAmount: 150000, unitPriceAfter: 425000 }],
+      })),
+    };
     const invoices = {
-      findOne: jest.fn(async () => draftInvoice),
+      findOne: jest.fn(async () => (checkoutRunner.run.mock.calls.length > 0 ? issuedInvoice : draftInvoice)),
       findOneWithItems: jest.fn(async () => draftInvoice),
       update: jest.fn(async () => draftInvoice),
     };
@@ -54,16 +89,6 @@ describe('MobileCashierService', () => {
     const dataSource = {
       query: jest.fn(async () => [{ total: '250000' }]),
       getRepository: jest.fn(() => ({ update: invoiceRepoUpdate, find: jest.fn(async () => [{ id: 'it-1', productId: 'm-1' }]) })),
-    };
-    const checkoutService = {
-      checkout: jest.fn(async () => ({
-        id: 'inv-1',
-        code: 'HD00012',
-        status: options.partial ? 'partial_debt' : 'paid',
-        amountDue: '1400000.00',
-        totalPaid: options.partial ? '1000000.00' : '1400000.00',
-        salesOrderId: 'so-1',
-      })),
     };
     const paymentRows = [
       { id: 'pa-1', label: 'VCB 0011', paymentMethod: 'bank_transfer', branchId: null, sortOrder: 1 },
@@ -130,7 +155,7 @@ describe('MobileCashierService', () => {
       profiles as never,
       salesOrders as never,
       dataSource as never,
-      checkoutService as never,
+      checkoutRunner as never,
       paymentAccountRepo as never,
       partnerLookup as never,
       cashDebtCollection as never,
@@ -142,7 +167,7 @@ describe('MobileCashierService', () => {
       checkoutReturn as never,
     );
     return {
-      service, repo, cashRepo, posSessions, invoices, salesOrders, dataSource, invoiceRepoUpdate, checkoutService, qb,
+      service, repo, cashRepo, posSessions, invoices, salesOrders, dataSource, invoiceRepoUpdate, checkoutRunner, qb,
       partnerLookup, cashDebtCollection, bankDebtCollection, queryBus, returnEligibility, createReturn, createExchange, checkoutReturn,
     };
   }
@@ -274,37 +299,99 @@ describe('MobileCashierService', () => {
       await expect(service.draft('inv-1', actor)).resolves.toMatchObject({ salesChannel: 'STORE' });
     });
 
-    it('thu đủ: đi qua CheckoutInvoiceService với `paymentMethod`, trả số hoá đơn + paid, remainder 0', async () => {
-      const { service, checkoutService } = build([]);
+    it('thu đủ: đi qua CheckoutSagaRunner với `paymentMethod`, trả số hoá đơn + paid, remainder 0', async () => {
+      const { service, checkoutRunner } = build([]);
       const result = await service.checkout(
         'inv-1',
-        { payments: [{ method: 'cash' as never, amount: 1000000 }, { method: 'bank_transfer' as never, amount: 400000, paymentAccountId: 'pa-1' }] },
+        {
+          payments: [{ method: 'cash' as never, amount: 1000000 }, { method: 'bank_transfer' as never, amount: 400000, paymentAccountId: 'pa-1' }],
+          keptChangeAmount: 20000,
+          selectedProgramIds: ['p-1'],
+          excludedProgramIds: ['p-2'],
+          dueDate: '2026-10-01',
+        },
+        undefined,
         actor,
       );
-      const [id, dto] = checkoutService.checkout.mock.calls[0] as unknown as [string, { payments: Array<Record<string, unknown>> }];
-      expect(id).toBe('inv-1');
-      expect(dto.payments).toEqual([
-        { paymentMethod: 'cash', amount: 1000000, paymentAccountId: undefined },
-        { paymentMethod: 'bank_transfer', amount: 400000, paymentAccountId: 'pa-1' },
-      ]);
-      expect(result).toMatchObject({ invoiceCode: 'HD00012', status: 'paid', amountDue: 1400000, totalPaid: 1400000, remainder: 0 });
+      const [input, opts, who] = checkoutRunner.run.mock.calls[0] as unknown as [Record<string, unknown>, Record<string, unknown>, ActorContext];
+      expect(input).toEqual({
+        invoiceId: 'inv-1',
+        payments: [
+          { paymentMethod: 'cash', amount: 1000000, paymentAccountId: undefined },
+          { paymentMethod: 'bank_transfer', amount: 400000, paymentAccountId: 'pa-1' },
+        ],
+        dueDate: '2026-10-01',
+        keptChangeAmount: 20000,
+        selectedProgramIds: ['p-1'],
+        excludedProgramIds: ['p-2'],
+      });
+      // Thật sự chạy (không phải dryRun) — thiếu cờ là commit, như controller web.
+      expect(opts.dryRun).toBeUndefined();
+      expect(who).toBe(actor);
+      // Hình dạng cũ mà `CheckoutResultModel` của app đọc — không thêm, không bớt khoá.
+      expect(result).toEqual({
+        invoiceId: 'inv-1',
+        invoiceCode: 'HD00012',
+        status: 'paid',
+        amountDue: 1400000,
+        totalPaid: 1400000,
+        remainder: 0,
+        salesOrderId: 'so-1',
+      });
     });
 
-    it('thu thiếu có khách: phần còn là remainder, trạng thái partial_debt do POS quyết', async () => {
+    it('idempotency key = header khi có, rơi về invoiceId khi vắng (không phải khoá ngẫu nhiên)', async () => {
+      const withHeader = build([]);
+      await withHeader.service.checkout('inv-1', { payments: [] }, 'client-key-1', actor);
+      expect((withHeader.checkoutRunner.run.mock.calls[0] as unknown[])[1]).toEqual({ idempotencyKey: 'client-key-1', correlationId: 'client-key-1' });
+
+      const bare = build([]);
+      await bare.service.checkout('inv-1', { payments: [] }, undefined, actor);
+      expect((bare.checkoutRunner.run.mock.calls[0] as unknown[])[1]).toEqual({ idempotencyKey: 'inv-1', correlationId: 'inv-1' });
+    });
+
+    it('thu thiếu có khách: phần còn là remainder, trạng thái partial_debt do saga quyết', async () => {
       const { service } = build([], { partial: true });
-      const result = await service.checkout('inv-1', { payments: [{ method: 'cash' as never, amount: 1000000 }] }, actor);
+      const result = await service.checkout('inv-1', { payments: [{ method: 'cash' as never, amount: 1000000 }] }, undefined, actor);
       expect(result).toMatchObject({ status: 'partial_debt', remainder: 400000 });
     });
 
-    it('kênh bán gửi kèm được ghi TRƯỚC khi checkout; đã checkout rồi → 400, không gọi POS', async () => {
-      const { service, invoiceRepoUpdate, checkoutService } = build([]);
-      await service.checkout('inv-1', { payments: [], salesChannel: 'ONLINE' }, actor);
-      expect(invoiceRepoUpdate.mock.invocationCallOrder[0]).toBeLessThan(checkoutService.checkout.mock.invocationCallOrder[0]);
+    it('kênh bán gửi kèm được ghi TRƯỚC khi checkout; đã checkout rồi → 400, không gọi saga', async () => {
+      const { service, invoiceRepoUpdate, checkoutRunner } = build([]);
+      await service.checkout('inv-1', { payments: [], salesChannel: 'ONLINE' }, undefined, actor);
+      expect(invoiceRepoUpdate.mock.invocationCallOrder[0]).toBeLessThan(checkoutRunner.run.mock.invocationCallOrder[0]);
       expect(invoiceRepoUpdate).toHaveBeenCalledWith({ id: 'inv-1', organizationId: 'org-1' }, { salesChannel: 'ONLINE' });
 
       const done = build([], { checkedOut: true });
-      await expect(done.service.checkout('inv-1', { payments: [] }, actor)).rejects.toThrow('đã thu tiền');
-      expect(done.checkoutService.checkout).not.toHaveBeenCalled();
+      await expect(done.service.checkout('inv-1', { payments: [] }, undefined, actor)).rejects.toThrow('đã thu tiền');
+      expect(done.checkoutRunner.run).not.toHaveBeenCalled();
+    });
+
+    it('preview: chuyển lựa chọn CTKM cho runner.preview, trả tổng phẳng + appliedPrograms đã cắt gọn', async () => {
+      const { service, checkoutRunner } = build([]);
+      const result = await service.previewCheckout('inv-1', { selectedProgramIds: ['p-1'], excludedProgramIds: ['p-2'] }, actor);
+
+      expect(checkoutRunner.preview).toHaveBeenCalledWith(
+        { invoiceId: 'inv-1', selectedProgramIds: ['p-1'], excludedProgramIds: ['p-2'] },
+        actor,
+      );
+      expect(checkoutRunner.run).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        subtotal: 1500000,
+        manualDiscountAmount: 100000,
+        promotionDiscount: 150000,
+        pointsRedeemed: 2,
+        pointsDiscountAmount: 1000,
+        depositAmount: 0,
+        amountDue: 1249000,
+        pointsEarned: 124,
+        appliedPrograms: [
+          {
+            programId: 'p-1', code: 'KM10', name: 'Giảm 10%', type: 'ITEM_DISCOUNT', discountAmount: 150000,
+            lineDiscounts: [{ lineId: 'line-1', discountAmount: 150000 }],
+          },
+        ],
+      });
     });
 
     it('tài khoản nhận: đúng tổ chức, đang hoạt động, của chi nhánh hoặc dùng chung; nhãn rơi về phương thức', async () => {

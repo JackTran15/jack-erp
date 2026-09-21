@@ -7,7 +7,7 @@ import { BranchScopeGuard } from '../../rbac/branch-scope.guard';
 import { PermissionGuard } from '../../rbac/permission.guard';
 import { MobileCloseShiftDto, MobileOpenShiftDto } from '../dto/mobile-session.dto';
 import { MobileCreateDraftDto, MobileRedeemPointsDto, MobileUpdateDraftDto } from '../dto/mobile-cashier-draft.dto';
-import { MobileCheckoutDto } from '../dto/mobile-checkout.dto';
+import { MobileCheckoutDto, MobileCheckoutPreviewDto } from '../dto/mobile-checkout.dto';
 import { MobileCollectDebtDto, MobileDebtorsQueryDto } from '../dto/mobile-debt.dto';
 import { MobileExchangeDto, MobileReturnableQueryDto } from '../dto/mobile-exchange.dto';
 import { PointsRedemptionService } from '../../pos/services/points-redemption.service';
@@ -163,14 +163,51 @@ export class MobileCashierController {
     return this.service.paymentAccounts(actor);
   }
 
-  /** Thu tiền hoá đơn nháp — phát hành số hoá đơn, ghi sổ quỹ / công nợ. */
+  /**
+   * Thu tiền hoá đơn nháp qua checkout saga v2 (T-03-02) — phát hành số hoá
+   * đơn, ghi sổ quỹ / công nợ / kho / điểm, cùng đường với POS web.
+   *
+   * `x-idempotency-key` đọc như `collectDebt`, nhưng vắng thì rơi về
+   * `invoiceId` (không phải `randomUUID()`): khoá của saga phải ổn định qua
+   * các lần gửi lại, nếu không một lượt thu mất phản hồi sẽ thu hai lần.
+   *
+   * Trả: `{ invoiceId, invoiceCode, status, amountDue, totalPaid, remainder, salesOrderId }`
+   * — giữ nguyên hình dạng thời v1 mà app đang đọc.
+   */
   @Post('drafts/:invoiceId/checkout')
   checkout(
     @Param('invoiceId', ParseUUIDPipe) invoiceId: string,
     @Body() dto: MobileCheckoutDto,
+    @Headers('x-idempotency-key') idempotencyKey: string | undefined,
     @Actor() actor: ActorContext,
   ) {
-    return this.service.checkout(invoiceId, dto, actor);
+    return this.service.checkout(invoiceId, dto, idempotencyKey, actor);
+  }
+
+  /**
+   * Số phải thu theo saga, trước khi thu (ADR-51). Không ghi gì, không mở
+   * transaction; hoá đơn không còn là nháp → 400 `INVOICE_NOT_CHECKOUTABLE`.
+   * Quyền: khoá lớp `accounting.cash.create` — cố ý không thêm khoá method,
+   * vì khoá method THAY THẾ khoá lớp (xem `redeemPoints`).
+   *
+   * Trả (tổng phẳng ở cấp gốc):
+   * ```
+   * { subtotal, manualDiscountAmount, promotionDiscount, pointsRedeemed,
+   *   pointsDiscountAmount, depositAmount, amountDue, pointsEarned,
+   *   appliedPrograms: [{ programId, code, name, type, discountAmount,
+   *                       lineDiscounts: [{ lineId, discountAmount }] }] }
+   * ```
+   * `pointsRedeemed` là số SAU khi saga kẹp; `pointsEarned` đã qua luật khách
+   * lẻ / CTKM chặn tích điểm — đúng số hoá đơn sẽ lưu.
+   */
+  @Post('drafts/:invoiceId/checkout/preview')
+  @ApiOperation({ summary: 'Xem trước số phải thu của hoá đơn nháp theo checkout saga' })
+  previewCheckout(
+    @Param('invoiceId', ParseUUIDPipe) invoiceId: string,
+    @Body() dto: MobileCheckoutPreviewDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.service.previewCheckout(invoiceId, dto, actor);
   }
 
   /** Khách còn nợ (T-17-01). */

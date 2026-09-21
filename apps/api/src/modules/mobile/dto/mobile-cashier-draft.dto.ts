@@ -9,7 +9,10 @@ export class MobileDraftLineDto {
   @IsString() unit: string;
   @IsNumber() @Min(0) quantity: number;
   @IsNumber() @Min(0) unitPrice: number;
-  /** Giảm dòng theo TIỀN (giảm tay + khuyến mại đã chốt) — cùng nghĩa với `lineDiscount` của POS. */
+  /**
+   * Giảm dòng theo TIỀN — CHỈ giảm tay. Khuyến mại do checkout saga tính lại lúc
+   * thu (ADR-50); gộp KM vào đây thì saga trừ KM hai lần (A-87).
+   */
   @IsOptional() @IsNumber() @Min(0) lineDiscount?: number;
   @IsOptional() @IsString() @MaxLength(255) lineDiscountReason?: string;
   @IsOptional() @IsString() note?: string;

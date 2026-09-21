@@ -8,6 +8,7 @@ import { SalesOrderEntity } from '../sales-order/entities/sales-order.entity';
 import { PaymentAccountEntity } from '../accounting/payment-accounts/payment-account.entity';
 import { PosSessionEntity } from '../pos/entities/pos-session.entity';
 import { PosModule } from '../pos/pos.module';
+import { CheckoutSagaModule } from '../pos/checkout-saga/checkout-saga.module';
 import { CashVouchersModule } from '../accounting/cash-vouchers/cash-vouchers.module';
 import { DepositVouchersModule } from '../accounting/deposit-vouchers/deposit-vouchers.module';
 import { InvoiceReportModule } from '../reporting/invoice-report/invoice-report.module';
@@ -146,6 +147,11 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     // chỉ tìm được handler đã đăng ký, nên thiếu dòng import này là 500
     // "No handler found" lúc CHẠY, không phải lỗi lúc biên dịch.
     PosModule,
+    // Thu tiền của thu ngân đi checkout saga v2 qua `CheckoutSagaRunner`
+    // (T-03-02, ADR-49). Không cần `forwardRef`: vòng `PosModule` ↔
+    // `CheckoutSagaModule` đã tự giải ở hai phía, và không module nào trong
+    // vòng đó import `MobileModule`.
+    CheckoutSagaModule,
     // Thu nợ của thu ngân (T-17-01) đi đúng hai saga phiếu thu của web.
     CashVouchersModule,
     DepositVouchersModule,
