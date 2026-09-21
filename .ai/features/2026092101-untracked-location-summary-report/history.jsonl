@@ -8,3 +8,6 @@
 {"action": "ticket in_progress", "at": "2026-09-21T21:01:18", "base": "e2a21c332c9d41fbde3768ccf61e2f486046f02f", "by": "Akenzy", "gate": "G4", "id": "2871b5b04c93", "ticket": "T-02-01", "ts": "2026-09-21T21:01:18.708577"}
 {"action": "scope", "at": "2026-09-21T21:03:15", "base": "e2a21c332c9d41fbde3768ccf61e2f486046f02f", "by": "Akenzy", "gate": "G4", "id": "7eba085e4eac", "ticket": "T-02-01", "ts": "2026-09-21T21:03:15.824375", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-21T21:03:15", "by": "Akenzy", "gate": "G4", "id": "9dec0a812456", "ticket": "T-02-01", "ts": "2026-09-21T21:03:15.826578"}
+{"action": "ticket in_progress", "at": "2026-09-21T21:03:21", "base": "73d47b3a16f3007333dfd1cd7e5e8fe87b3ccbf8", "by": "Akenzy", "gate": "G4", "id": "34d8fbdafe5e", "ticket": "T-01-02", "ts": "2026-09-21T21:03:21.476341"}
+{"action": "scope", "at": "2026-09-21T21:08:49", "base": "73d47b3a16f3007333dfd1cd7e5e8fe87b3ccbf8", "by": "Akenzy", "gate": "G4", "id": "eda673b46145", "ticket": "T-01-02", "ts": "2026-09-21T21:08:49.707208", "verdict": "clean"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-21T21:08:49", "by": "Akenzy", "gate": "G4", "id": "42fe572931b9", "ticket": "T-01-02", "ts": "2026-09-21T21:08:49.709624"}
