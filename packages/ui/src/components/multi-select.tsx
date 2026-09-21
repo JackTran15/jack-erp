@@ -29,6 +29,28 @@ function MultiSelect({
   disabled,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const listRef = React.useRef<HTMLDivElement>(null);
+
+  // Options are real buttons, so Tab and Enter already work. Arrow keys are
+  // what's missing: this moves focus between them the way every other select
+  // in the package behaves.
+  const handleListKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") {
+      return;
+    }
+    const items = Array.from(
+      listRef.current?.querySelectorAll<HTMLButtonElement>("[data-multi-select-option]") ?? [],
+    );
+    if (items.length === 0) return;
+    e.preventDefault();
+    const current = items.findIndex((el) => el === document.activeElement);
+    let next: number;
+    if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = items.length - 1;
+    else if (e.key === "ArrowDown") next = current < 0 ? 0 : (current + 1) % items.length;
+    else next = current <= 0 ? items.length - 1 : current - 1;
+    items[next]?.focus();
+  };
 
   const toggle = (optionValue: string) => {
     if (value.includes(optionValue)) {
@@ -76,15 +98,17 @@ function MultiSelect({
         className="z-50 w-[--radix-popover-trigger-width] rounded-md border bg-popover p-1 shadow-md"
         sideOffset={4}
       >
-        <ScrollArea className="max-h-60">
+        <ScrollArea className="max-h-60" ref={listRef} onKeyDown={handleListKeyDown}>
           {options.map((opt) => {
             const checked = value.includes(opt.value);
             return (
               <button
                 key={opt.value}
                 type="button"
+                data-multi-select-option=""
                 className={cn(
                   "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent",
+                  "focus-visible:bg-accent focus-visible:text-accent-foreground focus-visible:shadow-[inset_3px_0_0_0_hsl(var(--ring))]",
                   checked && "bg-accent/50",
                 )}
                 onClick={() => toggle(opt.value)}

@@ -152,10 +152,27 @@ export function LookupField<T>({
   const pageRef = useRef(1);
   const loadingMoreRef = useRef(false);
   const lastSearchRef = useRef<{ query: string; ts: number }>({ query: "\0", ts: 0 });
+  // Monotonic counter so a slow response for an older query can never overwrite
+  // a newer one. Without it, auto-highlighting the first row would silently
+  // point at a stale result set.
+  const searchSeqRef = useRef(0);
+  // Chrome reports isComposing=false on the very keydown that ends a
+  // composition, so the flag alone is not enough — the other components in this
+  // repo (single-select, tags-input) OR it with a compositionstart ref.
+  const isComposingRef = useRef(false);
+  // True between a keystroke and the arrival of that query's results: the list
+  // on screen still belongs to the previous query, so Enter must not pick from it.
+  const staleRef = useRef(false);
+  const optionRefs = useRef<(HTMLElement | null)[]>([]);
+  // Query the currently displayed list belongs to, and a mirror of that list —
+  // both readable synchronously, unlike state, right after an await.
+  const listQueryRef = useRef<string | null>(null);
+  const suggestionsRef = useRef<T[]>([]);
 
   const [suggestions, setSuggestions] = useState<T[]>([]);
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
+  const [stale, setStale] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -174,30 +191,76 @@ export function LookupField<T>({
     [maxSuggestions],
   );
 
-  const runSearch = useCallback(
-    async (q: string) => {
+  /**
+   * Runs the query and returns the resulting page, so callers that must act on
+   * the result immediately (Enter pressed before the debounce fired) can use the
+   * returned items directly instead of waiting for a re-render.
+   *
+   * Returns `null` when the call was superseded by a newer query — the caller
+   * must then do nothing, because another run owns the state now.
+   */
+  const runSearchCore = useCallback(
+    async (q: string, force = false): Promise<T[] | null> => {
       const now = Date.now();
-      if (lastSearchRef.current.query === q && now - lastSearchRef.current.ts < 300) {
-        return;
+      if (
+        !force &&
+        lastSearchRef.current.query === q &&
+        now - lastSearchRef.current.ts < 300
+      ) {
+        // The visible list is already the one for `q`. Re-arm the highlight in
+        // case the caller (handleClear, openAndLoad) just cleared it, otherwise
+        // it stays stuck at -1 and Enter does nothing.
+        if (listQueryRef.current === q && suggestionsRef.current.length > 0) {
+          setHighlightIdx(0);
+          staleRef.current = false;
+          setStale(false);
+          return suggestionsRef.current;
+        }
+        return null;
       }
       lastSearchRef.current = { query: q, ts: now };
       queryRef.current = q;
       pageRef.current = 1;
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const raw = await search(q, 1);
+        // A newer query started while this one was in flight — drop the result.
+        if (seq !== searchSeqRef.current) return null;
         const { items, hasMore: more } = normalize(raw);
         setSuggestions(items);
+        suggestionsRef.current = items;
+        listQueryRef.current = q;
         setHasMore(more);
+        // Results are now current: highlight the first row so Enter picks it
+        // without the user having to press ArrowDown first.
+        setHighlightIdx(items.length > 0 ? 0 : -1);
+        staleRef.current = false;
+        setStale(false);
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
+        return items;
       } catch {
+        if (seq !== searchSeqRef.current) return null;
         setSuggestions([]);
+        suggestionsRef.current = [];
+        listQueryRef.current = q;
         setHasMore(false);
+        setHighlightIdx(-1);
+        staleRef.current = false;
+        setStale(false);
+        return [];
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     },
     [search, normalize],
+  );
+
+  const runSearch = useCallback(
+    async (q: string) => {
+      await runSearchCore(q);
+    },
+    [runSearchCore],
   );
 
   const loadMore = useCallback(async () => {
@@ -205,8 +268,12 @@ export function LookupField<T>({
     loadingMoreRef.current = true;
     setLoadingMore(true);
     const nextPage = pageRef.current + 1;
+    const seq = searchSeqRef.current;
     try {
       const raw = await search(queryRef.current, nextPage);
+      // A new query started while this page was in flight — merging it now
+      // would splice the old query's rows into the current list.
+      if (seq !== searchSeqRef.current) return;
       const { items, hasMore: more } = normalize(raw);
       pageRef.current = nextPage;
       setSuggestions((prev) => {
@@ -215,6 +282,7 @@ export function LookupField<T>({
         for (const it of items) {
           if (!existing.has(itemKey(it))) merged.push(it);
         }
+        suggestionsRef.current = merged;
         return merged;
       });
       setHasMore(more);
@@ -229,7 +297,11 @@ export function LookupField<T>({
   const handleChange = useCallback(
     (val: string) => {
       onValueChange(val);
+      // The visible list still belongs to the previous query. Drop the
+      // highlight until fresh results land so Enter can't pick a stale row.
       setHighlightIdx(-1);
+      staleRef.current = true;
+      setStale(true);
       setOpen(true);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
@@ -352,7 +424,11 @@ export function LookupField<T>({
       onSelect(item);
       setOpen(false);
       setSuggestions([]);
+      suggestionsRef.current = [];
+      listQueryRef.current = null;
       setHighlightIdx(-1);
+      staleRef.current = false;
+      setStale(false);
       setHasMore(false);
     },
     [onSelect],
@@ -366,6 +442,40 @@ export function LookupField<T>({
       }
       return;
     }
+
+    // Escape is handled before the empty-list guard below, otherwise it is
+    // swallowed while "Không có dữ liệu." is showing. stopPropagation keeps it
+    // from bubbling to the Radix dialog, which would close the whole voucher.
+    if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      return;
+    }
+
+    if (e.key === "Enter") {
+      // Vietnamese IME: this Enter confirms the composition, it must not pick
+      // an option.
+      if (isComposingRef.current || e.nativeEvent.isComposing) return;
+      e.preventDefault();
+
+      // Typed and hit Enter before the debounce fired: the list on screen is
+      // the previous query's. Run the new query now and take its first row
+      // rather than selecting whatever happens to be displayed.
+      if (staleRef.current || loading) {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        void runSearchCore(value.trim(), true).then((items) => {
+          if (items && items.length > 0) selectItem(items[0]!);
+        });
+        return;
+      }
+
+      if (highlightIdx >= 0 && highlightIdx < suggestions.length) {
+        selectItem(suggestions[highlightIdx]!);
+      }
+      return;
+    }
+
     if (suggestions.length === 0) return;
     switch (e.key) {
       case "ArrowDown":
@@ -376,15 +486,13 @@ export function LookupField<T>({
         e.preventDefault();
         setHighlightIdx((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
         break;
-      case "Enter":
+      case "Home":
         e.preventDefault();
-        if (highlightIdx >= 0 && highlightIdx < suggestions.length) {
-          selectItem(suggestions[highlightIdx]!);
-        }
+        setHighlightIdx(0);
         break;
-      case "Escape":
+      case "End":
         e.preventDefault();
-        setOpen(false);
+        setHighlightIdx(suggestions.length - 1);
         break;
     }
   };
@@ -400,6 +508,14 @@ export function LookupField<T>({
     },
     [hasMore, loadMore],
   );
+
+  // Keep the highlighted row visible while arrowing through the list.
+  // `block: "nearest"` leaves the scroll alone when the row is already visible,
+  // so the popover doesn't jump on every keystroke.
+  useEffect(() => {
+    if (!open || highlightIdx < 0) return;
+    optionRefs.current[highlightIdx]?.scrollIntoView({ block: "nearest" });
+  }, [highlightIdx, open, suggestions]);
 
   const hasSuggestions = suggestions.length > 0;
 
@@ -418,7 +534,7 @@ export function LookupField<T>({
               pointerEvents: "auto",
             }}
             className={cn(
-              "overflow-hidden rounded-md border bg-background shadow-md",
+              "overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md",
               dropdownClassName,
             )}
           >
@@ -428,7 +544,11 @@ export function LookupField<T>({
               <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-muted/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40"
+                className={cn(
+                  // Dimmed while the query that produced it is out of date.
+                  stale && "opacity-50",
+                  "overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-muted/40 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40",
+                )}
                 style={{ maxHeight: rect.maxHeight }}
               >
                 {columns && columns.length > 0 ? (
@@ -452,12 +572,17 @@ export function LookupField<T>({
                       {suggestions.map((item, idx) => (
                         <tr
                           key={itemKey(item)}
+                          ref={(el) => {
+                            optionRefs.current[idx] = el;
+                          }}
                           id={`${listboxId}-${idx}`}
                           role="option"
                           aria-selected={idx === highlightIdx}
                           className={cn(
-                            "cursor-pointer",
-                            idx === highlightIdx ? "bg-muted" : "hover:bg-muted/40",
+                            "cursor-pointer scroll-mt-8",
+                            idx === highlightIdx
+                              ? "bg-accent font-medium text-accent-foreground [&>td:first-child]:shadow-[inset_3px_0_0_0_hsl(var(--ring))]"
+                              : "hover:bg-muted/60",
                           )}
                           onMouseDown={(e) => {
                             e.preventDefault();
@@ -479,12 +604,17 @@ export function LookupField<T>({
                     {suggestions.map((item, idx) => (
                       <li
                         key={itemKey(item)}
+                        ref={(el) => {
+                          optionRefs.current[idx] = el;
+                        }}
                         id={`${listboxId}-${idx}`}
                         role="option"
                         aria-selected={idx === highlightIdx}
                         className={cn(
                           "cursor-pointer px-3 py-2 text-sm",
-                          idx === highlightIdx ? "bg-muted" : "bg-background hover:bg-muted/40",
+                          idx === highlightIdx
+                            ? "bg-accent font-medium text-accent-foreground shadow-[inset_3px_0_0_0_hsl(var(--ring))]"
+                            : "bg-popover hover:bg-muted/60",
                         )}
                         onMouseDown={(e) => {
                           e.preventDefault();
@@ -515,7 +645,11 @@ export function LookupField<T>({
       : null;
 
   return (
-    <div className={cn("relative flex items-stretch", className)} ref={wrapRef}>
+    <div
+      className={cn("relative flex items-stretch", className)}
+      ref={wrapRef}
+      data-dropdown-open={open ? "true" : undefined}
+    >
       <div className="relative flex flex-1 items-stretch">
         <Input
           ref={inputRef}
@@ -530,12 +664,21 @@ export function LookupField<T>({
             }
           }}
           onKeyDown={handleKeyDown}
+          onCompositionStart={() => {
+            isComposingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            isComposingRef.current = false;
+          }}
           placeholder={placeholder}
           disabled={disabled}
           role="combobox"
           aria-expanded={open && hasSuggestions}
           aria-autocomplete="list"
           aria-controls={listboxId}
+          aria-activedescendant={
+            open && highlightIdx >= 0 ? `${listboxId}-${highlightIdx}` : undefined
+          }
           className={cn(
             hideSearchButton ? undefined : "rounded-r-none",
             value ? "pr-14" : "pr-8",

@@ -51,6 +51,13 @@ export function SearchListingInput<T>({
   const listboxId = `${resolvedId}-listbox`;
   const wrapRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic counter: a slow response for an older query must never overwrite
+  // a newer one, or the auto-highlighted first row would point at stale data.
+  const searchSeqRef = useRef(0);
+  // True between a keystroke and that query's results landing.
+  const staleRef = useRef(false);
+  const isComposingRef = useRef(false);
+  const optionRefs = useRef<(HTMLLIElement | null)[]>([]);
 
   const [suggestions, setSuggestions] = useState<T[]>([]);
   const [open, setOpen] = useState(false);
@@ -58,19 +65,32 @@ export function SearchListingInput<T>({
   const [loading, setLoading] = useState(false);
 
   const runSearch = useCallback(
-    async (q: string) => {
+    async (q: string): Promise<T[] | null> => {
       if (q.length < minChars) {
         setSuggestions([]);
-        return;
+        setHighlightIdx(-1);
+        staleRef.current = false;
+        return [];
       }
+      const seq = ++searchSeqRef.current;
       setLoading(true);
       try {
         const results = await search(q);
-        setSuggestions(results.slice(0, maxSuggestions));
+        if (seq !== searchSeqRef.current) return null;
+        const items = results.slice(0, maxSuggestions);
+        setSuggestions(items);
+        // Results are current: highlight row 0 so Enter picks it directly.
+        setHighlightIdx(items.length > 0 ? 0 : -1);
+        staleRef.current = false;
+        return items;
       } catch {
+        if (seq !== searchSeqRef.current) return null;
         setSuggestions([]);
+        setHighlightIdx(-1);
+        staleRef.current = false;
+        return [];
       } finally {
-        setLoading(false);
+        if (seq === searchSeqRef.current) setLoading(false);
       }
     },
     [search, minChars, maxSuggestions],
@@ -79,12 +99,16 @@ export function SearchListingInput<T>({
   const handleChange = useCallback(
     (val: string) => {
       onValueChange(val);
+      // Visible rows still belong to the previous query — drop the highlight
+      // until fresh results land so Enter can't pick a stale one.
       setHighlightIdx(-1);
+      staleRef.current = true;
       setOpen(true);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       const q = val.trim();
       if (q.length < minChars) {
         setSuggestions([]);
+        staleRef.current = false;
         return;
       }
       debounceRef.current = setTimeout(() => {
@@ -117,12 +141,50 @@ export function SearchListingInput<T>({
       setOpen(false);
       setSuggestions([]);
       setHighlightIdx(-1);
+      staleRef.current = false;
     },
     [onSelect],
   );
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (!open || suggestions.length === 0) return;
+    // Handled before the empty-list guard below, otherwise Escape is swallowed
+    // while "Không tìm thấy" is showing. stopPropagation keeps it from reaching
+    // an enclosing dialog, which would close the whole form.
+    if (e.key === "Escape") {
+      if (!open) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setOpen(false);
+      setHighlightIdx(-1);
+      return;
+    }
+    if (!open) return;
+
+    if (e.key === "Enter") {
+      // Vietnamese IME: this Enter confirms the composition, not a selection.
+      if (isComposingRef.current || e.nativeEvent.isComposing) return;
+      e.preventDefault();
+
+      // Enter before the debounce fired: the visible list is the previous
+      // query's. Run the new query now and take its first row instead.
+      if (staleRef.current || loading) {
+        const q = value.trim();
+        if (q.length < minChars) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        void runSearch(q).then((items) => {
+          if (items && items.length > 0) selectItem(items[0]!);
+        });
+        return;
+      }
+
+      if (highlightIdx >= 0 && highlightIdx < suggestions.length) {
+        selectItem(suggestions[highlightIdx]!);
+      }
+      return;
+    }
+
+    if (suggestions.length === 0) return;
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
@@ -132,25 +194,28 @@ export function SearchListingInput<T>({
         e.preventDefault();
         setHighlightIdx((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
         break;
-      case "Enter": {
+      case "Home":
         e.preventDefault();
-        if (highlightIdx >= 0 && highlightIdx < suggestions.length) {
-          selectItem(suggestions[highlightIdx]!);
-        }
+        setHighlightIdx(0);
         break;
-      }
-      case "Escape":
+      case "End":
         e.preventDefault();
-        setOpen(false);
+        setHighlightIdx(suggestions.length - 1);
         break;
     }
   };
+
+  // Keep the highlighted row visible while arrowing.
+  useEffect(() => {
+    if (!open || highlightIdx < 0) return;
+    optionRefs.current[highlightIdx]?.scrollIntoView({ block: "nearest" });
+  }, [highlightIdx, open, suggestions]);
 
   const showDropdown = open && value.trim().length >= minChars;
   const hasSuggestions = suggestions.length > 0;
 
   return (
-    <div className="relative" ref={wrapRef}>
+    <div className="relative" ref={wrapRef} data-dropdown-open={open ? "true" : undefined}>
       {label && (
           <label htmlFor={resolvedId} className="text-sm font-medium">
           {label}
@@ -183,7 +248,7 @@ export function SearchListingInput<T>({
       {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
 
       {showDropdown ? (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
           {loading ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">Đang tìm…</div>
           ) : hasSuggestions ? (
@@ -192,12 +257,17 @@ export function SearchListingInput<T>({
                 {suggestions.map((item, idx) => (
                   <li
                     key={itemKey(item)}
+                    ref={(el) => {
+                      optionRefs.current[idx] = el;
+                    }}
                     id={`${listboxId}-${idx}`}
                     role="option"
                     aria-selected={idx === highlightIdx}
                     className={[
                       "cursor-pointer px-3 py-2 text-sm",
-                      idx === highlightIdx ? "bg-muted" : "bg-background",
+                      idx === highlightIdx
+                        ? "bg-accent font-medium text-accent-foreground shadow-[inset_3px_0_0_0_hsl(var(--ring))]"
+                        : "bg-popover hover:bg-muted/60",
                     ]
                       .filter(Boolean)
                       .join(" ")}
