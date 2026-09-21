@@ -61,6 +61,8 @@ export interface StockBalancesQuery {
   isTracked?: boolean;
   /** Loại trừ kho showroom (is_main_storage) khỏi kết quả. */
   excludeShowroom?: boolean;
+  /** Chỉ lấy kho nhập mặc định của chi nhánh (is_default_receiving). */
+  defaultReceivingOnly?: boolean;
   // Per-column symbol filters
   locationCode?: string;
   locationCodeMode?: StringFilterMode;

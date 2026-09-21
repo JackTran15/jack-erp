@@ -39,7 +39,11 @@ import {
   buildItemLocationColumns,
   buildLocationStockItemColumns,
 } from "./ItemLocationDetailsColumns";
-import { buildQuery, EXCLUDE_SHOWROOM_FILTER_VALUE } from "./ItemLocationDetailsQuery";
+import {
+  buildQuery,
+  DEFAULT_RECEIVING_FILTER_VALUE,
+  EXCLUDE_SHOWROOM_FILTER_VALUE,
+} from "./ItemLocationDetailsQuery";
 import { ArrangeLocationDialog } from "./ArrangeLocationDialog";
 import { TransferLocationDialog } from "./TransferLocationDialog";
 
@@ -47,6 +51,7 @@ interface InventoryStorage {
   id: string;
   name: string;
   isMainStorage: boolean;
+  isDefaultReceiving: boolean;
 }
 
 const naturalCollator = new Intl.Collator("vi-VN", {
@@ -85,7 +90,7 @@ export function ItemLocationDetailsPage() {
   const isLocationDetail = Boolean(locationId);
   const [filters, setFilters] = useState<Record<string, ColumnFilter>>({
     isTracked: { mode: "equals", value: "true" },
-    storageId: { mode: "equals", value: EXCLUDE_SHOWROOM_FILTER_VALUE },
+    storageId: { mode: "equals", value: DEFAULT_RECEIVING_FILTER_VALUE },
   });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -355,19 +360,34 @@ export function ItemLocationDetailsPage() {
     [locationRows, page, pageSize],
   );
 
-  // Option "Trừ {kho showroom}" luôn đứng đầu (ngay dưới "— Tất cả —" do bảng
-  // tự thêm) kể cả khi danh sách kho chưa tải xong, để lựa chọn mặc định hiển
-  // thị đúng ngay lần render đầu; nhãn tự điền tên kho khi danh sách về.
+  // Hai option ảo luôn có mặt kể cả khi danh sách kho chưa tải xong, để lựa
+  // chọn mặc định hiển thị đúng ngay lần render đầu; nhãn tự điền tên kho khi
+  // danh sách về. Kho nhập mặc định mang value sentinel thay cho id của nó: lưới
+  // đã gọi API bằng sentinel từ lần render đầu, đổi sang id sẽ tốn một lượt gọi
+  // nữa mà kết quả y hệt.
   const storageFilterOptions = useMemo(() => {
     const storages = storagesQuery.data ?? [];
     const showroom = storages.find((s) => s.isMainStorage);
-    return [
+    const options = [
       {
         value: EXCLUDE_SHOWROOM_FILTER_VALUE,
         label: showroom ? `Trừ ${showroom.name}` : "Trừ kho showroom",
       },
-      ...storages.map((s) => ({ value: s.id, label: s.name })),
+      ...storages.map((s) => ({
+        value: s.isDefaultReceiving ? DEFAULT_RECEIVING_FILTER_VALUE : s.id,
+        label: s.name,
+      })),
     ];
+    // Danh sách kho chưa tải xong, hoặc chi nhánh không có kho nhập mặc định:
+    // vẫn phải có một option mang sentinel, nếu không <select> sẽ hiện option
+    // đầu danh sách trong khi lưới đang lọc theo kho nhập mặc định.
+    if (!options.some((o) => o.value === DEFAULT_RECEIVING_FILTER_VALUE)) {
+      options.unshift({
+        value: DEFAULT_RECEIVING_FILTER_VALUE,
+        label: "Kho nhập mặc định",
+      });
+    }
+    return options;
   }, [storagesQuery.data]);
 
   const stockColumns = useMemo(

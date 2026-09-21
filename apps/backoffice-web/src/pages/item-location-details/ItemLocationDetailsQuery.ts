@@ -18,6 +18,14 @@ export type StringFilterKey = (typeof STRING_FILTER_KEYS)[number];
  */
 export const EXCLUDE_SHOWROOM_FILTER_VALUE = "__exclude_showroom__";
 
+/**
+ * Giá trị sentinel của option "kho nhập mặc định" trong bộ lọc cột Kho. Cùng lý
+ * do với sentinel trên: id kho nhập mặc định chỉ biết được sau khi danh sách kho
+ * tải xong, nên để server tự phân giải (`defaultReceivingOnly`) thay vì chờ rồi
+ * gọi lưới lần hai.
+ */
+export const DEFAULT_RECEIVING_FILTER_VALUE = "__default_receiving__";
+
 export function buildQuery(
   page: number,
   pageSize: number,
@@ -32,7 +40,8 @@ export function buildQuery(
     extra[`${key as StringFilterKey}Mode`] = f.mode;
   }
   const storageId = filters.storageId?.value?.trim();
-  if (storageId === EXCLUDE_SHOWROOM_FILTER_VALUE) extra.excludeShowroom = true;
+  if (storageId === DEFAULT_RECEIVING_FILTER_VALUE) extra.defaultReceivingOnly = true;
+  else if (storageId === EXCLUDE_SHOWROOM_FILTER_VALUE) extra.excludeShowroom = true;
   else if (storageId) extra.storageId = storageId;
   // Cột số dùng toán tử ≤ (number-range), giống các cột số khác trong app.
   const q = filters.quantity;

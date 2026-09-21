@@ -688,6 +688,38 @@ describe('StockLedgerService', () => {
           false,
         );
       });
+
+      it('test 8: defaultReceivingOnly keeps only kho nhập mặc định (is_default_receiving)', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          defaultReceivingOnly: true,
+          page: 1,
+          pageSize: 20,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+          'storage.is_default_receiving = true',
+        );
+      });
+
+      it('test 9: no default-receiving filter is applied when defaultReceivingOnly is omitted', async () => {
+        const qb = createQbSpy();
+        balanceRepo.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        await service.getBalances({
+          organizationId: 'org-1',
+          page: 1,
+          pageSize: 20,
+        });
+
+        const calls = qb.andWhere.mock.calls.map((args: unknown[]) => String(args[0]));
+        expect(
+          calls.some((sql: string) => sql.includes('is_default_receiving')),
+        ).toBe(false);
+      });
     });
 
     describe('locationIsActive filter (ADR-02 / A-07)', () => {
