@@ -516,6 +516,16 @@ function AppModal({
           // dialog on mount — before the measurement lands.
           opacity: autoHeight && !autoHeightReady ? 0 : undefined,
         }}
+        onEscapeKeyDown={(event) => {
+          // Radix listens for Escape on `document` in the CAPTURE phase, so a
+          // field's own bubble-phase onKeyDown can never stopPropagation() in
+          // time. An open dropdown owns this keypress: preventDefault here and
+          // the field closes itself on the same event, leaving the modal open.
+          const target = event.target as Element | null;
+          if (target?.closest?.('[data-dropdown-open="true"]')) {
+            event.preventDefault();
+          }
+        }}
         onPointerDownOutside={(event) => {
           if (preventOutsideClose) { event.preventDefault(); return; }
           const target = event.target as Element | null;
