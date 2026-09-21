@@ -28,6 +28,8 @@ interface PreferredRow {
 interface BalanceRow {
   itemId: string;
   locationId: string;
+  /** Real column; the mock only looks at it when the code asks for `quantity > 0`. */
+  quantity: number;
 }
 
 interface UntrackedRow {
@@ -96,6 +98,15 @@ function build(opts: {
     createQueryBuilder: jest.fn(() => {
       let filterItemIds: string[] = [];
       let filterWarehouseIds: string[] = [];
+      // The mock honours the predicates the code actually applies rather than
+      // ignoring the SQL: a `quantity > 0` clause filters on the fixture's
+      // quantity, and `isTracked = true` is modelled by dropping any pair the
+      // fixture lists as `untracked`. Without this a rule change in the query
+      // could not turn a test red.
+      let requiresStock = false;
+      const untrackedKeys = new Set(
+        (opts.untracked ?? []).map((u) => `${u.itemId}::${u.locationId}`),
+      );
       const qb: Record<string, unknown> = {
         innerJoin: () => qb,
         select: () => qb,
@@ -104,14 +115,17 @@ function build(opts: {
           if (params?.itemIds) filterItemIds = params.itemIds;
           return qb;
         },
-        andWhere: (_sql: string, params?: { warehouseIds?: string[] }) => {
+        andWhere: (sql: string, params?: { warehouseIds?: string[] }) => {
           if (params?.warehouseIds) filterWarehouseIds = params.warehouseIds;
+          if (sql.includes('quantity > 0')) requiresStock = true;
           return qb;
         },
         getRawMany: () =>
           Promise.resolve(
             opts.balances.filter((b) => {
               if (!filterItemIds.includes(b.itemId)) return false;
+              if (requiresStock && !(b.quantity > 0)) return false;
+              if (untrackedKeys.has(`${b.itemId}::${b.locationId}`)) return false;
               const loc = locationById.get(b.locationId);
               return !!loc && filterWarehouseIds.includes(loc.storageId);
             }),
@@ -177,7 +191,7 @@ describe('resolveItemWarehouseLocations', () => {
       storages: [wh1, wh2],
       locations: [locA101, locB202],
       preferred: [{ itemId: 'item-3', storageId: 'wh-a1', locationId: 'loc-a101' }],
-      balances: [{ itemId: 'item-3', locationId: 'loc-b202' }],
+      balances: [{ itemId: 'item-3', locationId: 'loc-b202', quantity: 1 }],
     });
 
     const result = await resolveItemWarehouseLocations(repos, ['item-3'], 'org-1', 'branch-1');
@@ -312,7 +326,7 @@ describe('resolveItemWarehouseLocations', () => {
       storages: [wh1],
       locations: [locA101],
       preferred: [],
-      balances: [{ itemId: 'item-7', locationId: 'loc-a101' }],
+      balances: [{ itemId: 'item-7', locationId: 'loc-a101', quantity: 1 }],
     });
 
     await resolveItemWarehouseLocations(repos, ['item-7'], 'org-1', 'branch-1');
@@ -341,12 +355,43 @@ describe('resolveItemWarehouseLocations', () => {
     expect(result.get('item-8')).toEqual({ code: 'A201', name: 'Kệ A201', storage: 'Kho A2' });
   });
 
+  it('reports a tracked shelf at quantity 0 that is not the preferred shelf (AC-06/AC-08)', async () => {
+    const { repos } = build({
+      storages: [wh1],
+      locations: [locA101],
+      preferred: [],
+      balances: [{ itemId: 'item-11', locationId: 'loc-a101', quantity: 0 }],
+    });
+
+    const result = await resolveItemWarehouseLocations(repos, ['item-11'], 'org-1', 'branch-1');
+
+    // A shelf that just sold out is still where the item lives.
+    expect(result.get('item-11')).toEqual({ code: 'A101', name: 'Kệ A101', storage: 'Kho A1' });
+  });
+
+  it('still drops a stopped pair at quantity 0 while keeping the tracked one (AC-07)', async () => {
+    const { repos } = build({
+      storages: [wh1, wh2],
+      locations: [locA101, locA201],
+      preferred: [],
+      balances: [
+        { itemId: 'item-12', locationId: 'loc-a101', quantity: 0 },
+        { itemId: 'item-12', locationId: 'loc-a201', quantity: 0 },
+      ],
+      untracked: [{ itemId: 'item-12', locationId: 'loc-a101' }],
+    });
+
+    const result = await resolveItemWarehouseLocations(repos, ['item-12'], 'org-1', 'branch-1');
+
+    expect(result.get('item-12')).toEqual({ code: 'A201', name: 'Kệ A201', storage: 'Kho A2' });
+  });
+
   it('falls back to the showroom shelf when every warehouse pair is untracked and showroomFallback is requested (AC-05)', async () => {
     const { repos } = build({
       storages: [wh1, showroom1],
       locations: [locA101, locShowroomDefault],
       preferred: [{ itemId: 'item-9', storageId: 'wh-a1', locationId: 'loc-a101' }],
-      balances: [{ itemId: 'item-9', locationId: 'loc-showroom-default' }],
+      balances: [{ itemId: 'item-9', locationId: 'loc-showroom-default', quantity: 1 }],
       untracked: [{ itemId: 'item-9', locationId: 'loc-a101' }],
     });
 
@@ -362,7 +407,7 @@ describe('resolveItemWarehouseLocations', () => {
       storages: [wh1, showroom1],
       locations: [locA101, locShowroomDefault],
       preferred: [{ itemId: 'item-9', storageId: 'wh-a1', locationId: 'loc-a101' }],
-      balances: [{ itemId: 'item-9', locationId: 'loc-showroom-default' }],
+      balances: [{ itemId: 'item-9', locationId: 'loc-showroom-default', quantity: 1 }],
       untracked: [{ itemId: 'item-9', locationId: 'loc-a101' }],
     });
 
@@ -376,7 +421,7 @@ describe('resolveItemWarehouseLocations', () => {
       storages: [wh1, showroom1],
       locations: [locA101, locShowroomDefault],
       preferred: [{ itemId: 'item-10', storageId: 'wh-a1', locationId: 'loc-a101' }],
-      balances: [{ itemId: 'item-10', locationId: 'loc-showroom-default' }],
+      balances: [{ itemId: 'item-10', locationId: 'loc-showroom-default', quantity: 1 }],
     });
 
     const result = await resolveItemWarehouseLocations(repos, ['item-10'], 'org-1', 'branch-1', {
