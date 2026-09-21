@@ -5,7 +5,7 @@ import { MobileCashierService } from './mobile-cashier.service';
 describe('MobileCashierService', () => {
   const actor: ActorContext = { userId: 'u-1', organizationId: 'org-1', branchId: 'br-1', roles: [] };
 
-  function build(sessions: Array<Record<string, unknown>>, options: { withinThreshold?: boolean; checkedOut?: boolean; partial?: boolean; invoiceChannel?: string | null; netAmount?: number; originalDebt?: number } = {}) {
+  function build(sessions: Array<Record<string, unknown>>, options: { withinThreshold?: boolean; checkedOut?: boolean; partial?: boolean; invoiceChannel?: string | null; netAmount?: number; originalDebt?: number; selfBuilt?: boolean } = {}) {
     const repo = { find: jest.fn(async () => sessions), findOne: jest.fn(async () => sessions.find((s) => s.status === SessionStatus.CLOSING) ?? null) };
     const cashRepo = { find: jest.fn(async () => [{ id: 'ca-1', name: 'Quỹ tiền mặt - KHO SG' }]) };
     const posSessions = {
@@ -22,7 +22,8 @@ describe('MobileCashierService', () => {
       id: 'inv-1',
       code: 'DRAFT-1',
       isDraft: options.checkedOut !== true,
-      salesOrderId: 'so-1',
+      // Nháp giỏ tự dựng của thu ngân không có đơn tư vấn phía sau.
+      salesOrderId: options.selfBuilt ? null : 'so-1',
       salespersonId: 'profile-1',
       salesChannel: options.invoiceChannel ?? null,
       note: null,
@@ -35,8 +36,8 @@ describe('MobileCashierService', () => {
       amountDue: '1399000.00',
       customer: { id: 'c-1', name: 'Nguyễn Văn A', phone: '0900000001' },
       items: [
-        { sortOrder: 1, itemId: 'i-2', itemCode: 'B', itemName: 'Hàng B', unit: 'cái', quantity: '1', unitPrice: '500000', lineDiscount: '0', promotionDiscount: '0', lineTotal: '500000' },
-        { sortOrder: 0, itemId: 'i-1', itemCode: 'A', itemName: 'Hàng A', unit: 'cái', quantity: '2', unitPrice: '500000', lineDiscount: '50000', promotionDiscount: '50000', lineTotal: '900000' },
+        { id: 'line-b', sortOrder: 1, itemId: 'i-2', itemCode: 'B', itemName: 'Hàng B', unit: 'cái', quantity: '1', unitPrice: '500000', lineDiscount: '0', promotionDiscount: '0', lineTotal: '500000' },
+        { id: 'line-a', sortOrder: 0, itemId: 'i-1', itemCode: 'A', itemName: 'Hàng A', unit: 'cái', quantity: '2', unitPrice: '500000', lineDiscount: '50000', promotionDiscount: '50000', lineTotal: '900000' },
       ],
       payments: [],
     };
@@ -82,7 +83,13 @@ describe('MobileCashierService', () => {
     };
     const profiles = { findOne: jest.fn(async () => ({ user: { firstName: 'Trần', lastName: 'Lộc' } })) };
     const salesOrders = {
-      findOne: jest.fn(async () => ({ id: 'so-1', documentNumber: 'DT000015', salesChannel: 'ONLINE' })),
+      findOne: jest.fn(async () => ({
+        id: 'so-1',
+        documentNumber: 'DT000015',
+        salesChannel: 'ONLINE',
+        selectedProgramIds: ['p-sel'],
+        excludedProgramIds: ['p-exc'],
+      })),
       update: jest.fn(async () => undefined),
     };
     const invoiceRepoUpdate = jest.fn(async () => undefined);
@@ -253,6 +260,31 @@ describe('MobileCashierService', () => {
       expect(view.lines[0]).toMatchObject({ quantity: 2, unitPrice: 500000, lineDiscount: 100000, lineTotal: 900000 });
       // Công nợ tra đúng khách, đúng tổ chức, chỉ khoản CHƯA TRẢ — enum `debt_status_enum` là chữ THƯỜNG (đo: 'OPEN' → 500).
       expect(dataSource.query).toHaveBeenCalledWith(expect.stringContaining("status IN ('open', 'overdue')"), ['org-1', 'c-1']);
+    });
+
+    it('mỗi dòng mang `id` (invoice_items.id) — khoá ghép lineDiscounts[].lineId của preview saga', async () => {
+      const { service } = build([]);
+      const view = await service.draft('inv-1', actor);
+      expect(view.lines.map((l) => [l.id, l.itemCode])).toEqual([['line-a', 'A'], ['line-b', 'B']]);
+    });
+
+    it('nháp sinh từ đơn trả lựa chọn CTKM của đơn; nháp giỏ tự dựng trả [] và không tra đơn', async () => {
+      const fromOrder = build([]);
+      await expect(fromOrder.service.draft('inv-1', actor)).resolves.toMatchObject({
+        selectedProgramIds: ['p-sel'],
+        excludedProgramIds: ['p-exc'],
+      });
+      const [query] = fromOrder.salesOrders.findOne.mock.calls[0] as unknown as [{ where: Record<string, unknown>; select: string[] }];
+      expect(query.where).toEqual({ id: 'so-1', organizationId: 'org-1' });
+      expect(query.select).toEqual(expect.arrayContaining(['selectedProgramIds', 'excludedProgramIds']));
+
+      const selfBuilt = build([], { selfBuilt: true });
+      await expect(selfBuilt.service.draft('inv-1', actor)).resolves.toMatchObject({
+        salesOrderId: null,
+        selectedProgramIds: [],
+        excludedProgramIds: [],
+      });
+      expect(selfBuilt.salesOrders.findOne).not.toHaveBeenCalled();
     });
 
     it('mang theo điểm ĐÃ TRỪ trên nháp — giỏ nạp lại không được bày số tiền chưa trừ', async () => {

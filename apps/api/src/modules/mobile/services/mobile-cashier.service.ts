@@ -50,6 +50,12 @@ export interface MobileDraftView {
   salesChannel: string | null;
   note: string | null;
   lines: Array<{
+    /**
+     * `invoice_items.id` — khoá để app ghép `lineDiscounts[].lineId` của preview
+     * saga vào đúng dòng giỏ. `itemId` không dùng được: một mã hàng có thể nằm
+     * trên hai dòng (khác giá / khác ghi chú).
+     */
+    id: string;
     itemId: string;
     itemCode: string;
     itemName: string;
@@ -76,6 +82,13 @@ export interface MobileDraftView {
   pointsRedeemed: number;
   pointsDiscountAmount: number;
   amountDue: number;
+  /**
+   * Lựa chọn CTKM tư vấn đã chốt trên ĐƠN gốc (ADR-52) — giỏ nạp làm trạng thái
+   * ban đầu rồi gửi theo preview/checkout. Nháp giỏ tự dựng (không có đơn) → `[]`.
+   * Thu ngân sửa trong giỏ KHÔNG ghi ngược lại đơn (A-97).
+   */
+  selectedProgramIds: string[];
+  excludedProgramIds: string[];
 }
 
 export interface MobileCashierSessionView {
@@ -250,7 +263,7 @@ export class MobileCashierService {
     const order = invoice.salesOrderId
       ? await this.salesOrders.findOne({
           where: { id: invoice.salesOrderId, organizationId: actor.organizationId },
-          select: ['id', 'documentNumber', 'salesChannel'],
+          select: ['id', 'documentNumber', 'salesChannel', 'selectedProgramIds', 'excludedProgramIds'],
         })
       : null;
 
@@ -268,6 +281,7 @@ export class MobileCashierService {
     const lines = [...invoice.items]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((item) => ({
+        id: item.id,
         itemId: item.itemId,
         modelId: modelByItem.get(item.itemId) ?? null,
         itemCode: item.itemCode,
@@ -306,6 +320,8 @@ export class MobileCashierService {
       pointsRedeemed: Number(invoice.pointsRedeemed ?? 0),
       pointsDiscountAmount: Number(invoice.pointsDiscountAmount ?? 0),
       amountDue: Number(invoice.amountDue),
+      selectedProgramIds: order?.selectedProgramIds ?? [],
+      excludedProgramIds: order?.excludedProgramIds ?? [],
     };
   }
 

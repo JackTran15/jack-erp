@@ -86,6 +86,18 @@ export class SalesOrderEntity extends BaseEntity {
   pointsRedeemed: number;
 
   /**
+   * Lựa chọn CTKM của tư vấn (ADR-52): bật thêm / gỡ ra. Chỉ là Ý ĐỊNH — số tiền
+   * khuyến mại do checkout saga tính lại lúc thu, không bao giờ lấy từ đơn.
+   * Thu ngân đọc hai cột này qua draft view (`invoice.salesOrderId`) để biết tư
+   * vấn đã bỏ CTKM nào.
+   */
+  @Column({ name: 'selected_program_ids', type: 'jsonb', default: () => "'[]'" })
+  selectedProgramIds: string[];
+
+  @Column({ name: 'excluded_program_ids', type: 'jsonb', default: () => "'[]'" })
+  excludedProgramIds: string[];
+
+  /**
    * Hoá đơn nháp do `approve` tạo (ADR-32). Không FK: huỷ hoá đơn chỉ dọn về
    * null. Đọc mã hoá đơn qua join ở `toView` của đường chi tiết.
    */
