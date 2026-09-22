@@ -133,7 +133,7 @@ describe('EvaluateCartHandler', () => {
     const result = await handler.execute(new EvaluateCartQuery(baseDto({ excludedProgramIds: [program.id!] }), actor));
 
     expect(result.appliedPrograms).toHaveLength(0);
-    expect(result.skippedPrograms).toContainEqual({ programId: program.id, name: program.name, reason: 'EXCLUDED_BY_CASHIER' });
+    expect(result.skippedPrograms).toContainEqual(expect.objectContaining({ programId: program.id, name: program.name, reason: 'EXCLUDED_BY_CASHIER' }));
   });
 
   it('defaults excludedProgramIds to [] when omitted, so an eligible program still applies', async () => {

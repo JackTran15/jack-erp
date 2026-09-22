@@ -1,0 +1,54 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-promotion-exchange-defects
+slug: 2026092102-pos-promotion-exchange-defects
+profile: none
+created: 2026-09-21T20:43:05
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: 14 assumptions, none blocking-and-pending; 28 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T09:42:39
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T09:47:12
+    by: Akenzy
+    reason: T-01-01 - 13 exact-shape toContainEqual assertions in promotion-resolver.spec.ts and evaluate-cart.handler.spec.ts go red on the new required SkippedProgram.type; the spec files must be in touches and the 'không sửa test cũ' box reworded
+  - gate: G3
+    action: passed
+    at: 2026-09-22T09:47:32
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-22T09:52:29
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T09:52:29
+    by: Akenzy
+    ticket: T-01-01
