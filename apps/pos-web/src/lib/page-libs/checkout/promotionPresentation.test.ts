@@ -71,7 +71,7 @@ describe("mapEvaluateResponseToPromotionItems", () => {
     const items = mapEvaluateResponseToPromotionItems({
       ...baseResponse,
       skippedPrograms: [
-        { programId: "P3", name: "GIÀY NAM ONSALE 70%", reason: "CONDITION_NOT_MET" },
+        { programId: "P3", name: "GIÀY NAM ONSALE 70%", type: PromotionProgramType.ITEM_DISCOUNT, reason: "CONDITION_NOT_MET" },
       ],
     });
     expect(items[0].disabled).toBe(true);
@@ -98,7 +98,7 @@ describe("mapEvaluateResponseToPromotionItems", () => {
         },
       ],
       skippedPrograms: [
-        { programId: "P4", name: "GIÀY NAM ONSALE 50%", reason: "RESOURCE_TAKEN", takenBy: "WINNER" },
+        { programId: "P4", name: "GIÀY NAM ONSALE 50%", type: PromotionProgramType.INVOICE_DISCOUNT, reason: "RESOURCE_TAKEN", takenBy: "WINNER" },
       ],
     });
     const skipped = items.find((i) => i.id === "P4")!;
@@ -112,11 +112,60 @@ describe("mapEvaluateResponseToPromotionItems", () => {
     const items = mapEvaluateResponseToPromotionItems({
       ...baseResponse,
       skippedPrograms: [
-        { programId: "P5", name: "GIÀY NAM ONSALE 50%", reason: "RESOURCE_TAKEN", takenBy: "ghost-id" },
+        { programId: "P5", name: "GIÀY NAM ONSALE 50%", type: PromotionProgramType.INVOICE_DISCOUNT, reason: "RESOURCE_TAKEN", takenBy: "ghost-id" },
       ],
     });
     expect(items[0].disabled).toBe(false);
     expect(items[0].takenByName).toBeUndefined();
+  });
+
+  // 2026092102 / T-01-02 (AC-02/03/04) — "Hình thức" đến từ `type` ở cả ba nhóm,
+  // kể cả skipped; "Mô tả" chép `description`, rỗng → undefined để hàng in "—".
+  it("labels a skipped program's kind from its type instead of a dash", () => {
+    const items = mapEvaluateResponseToPromotionItems({
+      ...baseResponse,
+      skippedPrograms: [
+        { programId: "S1", name: "KM A", type: PromotionProgramType.ITEM_DISCOUNT, description: "Áp cho giày nữ", reason: "EXCLUDED_BY_CASHIER" },
+        { programId: "S2", name: "KM B", type: PromotionProgramType.INVOICE_DISCOUNT, reason: "EXCLUDED_BY_CASHIER" },
+      ],
+    });
+    expect(items[0].kindLabel).toBe("Giảm giá mặt hàng");
+    expect(items[0].description).toBe("Áp cho giày nữ");
+    expect(items[1].kindLabel).toBe("Giảm giá hoá đơn");
+    expect(items[1].description).toBeUndefined();
+  });
+
+  it("copies description onto applied and available rows, and turns an empty string into undefined", () => {
+    const items = mapEvaluateResponseToPromotionItems({
+      ...baseResponse,
+      appliedPrograms: [
+        {
+          programId: "P1",
+          code: "KM01",
+          name: "KM A",
+          type: PromotionProgramType.ITEM_DISCOUNT,
+          priority: 10,
+          discountAmount: 1_000,
+          lineDiscounts: [],
+          gifts: [],
+          description: "Áp cho giày nữ",
+        },
+      ],
+      availablePrograms: [
+        {
+          programId: "P2",
+          code: "KM02",
+          name: "KM B",
+          type: PromotionProgramType.INVOICE_DISCOUNT,
+          autoApply: false,
+          estimatedDiscount: 0,
+          description: "",
+        },
+      ],
+    });
+    expect(items[0].description).toBe("Áp cho giày nữ");
+    expect(items[1].description).toBeUndefined();
+    expect(items[1].kindLabel).toBe("Giảm giá hoá đơn");
   });
 });
 
@@ -136,7 +185,7 @@ describe("skippedReasonLabel", () => {
 
   it("interpolates the winning program's name for RESOURCE_TAKEN", () => {
     const label = skippedReasonLabel(
-      { programId: "P4", name: "GIÀY NAM ONSALE 50%", reason: "RESOURCE_TAKEN", takenBy: "WINNER" },
+      { programId: "P4", name: "GIÀY NAM ONSALE 50%", type: PromotionProgramType.INVOICE_DISCOUNT, reason: "RESOURCE_TAKEN", takenBy: "WINNER" },
       applied,
     );
     expect(label).toBe("Đã bị chương trình GIÀY NAM ONSALE 30% giành mất");
@@ -144,7 +193,7 @@ describe("skippedReasonLabel", () => {
 
   it("falls back to a generic sentence when takenBy has no match, without leaking the raw id", () => {
     const label = skippedReasonLabel(
-      { programId: "P5", name: "GIÀY NAM ONSALE 50%", reason: "RESOURCE_TAKEN", takenBy: "ghost-id" },
+      { programId: "P5", name: "GIÀY NAM ONSALE 50%", type: PromotionProgramType.INVOICE_DISCOUNT, reason: "RESOURCE_TAKEN", takenBy: "ghost-id" },
       applied,
     );
     expect(label).toBe("Đã bị chương trình khác giành mất");
@@ -163,7 +212,7 @@ describe("skippedReasonLabel", () => {
       "NOT_SELECTED",
     ] as const;
     for (const reason of reasons) {
-      const label = skippedReasonLabel({ programId: "X", name: "X", reason }, []);
+      const label = skippedReasonLabel({ programId: "X", name: "X", type: PromotionProgramType.ITEM_DISCOUNT, reason }, []);
       expect(label).not.toBe(reason);
       expect(label.length).toBeGreaterThan(0);
     }

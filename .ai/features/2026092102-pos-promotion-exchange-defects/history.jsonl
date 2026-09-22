@@ -7,3 +7,6 @@
 {"action": "passed", "at": "2026-09-22T09:47:32", "by": "Akenzy", "evidence": "graph valid - 4 UoW, 15 tickets, no cycles", "gate": "G3", "id": "4c1cd407e2c4", "ts": "2026-09-22T09:47:32.850489"}
 {"action": "scope", "at": "2026-09-22T09:52:29", "base": "43b1fe6cf0cbecdcd07f6ac3056f3dab018ebdbc", "by": "Akenzy", "gate": "G4", "id": "fe90009508b4", "ticket": "T-01-01", "ts": "2026-09-22T09:52:29.288104", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-22T09:52:29", "by": "Akenzy", "gate": "G4", "id": "cd6e66e1905f", "ticket": "T-01-01", "ts": "2026-09-22T09:52:29.290185"}
+{"action": "ticket in_progress", "agent": "aidlc-implementer", "at": "2026-09-22T09:53:33", "base": "a45843d11dbefed8608509d16749de3e8fb678d2", "by": "Akenzy", "gate": "G4", "id": "a76048634164", "ticket": "T-01-02", "ts": "2026-09-22T09:53:33.100350"}
+{"action": "scope", "at": "2026-09-22T09:58:56", "base": "a45843d11dbefed8608509d16749de3e8fb678d2", "by": "Akenzy", "gate": "G4", "id": "caca7f778cdb", "ticket": "T-01-02", "ts": "2026-09-22T09:58:56.333246", "verdict": "clean"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-22T09:58:56", "by": "Akenzy", "gate": "G4", "id": "9145018d16aa", "ticket": "T-01-02", "ts": "2026-09-22T09:58:56.335019"}
