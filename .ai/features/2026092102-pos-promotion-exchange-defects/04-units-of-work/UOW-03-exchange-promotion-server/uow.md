@@ -45,9 +45,9 @@ rollback: revert commit T-03-02/T-03-03 (service + DTO); phiếu đổi đã pos
 | `checkout-return.service.spec.ts` dựng module bằng `Test.createTestingModule` — thêm `QueryBus` làm mọi case cũ đỏ | T-03-02 thêm provider `{ provide: QueryBus, useValue: { execute: jest.fn().mockResolvedValue(<evaluation rỗng>) } }` để case cũ giữ `promotionDiscount = 0` |
 
 ## Definition of done
-- [ ] AC-10..AC-19 và AC-28 mỗi AC một `it` xanh trong `exchange-promotion.e2e-spec.ts`
-- [ ] `checkout-return.service.spec.ts`, `persist-invoice.step.spec.ts`, `checkout-saga-promotion.e2e-spec.ts`, `quick-exchange-line-discount.e2e-spec.ts` xanh nguyên trạng
-- [ ] `pnpm openapi:generate` chỉ thêm 2 field vào `CheckoutReturnDto` + endpoint preview và 2 schema của nó trong `schema.ts`/`openapi.snapshot.json`
-- [ ] `tsc --noEmit` api xanh
-- [ ] Không file nào ngoài `touches:` của T-03-01..T-03-06 bị đụng
+- [x] AC-10..AC-19 và AC-28 mỗi AC một `it` xanh trong `exchange-promotion.e2e-spec.ts` (11/11, 2 lần liên tiếp)
+- [x] `checkout-return.service.spec.ts` 90/90 (case cũ nguyên trạng), `persist-invoice.step.spec.ts` 23/23 không sửa, `checkout-saga-promotion` 13/13, `quick-exchange-line-discount` PASS
+- [x] `pnpm openapi:generate`: diff chỉ 2 field `CheckoutReturnDto` + path preview + `CheckoutReturnPreviewDto`/`CheckoutReturnPreviewResponseDto`
+- [x] `tsc --noEmit` api xanh
+- [x] Không file nào ngoài `touches:` của T-03-01..T-03-06 bị đụng (scope 0 drift)
 - [ ] Demo script chạy trước Akenzy

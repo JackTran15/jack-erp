@@ -43,9 +43,9 @@ rollback: revert 4 commit pos-web; BE (UOW-03) vẫn nhận request cũ không c
 | Thêm một request (`preview`) giữa tạo phiếu và post | Chỉ ở luồng đổi/trả; lỗi ở đây → toast + dọn draft như nhánh lỗi hiện có, không post nửa chừng |
 
 ## Definition of done
-- [ ] AC-20..AC-27 có ảnh headless + assert DOM/network trong `evidence/`; AC-24 đối chiếu body request với `netAmount` của `checkout-return/preview`
-- [ ] Ba kịch bản demo 4/5/6 cho `netAmount`/`refundedAmount` BE **bằng** số panel hiển thị
-- [ ] Tab bán: số *Còn phải thu* với giỏ `L-01`/`L-02` của 2026091804 không đổi (A-10 chỉ đổi khi có giảm tay %)
-- [ ] `tsc --noEmit` pos-web xanh
-- [ ] Không file nào ngoài `touches:` của T-04-01..T-04-04 bị đụng
+- [x] AC-20..AC-27 trong `evidence/` (`capture-uow04.py`, 33 assert): X-00 (body evaluate AC-20/26), X-01..X-03 (AC-21/22/23), X-04 (AC-27 — bản in hóa đơn sau Thanh toán, tab đổi trả không có *In tạm tính*; Akenzy chốt 2026-09-22), X-05/X-07/X-08 (AC-24: body ↔ `netAmount`/`refundedAmount` preview), X-09..X-11 (AC-25)
+- [x] Ba kịch bản 4/5/6: panel 0 / 68.500 / 526.500 = BE `netAmount 0` / `netAmount 68500` / `refundedAmount 526500` (526.500 vì CTKM-B 10% áp cho SKU-100 trên DB dev — số đọc từ preview lúc chạy)
+- [x] Tab bán: chạy lại `2026091804/capture-pos-evidence.py --lines` → 10/10 ok, *Còn phải thu* 616.500 (L-01) / 706.500 (L-02) như cũ
+- [x] `tsc --noEmit` pos-web xanh
+- [x] Không file nào ngoài `touches:` của T-04-01..T-04-04 bị đụng (scope 0 drift)
 - [ ] Demo script chạy trước Akenzy

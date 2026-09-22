@@ -36,8 +36,8 @@ rollback: revert 2 commit (domain+shared, POS mapper); response chỉ thêm fiel
 | Field bắt buộc `type` trên shared làm `modules/mobile` (nếu dựng `SkippedProgram` tay) đỏ tsc | `grep -rn "SkippedProgram" apps/api/src/modules/mobile` trước khi làm; A-11 của 2026091804 đã ghi mobile chỉ đọc |
 
 ## Definition of done
-- [ ] AC-01 có e2e xanh; AC-02/03/04 có ảnh headless + assert DOM trong `evidence/`
-- [ ] `pnpm --filter @erp/api test -- promotion` và `test:e2e -- promotion-evaluate` không đỏ thêm case nào
-- [ ] `tsc --noEmit` api, pos-web, shared-interfaces xanh
-- [ ] Không file nào ngoài `touches:` của T-01-01/T-01-02 bị đụng
+- [x] AC-01 e2e `promotion-evaluate-program-meta` 3/3 xanh; AC-02/03/04 `evidence/M-01..M-03` + 11 assert DOM (`capture-uow01.py`)
+- [x] `pnpm --filter @erp/api test -- promotion` 324/324; `test:e2e -- promotion-evaluate` chỉ đỏ AC-03 (đỏ sẵn trên main — memory `api-db-binding-check`), không đỏ thêm
+- [x] `tsc --noEmit` api, pos-web, shared-interfaces xanh
+- [x] Không file nào ngoài `touches:` của T-01-01/T-01-02 bị đụng (`aidlc flow`: scope 15 clean, 0 drift; 2 spec file thêm vào touches T-01-01 qua reopen G3)
 - [ ] Demo script chạy trước Akenzy

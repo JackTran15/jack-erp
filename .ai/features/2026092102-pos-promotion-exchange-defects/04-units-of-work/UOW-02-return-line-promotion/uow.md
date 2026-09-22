@@ -41,8 +41,8 @@ rollback: revert 2 commit (API eligible-returns, POS); `promotions[]` là field 
 | Draft đổi trả cũ trong localStorage không có `returnPromotions` | Field optional; không nhãn, không lỗi |
 
 ## Definition of done
-- [ ] AC-05/06 có unit spec + e2e xanh; AC-07/08/09 có ảnh headless + assert DOM trong `evidence/`
-- [ ] *Trả lại khách* và ô Tiền mặt **không đổi từng đồng** so với trước feature ở cả 3 kịch bản demo
-- [ ] `tsc --noEmit` api + pos-web xanh
-- [ ] Không file nào ngoài `touches:` của T-02-01..T-02-03 bị đụng
+- [x] AC-05/06: `return-eligibility.service.spec` 17/17 + e2e `eligible-returns-promotions` 3/3; AC-07/08/09 `evidence/R-01..R-03` + 11 assert DOM (`capture-uow02.py`)
+- [x] *Trả lại khách* / ô Tiền mặt không đổi: chạy cùng kịch bản trên base commit (git stash) và sau feature — trả theo HĐ có CTKM-A: 616.500 / 0 ở cả hai; trả nhanh 1 × SKU-100: 100.000 (chỉ *Thành tiền*/*Tổng tiền* đổi từ 0 → số âm — đúng mục tiêu ADR-04); `deriveSettlement` không bị đụng
+- [x] `tsc --noEmit` api + pos-web xanh
+- [x] Không file nào ngoài `touches:` của T-02-01..T-02-03 bị đụng (scope 0 drift; `checkout-return.service.spec.ts` thêm vào touches T-02-01 qua reopen G3)
 - [ ] Demo script chạy trước Akenzy
