@@ -69,8 +69,13 @@ Backoffice `:3000` phục vụ mã nhánh `fix/tree-select-dropdown-clip`.
 
 ## Definition of done
 
-- [ ] AC-01 … AC-08 pass
-- [ ] `pnpm --filter @erp/backoffice-web exec tsc --noEmit` sạch
-- [ ] `pnpm --filter @erp/api test -- base-crud.service.spec.ts` xanh và `tsc --noEmit` của `apps/api` sạch
+- [x] AC-01 … AC-08 pass — `capture-evidence.py` 10/10 xanh trên Vite `:3005` + API `:4000` (org My Company), 22/09/2026; từng AC ghi số đo ở T-01-01/02/03 và `evidence/summary.json`
+- [x] `pnpm --filter @erp/backoffice-web exec tsc --noEmit` sạch — sau T-01-01 và T-01-02
+- [x] `pnpm --filter @erp/api test -- base-crud.service.spec.ts` xanh (3/3), toàn bộ suite API 421/421, `tsc --noEmit` của `apps/api` sạch
 - [ ] `07-verification.md` chạy xanh ở `local-backoffice`, viewport desktop và laptop; ảnh trong `evidence/`
 - [ ] Demo script chạy đầu-cuối và được nghiệm thu ở G4
+
+Trạng thái 2026-09-22: ba ticket code xong và đã commit trên `fix/tree-select-dropdown-clip` (9834c503, c1ca385a,
+ee8a4aaa). Bằng chứng chạy bằng Playwright vì Chrome extension không kết nối và `:3000` đang phục vụ checkout `erp2`;
+Vite của checkout này chạy ở `:3005`. Hai ô còn trống chờ Akenzy: `07-verification.md` (runner ghim `:3000`) và
+nghiệm thu demo. T-01-02 đang `blocked` trên ô `07-verification`.
