@@ -233,6 +233,36 @@ export interface CheckoutReturnBody {
   dueDate?: string;
   creditDays?: number;
   note?: string;
+  /**
+   * CTKM thu ngân tick / bỏ tick cho dòng **mua thêm** — cùng nghĩa với
+   * `CheckoutBody` của luồng bán. BE tự evaluate dòng OUT (2026092102 ADR-01);
+   * FE không gửi số tiền CTKM. Chỉ gắn khi mảng khác rỗng.
+   */
+  selectedProgramIds?: string[];
+  excludedProgramIds?: string[];
+}
+
+/** Body cho `POST /invoices/:id/checkout-return/preview` — chỉ hai mảng id. */
+export interface CheckoutReturnPreviewBody {
+  selectedProgramIds?: string[];
+  excludedProgramIds?: string[];
+}
+
+/**
+ * Phản hồi `POST /invoices/:id/checkout-return/preview` — mirror
+ * `CheckoutReturnPreviewResponseDto` (API). Đây là `ComputedTotals` mà
+ * `checkout-return` sẽ chốt, tính bởi đúng code path đó (ADR-03): `netAmount`
+ * quyết định chiều tiền, `refundedAmount` là số hoàn. Số về từ BE có thể là
+ * string (Postgres numeric) — consumer đi qua `Number(...)`.
+ */
+export interface CheckoutReturnPreview {
+  returnSubtotal: number;
+  newSubtotal: number;
+  newPromotionDiscount: number;
+  newNet: number;
+  returnedNet: number;
+  netAmount: number;
+  refundedAmount: number;
 }
 
 // ─── v2 search (POST /v2/invoices/search) ─────────────────────────────────

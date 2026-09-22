@@ -32,16 +32,15 @@ function cartLine(overrides: Partial<CartLine> = {}): CartLine {
 }
 
 /**
- * A net refund (returnSubtotal > newSubtotal) routes to the fund the operator
- * picked in "Hình thức đổi trả": a cash line → CASH, a bank/card account → BANK
+ * A net refund (`netAmount` < 0, số BE trả ở `checkout-return/preview`) routes
+ * to the fund the operator picked in "Hình thức đổi trả": a cash line → CASH, a bank/card account → BANK
  * + its payment_accounts id. Luồng hoàn tiền không bao giờ gửi OFFSET nữa: BE tự
  * trừ công nợ hóa đơn gốc trước rồi mới chi phần còn lại qua quỹ này.
  */
 describe("buildCheckoutReturnPayload — net refund routing", () => {
   it("routes a cash fund selection to CASH", () => {
     const res = buildCheckoutReturnPayload({
-      returnSubtotal: 200_000,
-      newSubtotal: 0,
+      netAmount: -200_000,
       paymentLines: [line(PaymentMethodEnum.CASH, 200_000, "cash-acc")],
     });
     expect(res.ok).toBe(true);
@@ -52,8 +51,7 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
 
   it("routes a bank/card account selection to BANK + refundAccountId", () => {
     const res = buildCheckoutReturnPayload({
-      returnSubtotal: 200_000,
-      newSubtotal: 0,
+      netAmount: -200_000,
       paymentLines: [line(PaymentMethodEnum.TRANSFER, 200_000, "bank-acc-1")],
     });
     expect(res.ok).toBe(true);
@@ -64,8 +62,7 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
 
   it("never sends OFFSET on a refund — the debt offset is BE-side now (AC-15)", () => {
     const res = buildCheckoutReturnPayload({
-      returnSubtotal: 200_000,
-      newSubtotal: 0,
+      netAmount: -200_000,
       paymentLines: [line(PaymentMethodEnum.TRANSFER, 200_000, "bank-acc-1")],
     });
     expect(res.ok).toBe(true);
@@ -76,8 +73,7 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
 
   it("errors when a bank refund line has no account selected", () => {
     const res = buildCheckoutReturnPayload({
-      returnSubtotal: 200_000,
-      newSubtotal: 0,
+      netAmount: -200_000,
       paymentLines: [line(PaymentMethodEnum.TRANSFER, 200_000, null)],
     });
     expect(res.ok).toBe(false);
@@ -87,13 +83,81 @@ describe("buildCheckoutReturnPayload — net refund routing", () => {
 
   it("defaults to CASH when no fund line is present (e.g. quick return with empty picker)", () => {
     const res = buildCheckoutReturnPayload({
-      returnSubtotal: 200_000,
-      newSubtotal: 0,
+      netAmount: -200_000,
       paymentLines: [],
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.body.refundMethod).toBe("CASH");
+  });
+});
+
+/**
+ * 2026092102 / T-04-02 (AC-24) — the money direction is `netAmount` from the BE
+ * dry-run, and the cashier's selected/excluded programme ids ride along on every
+ * branch, only when non-empty.
+ */
+describe("buildCheckoutReturnPayload — netAmount từ BE + selected/excluded ids", () => {
+  it("net > 0 → CASH + payments, ids attached", () => {
+    const res = buildCheckoutReturnPayload({
+      netAmount: 112_500,
+      paymentLines: [line(PaymentMethodEnum.CASH, 112_500, "cash-acc")],
+      excludedProgramIds: ["P1"],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.refundMethod).toBe("CASH");
+    expect(res.body.payments).toEqual([
+      { paymentMethod: "cash", amount: 112_500, paymentAccountId: "cash-acc" },
+    ]);
+    expect(res.body.excludedProgramIds).toEqual(["P1"]);
+    expect(res.body).not.toHaveProperty("selectedProgramIds");
+  });
+
+  it("net = 0 → OFFSET, no payments, ids attached", () => {
+    const res = buildCheckoutReturnPayload({
+      netAmount: 0,
+      paymentLines: [line(PaymentMethodEnum.CASH, 0, "cash-acc")],
+      selectedProgramIds: ["P2"],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.body.refundMethod).toBe("OFFSET");
+    expect(res.body).not.toHaveProperty("payments");
+    expect(res.body.selectedProgramIds).toEqual(["P2"]);
+  });
+
+  it("net < 0 → refund, ids attached on both CASH and BANK", () => {
+    const cash = buildCheckoutReturnPayload({
+      netAmount: -50_000,
+      paymentLines: [line(PaymentMethodEnum.CASH, 50_000, "cash-acc")],
+      selectedProgramIds: ["P2"],
+      excludedProgramIds: ["P1"],
+    });
+    expect(cash.ok && cash.body.refundMethod).toBe("CASH");
+    expect(cash.ok && cash.body.selectedProgramIds).toEqual(["P2"]);
+    expect(cash.ok && cash.body.excludedProgramIds).toEqual(["P1"]);
+
+    const bank = buildCheckoutReturnPayload({
+      netAmount: -50_000,
+      paymentLines: [line(PaymentMethodEnum.TRANSFER, 50_000, "bank-acc-1")],
+      excludedProgramIds: ["P1"],
+    });
+    expect(bank.ok && bank.body.refundMethod).toBe("BANK");
+    expect(bank.ok && bank.body.excludedProgramIds).toEqual(["P1"]);
+  });
+
+  it("empty id arrays are dropped from the wire body", () => {
+    const res = buildCheckoutReturnPayload({
+      netAmount: 0,
+      paymentLines: [],
+      selectedProgramIds: [],
+      excludedProgramIds: [],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(JSON.parse(JSON.stringify(res.body))).not.toHaveProperty("selectedProgramIds");
+    expect(JSON.parse(JSON.stringify(res.body))).not.toHaveProperty("excludedProgramIds");
   });
 });
 

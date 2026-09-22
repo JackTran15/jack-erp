@@ -113,12 +113,18 @@ export function buildCreateExchangePayload(
   };
 }
 
-interface BuildCheckoutReturnPayloadInput {
-  /** Tổng tiền hàng trả lại (Σ unitPrice × qty của return lines). */
-  returnSubtotal: number;
-  /** Tổng tiền hàng mua mới (Σ unitPrice × qty của new lines, 0 nếu trả thuần). */
-  newSubtotal: number;
+export interface BuildCheckoutReturnPayloadInput {
+  /**
+   * `netAmount` BE trả ở `POST /invoices/:id/checkout-return/preview` — số
+   * chốt của phiếu (2026092102 ADR-03): > 0 khách trả thêm, = 0 bù trừ ngang,
+   * < 0 hoàn khách. FE không còn tự tính từ subtotal.
+   */
+  netAmount: number;
+  /** Người gọi đã kẹp Σ `amount` ≤ `netAmount` khi net > 0. */
   paymentLines: PaymentLine[];
+  /** CTKM thu ngân tick / bỏ tick — gắn vào body ở cả ba nhánh khi khác rỗng. */
+  selectedProgramIds?: string[];
+  excludedProgramIds?: string[];
   /**
    * Đơn ĐỔI net>0 (khách nợ thêm): operator tích "Tính vào công nợ" → phần chênh
    * chưa thu (net − Σpayments) ghi vào công nợ khách. `dueDate`/`creditDays` là hạn
@@ -132,7 +138,7 @@ interface BuildCheckoutReturnPayloadInput {
 
 /**
  * Body cho `POST /invoices/:id/checkout-return`. Chọn `refundMethod` theo
- * `netAmount = newSubtotal − returnSubtotal` (đúng ma trận BE):
+ * `netAmount` mà BE trả ở dry-run `checkout-return/preview` (ma trận BE):
  *   - net > 0  → khách trả thêm: CASH + `payments` (map từ dòng thanh toán).
  *   - net = 0  → bù trừ ngang: OFFSET.
  *   - net < 0  → hoàn tiền khách theo quỹ operator chọn ở "Hình thức đổi trả":
@@ -151,7 +157,15 @@ export function buildCheckoutReturnPayload(
 ):
   | { ok: true; body: CheckoutReturnBody }
   | { ok: false; error: ResolveCheckoutPayloadError } {
-  const net = input.newSubtotal - input.returnSubtotal;
+  const net = input.netAmount;
+  const ids = {
+    ...(input.selectedProgramIds && input.selectedProgramIds.length > 0
+      ? { selectedProgramIds: input.selectedProgramIds }
+      : {}),
+    ...(input.excludedProgramIds && input.excludedProgramIds.length > 0
+      ? { excludedProgramIds: input.excludedProgramIds }
+      : {}),
+  };
 
   if (net > 0) {
     const activeLines = input.paymentLines.filter((line) => line.amount > 0);
@@ -180,6 +194,7 @@ export function buildCheckoutReturnPayload(
             }
           : {}),
         note: input.note,
+        ...ids,
       },
     };
   }
@@ -191,6 +206,7 @@ export function buildCheckoutReturnPayload(
       body: {
         refundMethod: "OFFSET",
         note: input.note,
+        ...ids,
       },
     };
   }
@@ -212,6 +228,7 @@ export function buildCheckoutReturnPayload(
       body: {
         refundMethod: "CASH",
         note: input.note,
+        ...ids,
       },
     };
   }
@@ -225,6 +242,7 @@ export function buildCheckoutReturnPayload(
       refundMethod: "BANK",
       refundAccountId: selected.paymentAccountId,
       note: input.note,
+      ...ids,
     },
   };
 }

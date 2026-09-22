@@ -387,8 +387,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           // không atomic, và phiếu SALE bị ép thu đủ giá trị hàng mua nên tiền
           // qua quỹ là gross-in/gross-out thay vì net.
           const checkoutResolve = buildCheckoutReturnPayload({
-            returnSubtotal,
-            newSubtotal,
+            netAmount: newSubtotal - returnSubtotal,
             paymentLines: p.paymentLines,
             // Đơn ĐỔI net>0: tích "Tính vào công nợ" (DebtCheckRow) → ghi phần
             // chênh chưa thu vào công nợ khách, kèm hạn nợ như đơn bán nợ.
