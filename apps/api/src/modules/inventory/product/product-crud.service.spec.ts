@@ -37,6 +37,7 @@ describe('ProductCrudService', () => {
       where: jest.fn().mockReturnThis(),
       orWhere: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
       skip: jest.fn().mockReturnThis(),
       take: jest.fn().mockReturnThis(),
       getManyAndCount: jest.fn().mockResolvedValue([[mockProduct], 1]),

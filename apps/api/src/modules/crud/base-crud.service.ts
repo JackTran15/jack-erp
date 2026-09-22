@@ -339,6 +339,9 @@ export abstract class BaseCrudService<
     const field = sortBy ?? 'createdAt';
     const order = (sortOrder ?? 'desc').toUpperCase() as 'ASC' | 'DESC';
     qb.orderBy(`${alias}.${field}`, order);
+    // Seeds insert whole sets in one statement, so many rows share createdAt;
+    // without a total order LIMIT/OFFSET repeats and skips rows across pages.
+    if (field !== 'id') qb.addOrderBy(`${alias}.id`, order);
   }
 
   protected buildScopedWhere(

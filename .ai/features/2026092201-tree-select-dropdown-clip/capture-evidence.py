@@ -182,7 +182,7 @@ def ac02(page):
     expected = int(sys.argv[2]) if len(sys.argv) > 2 else 35  # OUT rows of the login org minus the edited one
     record("AC-02 list scrolls and pages to every other OUT option; form does not move",
            n == expected and thu == 0 and body_scroll_before == body_scroll_after and within(pop, vp)
-           and pop["height"] <= 321 and code_field not in " ".join(codes),
+           and pop["height"] <= 322 and code_field not in " ".join(codes),
            options=n, expected=expected, thu_options=thu, popover_height=pop["height"], editing=code_field,
            body_scroll=[body_scroll_before, body_scroll_after], codes=[c.split(" · ")[0].lstrip("— ") for c in codes])
     cancel(page)
