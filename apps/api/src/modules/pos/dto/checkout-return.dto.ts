@@ -10,6 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { RefundMethod } from '../entities/invoice.entity';
 import { InvoicePaymentLineDto } from './checkout-invoice.dto';
 
@@ -85,4 +86,25 @@ export class CheckoutReturnDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  /**
+   * Promotion programmes the cashier ticked for the "Mua thêm" (OUT) lines —
+   * same meaning as `CheckoutV2Dto.selectedProgramIds` (pos-promotion-apply
+   * ADR-03): an `auto_apply=false` programme only runs when listed here, and a
+   * listed programme wins a contested resource ahead of priority. The server
+   * evaluates the OUT lines itself (2026092102 ADR-01); no amount is accepted
+   * from the client.
+   */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  selectedProgramIds?: string[];
+
+  /** Programmes the cashier un-ticked — kept out of the race entirely (ADR-07). */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  excludedProgramIds?: string[];
 }

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
+import { QueryBus } from '@nestjs/cqrs';
 import { DataSource } from 'typeorm';
 import { CheckoutReturnService } from './checkout-return.service';
 import { ReturnEligibilityService } from './return-eligibility.service';
@@ -247,8 +248,21 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let stockReturnInPublisher: { publish: jest.Mock };
   let stockDeductionPublisher: { publish: jest.Mock };
   let tempWarehouseFulfillPublisher: { publish: jest.Mock };
+  // 2026092102 — `EvaluateCartQuery` on the OUT lines. Empty evaluation by
+  // default so every pre-existing case keeps `promotionDiscount = 0`.
+  let queryBus: { execute: jest.Mock };
 
   beforeEach(async () => {
+    queryBus = {
+      execute: jest.fn().mockResolvedValue({
+        subtotal: 0,
+        promotionDiscount: 0,
+        amountAfterPromotion: 0,
+        appliedPrograms: [],
+        availablePrograms: [],
+        skippedPrograms: [],
+      }),
+    };
     debtRow = {
       id: 'debt-1',
       invoiceId: 'orig-1',
@@ -329,6 +343,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: getRepositoryToken(PosSessionEntity), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
         { provide: DataSource, useValue: dataSource },
+        { provide: QueryBus, useValue: queryBus },
         { provide: DocumentNumberingService, useValue: { generate: jest.fn().mockResolvedValue('RET-0001') } },
         { provide: WebSocketEmitterService, useValue: { emitToBranch: jest.fn() } },
         { provide: CustomerCreditService, useValue: { issue: jest.fn() } },
@@ -2131,6 +2146,91 @@ describe('CheckoutReturnService — debt offset routing', () => {
    * the till, 465.000 still owed. Before this feature the whole 765.000 left the
    * drawer while the 465.000 debt stayed open — 930.000 lost on a 765.000 sale.
    */
+  /**
+   * 2026092102 / T-03-02 — the exchange's "Mua thêm" (OUT) lines go through the
+   * promotion engine (ADR-01) and the money is settled on `newNet`; the returned
+   * (IN) lines never do (AC-14).
+   */
+  describe('promotions on the OUT lines of an exchange (2026092102, ADR-01)', () => {
+    /** Return 685.000 (sold without promotion), buy 2 × 100.000. */
+    const promoExchangeItems = (): InvoiceItemEntity[] => [
+      { ...exchangeItems()[0], id: 'exc-in', unitPrice: 685000, lineTotal: 685000 } as InvoiceItemEntity,
+      { ...exchangeItems()[1], id: 'exc-out', unitPrice: 100000, quantity: 2, lineTotal: 200000 } as InvoiceItemEntity,
+    ];
+
+    const evaluationWith30Percent = () => ({
+      subtotal: 200000,
+      promotionDiscount: 60000,
+      amountAfterPromotion: 140000,
+      appliedPrograms: [
+        {
+          programId: 'prog-30',
+          code: 'KM000001',
+          name: 'Giảm giá hàng hóa 30%',
+          type: 'ITEM_DISCOUNT',
+          priority: 100,
+          discountAmount: 60000,
+          lineDiscounts: [{ lineId: 'exc-out', discountAmount: 60000, unitPriceAfter: 70000 }],
+          gifts: [],
+        },
+      ],
+      availablePrograms: [],
+      skippedPrograms: [],
+    });
+
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue(promoExchangeItems());
+    });
+
+    it('evaluates only the OUT lines, with the cashier\'s selected/excluded ids and the customer', async () => {
+      await service.checkout(
+        'exc-1',
+        { ...cashDto(), selectedProgramIds: ['sel-1'], excludedProgramIds: ['exc-9'] } as never,
+        actor,
+      );
+
+      expect(queryBus.execute).toHaveBeenCalledTimes(1);
+      const [query] = queryBus.execute.mock.calls[0];
+      expect(query.dto.customerId).toBe('cust-1');
+      expect(query.dto.selectedProgramIds).toEqual(['sel-1']);
+      expect(query.dto.excludedProgramIds).toEqual(['exc-9']);
+      expect(query.dto.lines).toEqual([
+        expect.objectContaining({ lineId: 'exc-out', itemId: 'item-new', quantity: 2, unitPrice: 100000 }),
+      ]);
+      expect(query.actor).toBe(actor);
+    });
+
+    it('settles on newNet: 200.000 − 60.000 − 685.000 ⇒ netAmount −545.000, refundedAmount 545.000 (AC-10 shape)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.netAmount).toBe(-545000);
+      expect(result.refundedAmount).toBe(545000);
+      // Gross stays on the header: `subtotal = Σ lineTotal` is untouched by the engine.
+      expect(result.subtotal).toBe(200000);
+      expect(cashRefundPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 545000 }),
+        actor,
+      );
+    });
+
+    it('a pure RETURN (no OUT line) never calls the engine (AC-14)', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'ret-1' ? returnDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue([inLineStub()]);
+
+      const result = await service.checkout('ret-1', cashDto(), actor);
+
+      expect(queryBus.execute).not.toHaveBeenCalled();
+      expect(result.refundedAmount).toBe(200);
+    });
+  });
+
   describe('debt-first refund split (QA #8)', () => {
     const DUE = 765_000;
 

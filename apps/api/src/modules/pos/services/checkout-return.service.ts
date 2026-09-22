@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { QueryBus } from '@nestjs/cqrs';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
@@ -13,6 +14,12 @@ import {
   SessionStatus,
   WsEventType,
 } from '@erp/shared-interfaces';
+import type { EvaluateCartResponse } from '@erp/shared-interfaces';
+import { EvaluateCartQuery } from '../../promotion/application/queries/evaluate-cart.query';
+import {
+  EvaluateCartDto,
+  EvaluateCartLineInputDto,
+} from '../../promotion/application/dto/evaluate-cart.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
@@ -63,11 +70,22 @@ import {
 interface ComputedTotals {
   /** Gross value of the returned lines. A gate and a display value, not a base. */
   returnSubtotal: number;
+  /** Gross value of the "Mua thêm" (OUT) lines — Σ lineTotal, into `invoice.subtotal`. */
   newSubtotal: number;
+  /** What the promotion engine took off the OUT lines (2026092102 ADR-01). */
+  newPromotionDiscount: number;
+  /** `newSubtotal − newPromotionDiscount`: what the customer owes for the OUT lines. */
+  newNet: number;
   /** What the customer actually paid for the returned lines — the money base. */
   returnedNet: number;
   netAmount: number;
   refundedAmount: number;
+}
+
+/** Ids the cashier ticked / un-ticked for the OUT lines — subset of `CheckoutReturnDto`. */
+interface ProgramSelection {
+  selectedProgramIds?: string[];
+  excludedProgramIds?: string[];
 }
 
 const RETURN_INVOICE_TYPES = new Set<InvoiceType>([
@@ -100,6 +118,7 @@ export class CheckoutReturnService {
     @InjectRepository(InvoiceDebtEntity)
     private readonly debtRepo: Repository<InvoiceDebtEntity>,
     private readonly dataSource: DataSource,
+    private readonly queryBus: QueryBus,
     private readonly numbering: DocumentNumberingService,
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly customerCredit: CustomerCreditService,
@@ -178,7 +197,28 @@ export class CheckoutReturnService {
       }
     }
 
-    const totals = this.computeTotals(items, originalInvoice, originalItems);
+    // Promotions on the "Mua thêm" (OUT) lines — same engine, same preflight
+    // posture as the sale saga's evaluate-promotion step (ADR-01): read outside
+    // the transaction, before any number depends on it. IN lines never go
+    // through the engine; they keep the original invoice's allocation.
+    const outItems = items.filter((it) => it.direction === ItemDirection.OUT);
+    const evaluation = outItems.length
+      ? await this.evaluateNewLines(invoice, outItems, dto, actor)
+      : null;
+
+    const totals = this.computeTotals(
+      items,
+      originalInvoice,
+      originalItems,
+      evaluation?.promotionDiscount ?? 0,
+    );
+    if (totals.newPromotionDiscount > 0 && evaluation) {
+      this.logger.log(
+        `Exchange ${id}: ${evaluation.appliedPrograms.length} programme(s) [${evaluation.appliedPrograms
+          .map((p) => p.code)
+          .join(', ')}] discount=${totals.newPromotionDiscount} newNet=${totals.newNet}`,
+      );
+    }
 
     // `refundMethod` no longer decides the fate of the whole refund — it names the
     // fund that pays out whatever is left AFTER the original invoice's debt has
@@ -556,6 +596,36 @@ export class CheckoutReturnService {
   // ─── helpers ─────────────────────────────────────────────────────────────
 
   /**
+   * Dispatches `EvaluateCartQuery` on the OUT lines of an exchange, built the
+   * way `evaluate-promotion.step.ts` builds it for a sale: `lineId` is
+   * `invoice_items.id` so the engine's allocation maps back to the exact row,
+   * `manualLineDiscount` is the money the cashier already took off the line,
+   * and the cashier's selected/excluded ids come from the request. Only
+   * `promotion/application` is imported — the query and its DTO, no domain.
+   */
+  private async evaluateNewLines(
+    invoice: InvoiceEntity,
+    outItems: InvoiceItemEntity[],
+    ids: ProgramSelection,
+    actor: ActorContext,
+  ): Promise<EvaluateCartResponse> {
+    const dto = new EvaluateCartDto();
+    dto.customerId = invoice.customerId ?? undefined;
+    dto.selectedProgramIds = ids.selectedProgramIds;
+    dto.excludedProgramIds = ids.excludedProgramIds;
+    dto.lines = outItems.map((item) => {
+      const line = new EvaluateCartLineInputDto();
+      line.lineId = item.id;
+      line.itemId = item.itemId;
+      line.quantity = Number(item.quantity);
+      line.unitPrice = Number(item.unitPrice);
+      line.manualLineDiscount = Number(item.lineDiscount) || undefined;
+      return line;
+    });
+    return this.queryBus.execute(new EvaluateCartQuery(dto, actor));
+  }
+
+  /**
    * `returnSubtotal` stays GROSS, but only as a gate (`> 0`) and as the value
    * shown on `invoice.subtotal`. It is NOT a money base and no longer a loyalty
    * base either: `computeReverseBase` moved onto `returnedNet` so that money and
@@ -592,6 +662,7 @@ export class CheckoutReturnService {
     items: InvoiceItemEntity[],
     originalInvoice: InvoiceEntity | null = null,
     originalItems: InvoiceItemEntity[] = [],
+    newPromotionDiscount = 0,
   ): ComputedTotals {
     const round = (v: number) => Math.round(v * 100) / 100;
 
@@ -604,6 +675,10 @@ export class CheckoutReturnService {
     }
     returnSubtotal = round(returnSubtotal);
     newSubtotal = round(newSubtotal);
+    newPromotionDiscount = round(newPromotionDiscount);
+    // The OUT side of the money is net of the engine's discount, mirroring how a
+    // sale's `amountDue` is; `newSubtotal` itself stays gross for `invoice.subtotal`.
+    const newNet = round(newSubtotal - newPromotionDiscount);
 
     const returnedNet = this.computeReturnedNet(
       items,
@@ -612,9 +687,17 @@ export class CheckoutReturnService {
       returnSubtotal,
     );
 
-    const netAmount = round(newSubtotal - returnedNet);
-    const refundedAmount = round(Math.max(returnedNet - newSubtotal, 0));
-    return { returnSubtotal, newSubtotal, returnedNet, netAmount, refundedAmount };
+    const netAmount = round(newNet - returnedNet);
+    const refundedAmount = round(Math.max(returnedNet - newNet, 0));
+    return {
+      returnSubtotal,
+      newSubtotal,
+      newPromotionDiscount,
+      newNet,
+      returnedNet,
+      netAmount,
+      refundedAmount,
+    };
   }
 
   /**
