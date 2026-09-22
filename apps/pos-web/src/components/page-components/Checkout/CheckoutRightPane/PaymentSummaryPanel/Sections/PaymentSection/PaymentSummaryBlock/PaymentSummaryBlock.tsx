@@ -44,8 +44,9 @@ export function PaymentSummaryBlock({
   // CTKM hàng hóa; dòng "Khuyến mại" bên dưới chỉ còn CTKM hóa đơn (ADR-02
   // pos-line-promotion-breakdown). Chỉ đổi số HIỂN THỊ: `deriveSettlement`
   // vẫn trừ `promotionDiscount` toàn phần khỏi grandTotal, nên "Còn phải thu"
-  // và payload checkout không đổi (ADR-03).
-  const total = Math.max(0, grandTotal - bucketTotals.item);
+  // và payload checkout không đổi (ADR-03). Không kẹp về 0: phiếu trả có
+  // grandTotal âm và đó là số đúng (ADR-04 pos-promotion-exchange-defects).
+  const total = grandTotal - bucketTotals.item;
   const pointsRedeemed = usePosCheckoutSessionStore(
     selectEffectivePointsRedeemed,
   );

@@ -55,5 +55,9 @@ export function mapEligibleLineToReturnableItem(
     refundableUnitPrice:
       Number(line.refundableUnitPrice ?? line.unitPrice) || 0,
     allowedQty: Number(line.maxReturnable) || 0,
+    promotions: (line.promotions ?? []).map((p) => ({
+      ...p,
+      unitDiscount: Number(p.unitDiscount) || 0,
+    })),
   };
 }

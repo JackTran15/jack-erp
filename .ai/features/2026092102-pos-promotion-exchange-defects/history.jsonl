@@ -15,3 +15,6 @@
 {"action": "passed", "at": "2026-09-22T10:01:14", "by": "Akenzy", "evidence": "graph valid - 4 UoW, 15 tickets, no cycles", "gate": "G3", "id": "1d37b56100aa", "ts": "2026-09-22T10:01:14.675907"}
 {"action": "scope", "at": "2026-09-22T10:07:26", "base": "1f6fa1b40d3979fa16e5930fd8826e55c1ddb08b", "by": "Akenzy", "gate": "G4", "id": "d22c6b362171", "ticket": "T-02-01", "ts": "2026-09-22T10:07:26.454733", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-22T10:07:26", "by": "Akenzy", "gate": "G4", "id": "0aa520063be3", "ticket": "T-02-01", "ts": "2026-09-22T10:07:26.456629"}
+{"action": "ticket in_progress", "agent": "aidlc-implementer", "at": "2026-09-22T10:07:35", "base": "2ae814c0c3cd9a82edc3308565c055416900e21b", "by": "Akenzy", "gate": "G4", "id": "e7d2eb1a2fae", "ticket": "T-02-02", "ts": "2026-09-22T10:07:35.263009"}
+{"action": "scope", "at": "2026-09-22T10:17:48", "base": "2ae814c0c3cd9a82edc3308565c055416900e21b", "by": "Akenzy", "gate": "G4", "id": "d7f537c63c22", "ticket": "T-02-02", "ts": "2026-09-22T10:17:48.756117", "verdict": "clean"}
+{"action": "ticket done (review bypassed)", "at": "2026-09-22T10:17:48", "by": "Akenzy", "gate": "G4", "id": "f4a053a36b6e", "ticket": "T-02-02", "ts": "2026-09-22T10:17:48.758124"}

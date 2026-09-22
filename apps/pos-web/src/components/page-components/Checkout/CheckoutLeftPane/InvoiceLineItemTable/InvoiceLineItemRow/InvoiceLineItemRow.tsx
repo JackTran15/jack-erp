@@ -14,8 +14,10 @@ import { InvoiceLineItemWarningCell } from "@erp/pos/components/page-components/
 import { useCheckoutCartActions } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-cart-actions";
 import { useCheckoutSessionCart } from "@erp/pos/hooks/page-hooks/checkout/use-checkout-session-cart";
 import {
+  bucketOf,
   formatPromotionLabel,
   itemDiscountOfLine,
+  type LinePromotion,
 } from "@erp/pos/lib/page-libs/checkout/linePromotionIndex";
 import {
   selectLinePromotionIndex,
@@ -84,14 +86,36 @@ export function InvoiceLineItemRow({
   const promotionItemDiscount = isReturnLine
     ? 0
     : itemDiscountOfLine(promotionIndex, line.lineId);
+  // Dòng trả: CTKM của hóa đơn gốc (snapshot qua `eligible-returns`), nhân SL
+  // đang trả — cùng nhãn/cùng class với dòng bán. Không đi qua preview.
+  const returnPromotions: LinePromotion[] = isReturnLine
+    ? (line.returnPromotions ?? []).map((p) => ({
+        programId: p.programId,
+        code: p.code,
+        name: p.name,
+        type: p.type,
+        discountAmount: p.unitDiscount * line.qty,
+        unitPriceAfter: line.unitPrice - p.unitDiscount,
+        bucket: bucketOf(p.type) ?? "item",
+      }))
+    : [];
   const rowTotal = lineTotal(line);
-  const displayLineTotal = Math.max(0, rowTotal - promotionItemDiscount);
+  // Dòng trả in số ÂM — đó là số đúng của phiếu trả, không kẹp về 0 (ADR-04
+  // pos-promotion-exchange-defects). `lineTotal()` đã âm với dòng
+  // `isReturnCredit` (trả theo HĐ) nhưng dương với `returnCart` của đổi trả
+  // nhanh (dấu do bảng quyết định, cùng cách cột SL in `-qty`), nên lấy
+  // `-|rowTotal|` cho cả hai. Kẹp chỉ giữ cho dòng bán, nơi CTKM có thể vượt
+  // tiền dòng.
+  const displayLineTotal = isReturnLine
+    ? -Math.abs(rowTotal)
+    : Math.max(0, rowTotal - promotionItemDiscount);
   const grossTotal = line.unitPrice * line.qty;
   const isReturnQuantityUi = isReturnLine;
   const displayQty = isReturnQuantityUi ? -line.qty : line.qty;
   const oversell = !isReturnQuantityUi && lineExceedsOnHandSnapshot(line);
   const hasManualDiscount = Boolean(line.lineDiscount);
-  const hasDiscount = hasManualDiscount || promotionItemDiscount > 0;
+  const hasDiscount =
+    hasManualDiscount || promotionItemDiscount > 0 || returnPromotions.length > 0;
 
   const qtyInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,6 +173,15 @@ export function InvoiceLineItemRow({
               key={p.programId}
               className="text-[12px] italic text-[#E5403A]"
               data-promotion-label={p.bucket}
+            >
+              {formatPromotionLabel(p)}
+            </span>
+          ))}
+          {returnPromotions.map((p) => (
+            <span
+              key={p.programId}
+              className="text-[12px] italic text-[#E5403A]"
+              data-promotion-label="return"
             >
               {formatPromotionLabel(p)}
             </span>
