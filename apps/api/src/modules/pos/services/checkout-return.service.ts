@@ -66,6 +66,7 @@ import {
   refundableFactor,
   refundableUnitValues,
 } from './refundable-value.util';
+import { persistAppliedPromotions } from '../checkout-saga/infrastructure/applied-promotion-writer';
 
 interface ComputedTotals {
   /** Gross value of the returned lines. A gate and a display value, not a base. */
@@ -378,12 +379,18 @@ export class CheckoutReturnService {
       invoice.refundedAmount = totals.refundedAmount;
       invoice.offsetAmount = offsetAmount;
       invoice.netAmount = totals.netAmount;
+      // Header discount = what the engine took off the OUT lines (A-07) — the
+      // same meaning a sale's header carries; the cashier's manual line
+      // discounts are already inside `lineTotal`. 0 when no programme applied,
+      // as create-exchange-invoice wrote it.
+      invoice.discountAmount = totals.newPromotionDiscount;
       // Loyalty earn is on the newly purchased (OUT) goods — a "Mua thêm" line is
       // a real sale and earns on its own value, independent of what was returned
       // (the return is reversed separately in fanOutEvents). RETURN/refund has no
-      // OUT lines, so newSubtotal = 0 and this earns nothing.
+      // OUT lines, so newNet = 0 and this earns nothing. `newNet`, not the gross
+      // `newSubtotal`: a sale earns on `amountDue`, after its promotion (A-02).
       invoice.pointsEarned = Math.floor(
-        totals.newSubtotal / POINT_EARN_VND_PER_POINT,
+        totals.newNet / POINT_EARN_VND_PER_POINT,
       );
       // Snapshot the points clawed back on the returned goods so receipts can show
       // "Điểm trừ" without querying point_history. Same base as the reverse event.
@@ -413,6 +420,18 @@ export class CheckoutReturnService {
             );
       if (dto.note) invoice.note = dto.note;
       const savedInvoice = await manager.save(invoice);
+
+      // What the engine decided for the OUT lines: per-line promotion_discount +
+      // the invoice_checkout_promotions snapshot, through the writer shared with
+      // the sale saga (ADR-02). Only `outItems` are handed over, so an allocation
+      // can never land on a returned line. `gifts[]` the engine may have offered
+      // are deliberately not turned into lines on an exchange (A-06).
+      await persistAppliedPromotions(manager, {
+        actor,
+        invoiceId: savedInvoice.id,
+        items: outItems,
+        appliedPrograms: evaluation?.appliedPrograms ?? [],
+      });
 
       // Atomic returned_quantity guard on each original SALE line referenced.
       const inLines = items.filter((it) => it.direction === ItemDirection.IN);
@@ -1271,13 +1290,15 @@ export class CheckoutReturnService {
     // leaving the balance unchanged. Netting them into a single netAmount would
     // swallow the earn whenever net <= 0.
     if (invoice.customerId) {
-      // AWARD on the newly purchased (OUT) goods.
-      if (totals.newSubtotal > 0) {
+      // AWARD on the newly purchased (OUT) goods — on `newNet`, the same base
+      // `pointsEarned` was snapshotted from above, so the consumer's figure and
+      // the receipt's agree.
+      if (totals.newNet > 0) {
         await this.loyaltyPointsPublisher.publish(
           {
             invoiceId: invoice.id,
             customerId: invoice.customerId,
-            subtotal: totals.newSubtotal,
+            subtotal: totals.newNet,
             issuedAt: invoice.issuedAt,
             branchId,
           },

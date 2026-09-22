@@ -2178,11 +2178,20 @@ describe('CheckoutReturnService — debt offset routing', () => {
       skippedPrograms: [],
     });
 
+    // `persistAppliedPromotions` writes the snapshot through
+    // `manager.getRepository(InvoiceCheckoutPromotionEntity)`.
+    let snapshotRepo: { create: jest.Mock; save: jest.Mock };
+
     beforeEach(() => {
       invoiceRepo.findOne.mockImplementation(({ where }) =>
         Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
       );
       itemRepo.find.mockResolvedValue(promoExchangeItems());
+      snapshotRepo = {
+        create: jest.fn().mockImplementation((data) => ({ id: 'snap-1', ...data })),
+        save: jest.fn().mockImplementation((rows) => Promise.resolve(rows)),
+      };
+      mockManager.getRepository = jest.fn().mockReturnValue(snapshotRepo);
     });
 
     it('evaluates only the OUT lines, with the cashier\'s selected/excluded ids and the customer', async () => {
@@ -2216,6 +2225,60 @@ describe('CheckoutReturnService — debt offset routing', () => {
         expect.objectContaining({ amount: 545000 }),
         actor,
       );
+    });
+
+    /**
+     * T-03-03 — what the transaction leaves behind: the OUT line's
+     * promotion_discount, one snapshot row keyed on the exchange, the header
+     * discount (A-07), and points + the loyalty award on newNet (A-02).
+     */
+    it('writes promotion_discount on the OUT line and one snapshot row for the exchange (AC-16/AC-18 shape)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      const savedOut = mockManager.save.mock.calls
+        .flatMap(([arg]) => (Array.isArray(arg) ? arg : [arg]))
+        .find((e: InvoiceItemEntity) => e.id === 'exc-out');
+      expect(savedOut).toBeDefined();
+      expect(Number(savedOut.promotionDiscount)).toBe(60000);
+      expect(Number(savedOut.lineTotal)).toBe(200000);
+
+      expect(snapshotRepo.save).toHaveBeenCalledTimes(1);
+      const [rows] = snapshotRepo.save.mock.calls[0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        invoiceId: result.id,
+        programId: 'prog-30',
+        code: 'KM000001',
+        name: 'Giảm giá hàng hóa 30%',
+        type: 'ITEM_DISCOUNT',
+        discountAmount: 60000,
+        lineDiscounts: [{ lineId: 'exc-out', discountAmount: 60000, unitPriceAfter: 70000 }],
+      });
+
+      expect(result.discountAmount).toBe(60000);
+    });
+
+    it('earns points on newNet and publishes the award on the same base (AC-15)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.pointsEarned).toBe(Math.floor(140000 / POINT_EARN_VND_PER_POINT));
+      expect(result.pointsEarned).not.toBe(Math.floor(200000 / POINT_EARN_VND_PER_POINT));
+      expect(loyaltyAwardPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: 'cust-1', subtotal: 140000 }),
+        actor,
+      );
+    });
+
+    it('with no programme applied the header discount stays 0 and nothing is snapshotted', async () => {
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.discountAmount).toBe(0);
+      expect(snapshotRepo.save).not.toHaveBeenCalled();
+      expect(result.netAmount).toBe(-485000);
     });
 
     it('a pure RETURN (no OUT line) never calls the engine (AC-14)', async () => {
