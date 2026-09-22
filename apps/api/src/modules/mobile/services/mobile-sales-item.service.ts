@@ -577,11 +577,14 @@ export class MobileSalesItemService {
       actor.organizationId,
     );
 
+    const modelImages = images.get(product.id) ?? [];
+
     return {
       id: product.id,
       code: product.code,
       name: product.name,
-      thumbnailUrl: images.get(product.id)?.[0]?.url ?? null,
+      thumbnailUrl: modelImages[0]?.url ?? null,
+      images: modelImages,
       attributes: [...dimensions].map(([name, options]) => ({ name, options })),
       variants: variants.map((row) => ({
         id: row.id,
