@@ -232,3 +232,13 @@ history:
     at: 2026-09-22T11:16:20
     by: Akenzy
     ticket: T-04-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:20:51
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:20:51
+    by: Akenzy
+    ticket: T-03-04
