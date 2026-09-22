@@ -842,7 +842,15 @@ export class MobileCashierService {
     const dto = new PosDailySummaryDto();
     dto.issuedAt = { from: session.openedAt.toISOString(), to: (session.closedAt ?? now).toISOString() };
     dto.branchId = session.branchId;
-    dto.cashierId = session.openedBy;
+    // KHÔNG lọc theo người mở ca (Loc chốt 2026-09-22: báo cáo = TOÀN BỘ ca). Ca
+    // là của CHI NHÁNH — một ca mở, mọi thu ngân cùng bán trên đó — nên lọc
+    // `cashierId = openedBy` làm rơi mọi khoản người khác thu (đo trên dev: ca
+    // `c4ca…` có 5 hoá đơn, báo cáo chỉ đếm 4 của người mở; hoá đơn chuyển
+    // khoản 2.397.500 của `e2e-cashier` biến mất). Chi nhánh + cửa sổ thời gian
+    // của ca KHÔNG đủ: mỗi KÉT một ca, nên một chi nhánh mở được nhiều ca cùng
+    // lúc — lọc hoá đơn theo CHÍNH ca (`sessionId`). Thu nợ / phiếu thu chi không
+    // gắn ca nên vẫn theo chi nhánh + cửa sổ (giới hạn đã biết khi hai két cùng mở).
+    dto.sessionId = session.id;
     const summary: PosDailySummaryResult = await this.queryBus.execute(new GetPosDailySummaryQuery(dto, actor));
 
     const r = summary.revenue;

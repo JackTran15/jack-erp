@@ -637,7 +637,7 @@ describe('MobileCashierService', () => {
       await expect(service.shiftReport(actor)).resolves.toEqual({ session: null, totals: null, groups: [] });
     });
 
-    it('ca qua đêm: cửa sổ là openedAt..now (không cắt theo ngày), cashierId = người mở, chi nhánh của phiên; sáu nhóm MISA', async () => {
+    it('ca qua đêm: cửa sổ là openedAt..now (không cắt theo ngày), TOÀN BỘ ca — không lọc người mở, chi nhánh của phiên; sáu nhóm MISA', async () => {
       const openedAt = new Date('2026-09-13T22:30:00.000Z');
       const session = { id: 'ses-1', status: SessionStatus.ACTIVE_SALES, openedAt, openedBy: 'u-cashier', branchId: 'br-1', closedAt: null };
       const { service, queryBus, repo } = build([session]);
@@ -649,7 +649,10 @@ describe('MobileCashierService', () => {
       const dto = (queryBus.execute.mock.calls[0] as unknown as [{ dto: { issuedAt: { from: string; to: string }; cashierId: string; branchId: string } }])[0].dto;
       expect(dto.issuedAt.from).toBe('2026-09-13T22:30:00.000Z');
       expect(new Date(dto.issuedAt.to).getTime()).toBeGreaterThanOrEqual(before);
-      expect(dto.cashierId).toBe('u-cashier');
+      // Loc chốt 2026-09-22: báo cáo = toàn bộ ca của chi nhánh. Lọc theo người mở
+      // làm rơi hoá đơn của thu ngân khác bán trên cùng ca.
+      expect(dto.cashierId).toBeUndefined();
+      expect((dto as unknown as { sessionId: string }).sessionId).toBe('ses-1');
       expect(dto.branchId).toBe('br-1');
       expect(report.session).toMatchObject({ id: 'ses-1', openedBy: 'u-cashier' });
       // Tiền mặt tổng = doanh thu tiền mặt (đã trừ trả) + thu nợ; nhóm bán tại cửa hàng cộng lại hàng trả để bày dương, đổi trả âm.

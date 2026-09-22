@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { MobileProductImageDto } from './mobile-product-detail.response.dto';
+
 /** Một chiều biến thiên của mẫu mã và các nhãn nó nhận — vd `Màu sắc: D, BO`. */
 export class MobileSalesModelAttributeDto {
   @ApiProperty({ description: 'Tên chiều — vd `Màu sắc`, `Size`' })
@@ -89,6 +91,16 @@ export class MobileSalesModelDetailDto {
       'thể dùng chung ảnh này nên nó không lặp lại ở từng phần tử `variants`.',
   })
   thumbnailUrl!: string | null;
+
+  @ApiProperty({
+    type: [MobileProductImageDto],
+    description:
+      'MỌI ảnh của mẫu mã theo thứ tự hiển thị — ảnh đầu trùng `thumbnailUrl`. ' +
+      'Màn chi tiết của app bán hàng bày chúng thành carousel full-width như ' +
+      'app quản lý. Rỗng khi chưa có ảnh HOẶC kho lưu trữ chưa cấu hình. ' +
+      '`thumbnailUrl` giữ lại cho client cũ.',
+  })
+  images!: MobileProductImageDto[];
 
   @ApiProperty({ type: [MobileSalesModelAttributeDto] })
   attributes!: MobileSalesModelAttributeDto[];

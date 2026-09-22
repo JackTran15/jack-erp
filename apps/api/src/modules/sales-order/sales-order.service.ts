@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   Logger,
+  Optional,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +14,7 @@ import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.ent
 import { CustomerEntity } from '../customer/customer.entity';
 import { DocumentNumberingService } from '../document-numbering/document-numbering.service';
 import { ItemEntity } from '../inventory/location/item.entity';
+import { MediaQueryService } from '../media/media-query.service';
 import type { CreateInvoiceDto } from '../pos/dto/create-invoice.dto';
 import { InvoiceEntity } from '../pos/entities/invoice.entity';
 import { InvoiceService } from '../pos/services/invoice.service';
@@ -59,6 +61,12 @@ export interface SalesOrderLineView {
   promotionName: string | null;
   note: string | null;
   lineTotal: number;
+  /**
+   * Ảnh bìa của MẪU MÃ cha (biến thể không có ảnh riêng — A-08), `null` khi
+   * chưa có ảnh. Chỉ đường CHI TIẾT tra; danh sách luôn `null` để khỏi thêm
+   * một lượt tra media cho cả trang.
+   */
+  thumbnailUrl: string | null;
 }
 
 export interface SalesOrderView {
@@ -86,6 +94,13 @@ export interface SalesOrderView {
   /** Hoá đơn nháp do `approve` tạo (ADR-32); null khi chưa nhận xử lý. */
   invoiceId: string | null;
   invoiceCode: string | null;
+  /**
+   * Hoá đơn của đơn CÒN là nháp (chưa thu tiền) — app bày nút *Tiếp tục thu tiền*
+   * trên đơn đã *Nhận xử lý* mà rời giỏ trước khi thu (Loc báo 2026-09-22: đơn
+   * rời hộp đơn chờ và không còn lối mở lại nháp). Chỉ đường CHI TIẾT tra; danh
+   * sách luôn `null`. `null` cũng khi đơn chưa có hoá đơn.
+   */
+  invoiceIsDraft: boolean | null;
   lines: SalesOrderLineView[];
 }
 
@@ -112,6 +127,9 @@ export class SalesOrderService {
     private readonly invoiceService: InvoiceService,
     private readonly posSessions: PosSessionService,
     private readonly points: PointsRedemptionService,
+    // Tuỳ chọn: `MediaModule` là `@Global()` nên Nest luôn tiêm; spec cũ dựng
+    // service bằng tay không truyền thì dòng đơn chỉ thiếu ảnh.
+    @Optional() private readonly mediaQuery?: MediaQueryService,
   ) {}
 
   async create(dto: CreateSalesOrderDto, actor: ActorContext): Promise<SalesOrderView> {
@@ -286,7 +304,13 @@ export class SalesOrderService {
     if (scope.salespersonId) {
       qb.andWhere(own, ownParams);
     }
-    if (query.status === SalesOrderStatus.DRAFT) {
+    if (query.awaitingCashier) {
+      qb.andWhere(
+        '(so.status = :sent OR (so.status = :processed AND EXISTS ' +
+          '(SELECT 1 FROM invoices i WHERE i.id = so.invoice_id AND i.is_draft = true)))',
+        { sent: SalesOrderStatus.SENT, processed: SalesOrderStatus.PROCESSED },
+      );
+    } else if (query.status === SalesOrderStatus.DRAFT) {
       // Đơn LƯU TẠM luôn là "của mình", kể cả với người có quyền duyệt: thu ngân
       // cũng có giỏ riêng, và không ai được thấy giỏ dở của người khác. (Lượt e2e
       // 2026-09-13 đỏ đúng ở đây: tài khoản test có quyền duyệt nên bị loại
@@ -341,9 +365,34 @@ export class SalesOrderService {
     const lines = await this.lines.find({ where: { salesOrderId: id }, order: { lineNo: 'ASC' } });
     // Chỉ ở đường CHI TIẾT mới tra mã hoá đơn — danh sách không N+1.
     const invoice = order.invoiceId
-      ? await this.invoices.findOne({ where: { id: order.invoiceId, organizationId: actor.organizationId }, select: ['id', 'code'] })
+      ? await this.invoices.findOne({
+          where: { id: order.invoiceId, organizationId: actor.organizationId },
+          select: ['id', 'code', 'isDraft'],
+        })
       : null;
-    return this.toView(order, lines, invoice?.code ?? null);
+    const thumbnails = await this.thumbnailsOf(lines, actor.organizationId);
+    return this.toView(order, lines, invoice?.code ?? null, thumbnails, invoice ? invoice.isDraft : null);
+  }
+
+  /**
+   * `itemId → URL ảnh bìa` cho các dòng đơn. Chủ sở hữu ảnh là mẫu mã cha
+   * (`productId ?? id`), cùng luật `imageOwnerOf` của `/mobile/sales-items` —
+   * dòng đơn chỉ lưu `item_id` của BIẾN THỂ nên phải tra qua `items`.
+   */
+  private async thumbnailsOf(lines: SalesOrderLineEntity[], organizationId: string): Promise<Map<string, string>> {
+    const result = new Map<string, string>();
+    if (!this.mediaQuery || lines.length === 0) return result;
+
+    const itemIds = [...new Set(lines.map((line) => line.itemId))];
+    const items = await this.items.find({ where: { id: In(itemIds), organizationId }, select: ['id', 'productId'] });
+    const ownerOf = new Map(items.map((item) => [item.id, item.productId ?? item.id]));
+    const images = await this.mediaQuery.resolvePublicUrls([...new Set(ownerOf.values())], organizationId);
+
+    for (const [itemId, owner] of ownerOf) {
+      const url = images.get(owner)?.[0]?.url;
+      if (url) result.set(itemId, url);
+    }
+    return result;
   }
 
   /**
@@ -622,7 +671,13 @@ export class SalesOrderService {
     };
   }
 
-  private toView(order: SalesOrderEntity, lines: SalesOrderLineEntity[], invoiceCode: string | null = null): SalesOrderView {
+  private toView(
+    order: SalesOrderEntity,
+    lines: SalesOrderLineEntity[],
+    invoiceCode: string | null = null,
+    thumbnails: Map<string, string> = new Map(),
+    invoiceIsDraft: boolean | null = null,
+  ): SalesOrderView {
     return {
       id: order.id,
       code: order.documentNumber,
@@ -645,6 +700,7 @@ export class SalesOrderService {
       cancelReason: order.cancelReason,
       invoiceId: order.invoiceId ?? null,
       invoiceCode,
+      invoiceIsDraft,
       lines: lines.map((line) => ({
         id: line.id,
         itemId: line.itemId,
@@ -659,6 +715,7 @@ export class SalesOrderService {
         promotionName: line.promotionName,
         note: line.note,
         lineTotal: Number(line.lineTotal),
+        thumbnailUrl: thumbnails.get(line.itemId) ?? null,
       })),
     };
   }

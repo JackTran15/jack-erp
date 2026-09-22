@@ -181,6 +181,9 @@ export class GetPosDailySummaryHandler
       invoiceStatus: dto.invoiceStatus,
     });
     new FilterBuilder(invoiceQb).applyDateRange('invoice.issuedAt', dto.issuedAt);
+    if (dto.sessionId) {
+      invoiceQb.andWhere('invoice.sessionId = :session', { session: dto.sessionId });
+    }
     if (dto.cashierId) {
       invoiceQb.andWhere('invoice.staffId = :cashier', { cashier: dto.cashierId });
     }
@@ -419,8 +422,11 @@ export class GetPosDailySummaryHandler
     applyBranchScope(newDebtQb, 'd', branchIds);
     if (from) newDebtQb.andWhere('d.issuedAt >= :dFrom', { dFrom: from });
     if (to) newDebtQb.andWhere('d.issuedAt <= :dTo', { dTo: to });
-    if (dto.cashierId || dto.salespersonId) {
+    if (dto.cashierId || dto.salespersonId || dto.sessionId) {
       newDebtQb.innerJoin(InvoiceEntity, 'debtInvoice', 'debtInvoice.id = d.invoiceId');
+      if (dto.sessionId) {
+        newDebtQb.andWhere('debtInvoice.sessionId = :session', { session: dto.sessionId });
+      }
       if (dto.cashierId) {
         newDebtQb.andWhere('debtInvoice.staffId = :cashier', { cashier: dto.cashierId });
       }
