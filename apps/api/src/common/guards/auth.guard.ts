@@ -97,12 +97,16 @@ export class AuthGuard implements CanActivate {
         // userId is the key's real shadow user (ADR-04) — PermissionGuard/
         // RbacService resolve permissions from a DB user_roles lookup keyed
         // on this id, unmodified, exactly as for a JWT request. apiKeyId
-        // rides along only for logging/observability, not for authorization.
+        // rides along only for logging/observability, not for authorization —
+        // and salesChannelId the same way: it is the key's channel IDENTITY
+        // (which channel an incoming partner order belongs to), never a
+        // permission. `null` when the key belongs to no sales channel.
         request.user = {
           userId: result.actor.userId,
           organizationId: result.actor.organizationId,
           branchIds: result.actor.branchIds,
           apiKeyId: result.actor.apiKeyId,
+          salesChannelId: result.actor.salesChannelId,
         };
         return true;
     }

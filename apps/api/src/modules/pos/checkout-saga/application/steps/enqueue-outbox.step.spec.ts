@@ -1,5 +1,7 @@
 import { EnqueueOutboxStep } from './enqueue-outbox.step';
+import { ComputeTotalsStep } from './compute-totals.step';
 import { InvoiceStatus } from '../../../entities/invoice.entity';
+import { POINT_EARN_VND_PER_POINT } from '../../../../customer/loyalty.constants';
 import { CheckoutContext } from '../checkout-step';
 
 function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
@@ -267,6 +269,121 @@ describe('EnqueueOutboxStep', () => {
 
     const ids = enqueue.mock.calls.map((c) => c[2].eventId);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  /**
+   * T-04-06 / A-24. The stored `pointsEarned` and the number the async consumer
+   * actually awards are computed in two different files from two different
+   * objects. `LoyaltyPointsConsumer` awards `floor(payload.subtotal / rate)`, and
+   * `persist-invoice` projects `pointsBalanceAfter` — printed on the customer's
+   * receipt — from `totals.pointsEarned`. If those two bases drift, the receipt
+   * promises a balance the card never reaches, and nothing else in the system
+   * notices.
+   */
+  describe('the loyalty award base excludes the delivery fee (T-04-06, A-24)', () => {
+    const feeCtx = (fee: unknown, amountDue = 880_000) =>
+      ctx({
+        invoice: {
+          id: 'inv-1',
+          branchId: 'b1',
+          customerId: 'cust-1',
+          shippingFeeAmount: fee,
+        } as any,
+        totals: { ...ctx().totals!, amountDue, pointsEarned: 85 },
+      });
+
+    it('sends the goods part, not the fee-inclusive amountDue', async () => {
+      const { manager, outbox, enqueue } = withManager();
+      const c = feeCtx(30_000);
+      c.manager = manager;
+
+      await new EnqueueOutboxStep(outbox as any).execute(c);
+
+      const loyaltyCall = enqueue.mock.calls.find(
+        (call) => call[1] === 'erp.loyalty.points.award',
+      );
+      // 880.000 payable − 30.000 fee = 850.000 of goods.
+      expect(loyaltyCall![2].payload.subtotal).toBe(850_000);
+      expect(loyaltyCall![2].payload.subtotal).not.toBe(880_000);
+    });
+
+    it('coerces the string TypeORM hands back for numeric(18,2)', async () => {
+      const { manager, outbox, enqueue } = withManager();
+      const c = feeCtx('30000.00');
+      c.manager = manager;
+
+      await new EnqueueOutboxStep(outbox as any).execute(c);
+
+      const loyaltyCall = enqueue.mock.calls.find(
+        (call) => call[1] === 'erp.loyalty.points.award',
+      );
+      expect(loyaltyCall![2].payload.subtotal).toBe(850_000);
+    });
+
+    it('leaves a fee-less invoice on exactly amountDue, as before', async () => {
+      const { manager, outbox, enqueue } = withManager();
+      const c = feeCtx(undefined); // column absent on every pre-T-04-02 invoice
+      c.manager = manager;
+
+      await new EnqueueOutboxStep(outbox as any).execute(c);
+
+      const loyaltyCall = enqueue.mock.calls.find(
+        (call) => call[1] === 'erp.loyalty.points.award',
+      );
+      expect(loyaltyCall![2].payload.subtotal).toBe(880_000);
+    });
+
+    it('the awarded points equal the persisted pointsEarned — the two halves cannot drift', async () => {
+      // Runs the REAL compute-totals over a fee-bearing draft, then feeds its
+      // output straight into this step, so the assertion holds the two files
+      // together instead of restating a constant in each.
+      const { manager, outbox, enqueue } = withManager();
+      const invoice = {
+        id: 'inv-1',
+        branchId: 'b1',
+        customerId: 'cust-1',
+        issuedAt: new Date('2026-08-05T00:00:00Z'),
+        discountAmount: 100_000,
+        pointsDiscountAmount: 50_000,
+        depositAmount: 0,
+        shippingFeeAmount: 30_000,
+      } as any;
+      const items = [
+        {
+          id: 'line-1',
+          itemId: 'item-1',
+          quantity: 1,
+          unitPrice: 1_000_000,
+          lineTotal: 1_000_000,
+          lineDiscount: 0,
+        } as any,
+      ];
+      const c = ctx({
+        invoice,
+        items,
+        input: {
+          invoiceId: 'inv-1',
+          payments: [{ paymentMethod: 'cash' as any, amount: 880_000 }],
+        },
+        totals: undefined,
+      });
+
+      await new ComputeTotalsStep().execute(c);
+      c.manager = manager;
+      await new EnqueueOutboxStep(outbox as any).execute(c);
+
+      const loyaltyCall = enqueue.mock.calls.find(
+        (call) => call[1] === 'erp.loyalty.points.award',
+      );
+      const awarded = Math.floor(
+        loyaltyCall![2].payload.subtotal / POINT_EARN_VND_PER_POINT,
+      );
+      expect(awarded).toBe(c.totals!.pointsEarned);
+      // Pin the absolute number too, so "both wrong the same way" fails.
+      expect(c.totals!.amountDue).toBe(880_000);
+      expect(c.totals!.pointsEarned).toBe(85);
+      expect(loyaltyCall![2].payload.subtotal).toBe(850_000);
+    });
   });
 
   it('sets ctx.wsNotification with the acknowledged payload, but does not emit it itself', async () => {

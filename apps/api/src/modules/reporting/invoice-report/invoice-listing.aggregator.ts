@@ -37,6 +37,12 @@ export interface InvoiceRowInput {
   cashier: string | null;
   salesperson: string | null;
   storeCode: string | null;
+  /**
+   * `invoices.sales_channel` — the channel label as it was snapshotted onto the
+   * invoice. Optional because a row assembled before this column existed simply
+   * has no channel; absent and NULL read the same way (see `IN_STORE_CHANNEL`).
+   */
+  salesChannel?: string | null;
   /** Σ invoice_payments.amount where method = cash. */
   cash: number;
   /** Σ invoice_payments.amount where method = bank_transfer. */
@@ -48,6 +54,19 @@ export interface InvoiceRowInput {
 }
 
 const DEBT_STATUSES = new Set(['debt', 'partial_debt']);
+
+/**
+ * What a NULL `invoices.sales_channel` means — a sale made at the counter, not
+ * a sale with an unknown channel (the entity's own comment says so).
+ *
+ * The substitution lives in `listingCellValue` and not in `listingDisplayValue`
+ * — the opposite of `status`, and for the opposite reason. `status` has a real
+ * stored value (`paid`) that the filter's select sends back, so translating it
+ * early would break the filter. A counter sale has NO stored value at all, so
+ * "Tại cửa hàng" is the only string the user can ever filter on; producing it
+ * here is what lets the filter and the cell compare the same thing.
+ */
+const IN_STORE_CHANNEL = 'Tại cửa hàng';
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 const invoiceFieldValue = (
@@ -73,6 +92,11 @@ const invoiceFieldValue = (
       return r.totalPaid;
     case 'note':
       return r.note ?? null;
+    case 'salesChannel':
+      // Passed through verbatim — no lookup against `sales_channels`, so a
+      // channel that was since renamed or deleted still reports under the
+      // label its invoices were sold with (ADR-03).
+      return r.salesChannel ?? IN_STORE_CHANNEL;
   }
 };
 

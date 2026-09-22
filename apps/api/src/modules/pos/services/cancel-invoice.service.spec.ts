@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { WsEventType } from '@erp/shared-interfaces';
 import { CancelInvoiceService } from './cancel-invoice.service';
@@ -148,12 +152,12 @@ describe('CancelInvoiceService', () => {
 
     it('throws when invoice is DRAFT', async () => {
       invoiceRepo.findOne.mockResolvedValue(invoiceStub({ status: InvoiceStatus.DRAFT }));
-      await expect(service.cancel('inv-1', { reason: 'mistake' }, actor)).rejects.toThrow(BadRequestException);
+      await expect(service.cancel('inv-1', { reason: 'mistake' }, actor)).rejects.toThrow(ConflictException);
     });
 
     it('throws when invoice is already CANCELLED', async () => {
       invoiceRepo.findOne.mockResolvedValue(invoiceStub({ status: InvoiceStatus.CANCELLED }));
-      await expect(service.cancel('inv-1', { reason: 'mistake' }, actor)).rejects.toThrow(BadRequestException);
+      await expect(service.cancel('inv-1', { reason: 'mistake' }, actor)).rejects.toThrow(ConflictException);
     });
   });
 
@@ -230,7 +234,7 @@ describe('CancelInvoiceService', () => {
 
       await expect(
         service.cancel('inv-1', { reason: 'mistake' }, actor),
-      ).rejects.toThrow(/Only sale invoices/);
+      ).rejects.toThrow(/không phải hoá đơn bán/); // 409 INVOICE_NOT_CANCELLABLE, câu tiếng Việt
       expect(invoiceCancelledPublisher.publish).not.toHaveBeenCalled();
     });
 
@@ -241,7 +245,7 @@ describe('CancelInvoiceService', () => {
 
       await expect(
         service.cancel('inv-1', { reason: 'mistake' }, actor),
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(ConflictException);
       expect(dataSource.transaction).not.toHaveBeenCalled();
     });
 
@@ -279,7 +283,7 @@ describe('CancelInvoiceService', () => {
 
       await expect(
         service.cancel('inv-1', { reason: 'mistake' }, actor),
-      ).rejects.toThrow(/Only paid\/debt\/partial-debt/);
+      ).rejects.toThrow(/trạng thái không huỷ được/);
     });
   });
 

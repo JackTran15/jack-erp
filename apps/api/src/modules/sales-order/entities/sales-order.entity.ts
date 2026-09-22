@@ -35,16 +35,36 @@ export class SalesOrderEntity extends BaseEntity {
   @Column({ type: 'enum', enum: SalesOrderStatus, enumName: 'sales_order_status_enum', default: SalesOrderStatus.SENT })
   status: SalesOrderStatus;
 
-  /** `employee_profiles.id` của người gửi — cùng khoá với `invoices.salesperson_id`. */
-  @Column({ name: 'salesperson_id', type: 'uuid' })
-  salespersonId: string;
+  /**
+   * `employee_profiles.id` của người gửi — cùng khoá với `invoices.salesperson_id`.
+   *
+   * NULL với đơn web (A-04): ở đó không có ai tư vấn. Phương án "nhân viên hệ
+   * thống" giả bị loại vì nó chảy thẳng vào `invoices.salesperson_id` và làm
+   * bẩn báo cáo hoa hồng.
+   */
+  @Column({ name: 'salesperson_id', type: 'uuid', nullable: true })
+  salespersonId: string | null;
 
   /** Tên hiển thị CHỐT lúc gửi — đổi tên nhân viên sau đó không đổi chứng từ cũ. */
-  @Column({ name: 'salesperson_name', type: 'varchar' })
-  salespersonName: string;
+  @Column({ name: 'salesperson_name', type: 'varchar', nullable: true })
+  salespersonName: string | null;
 
+  /** Nhãn kênh CHỐT lúc đặt. Phần khai báo nằm ở {@link salesChannelId}. */
   @Column({ name: 'sales_channel', type: 'varchar' })
   salesChannel: string;
+
+  /** `sales_channels.id`; NULL với đơn tư vấn viên trên mobile. */
+  @Column({ name: 'sales_channel_id', type: 'uuid', nullable: true })
+  salesChannelId: string | null;
+
+  /**
+   * Mã đơn phía website. Khoá chống tạo trùng: index riêng phần
+   * `UNIQUE (organization_id, sales_channel_id, external_order_id)
+   *  WHERE external_order_id IS NOT NULL` — đơn mobile không có mã ngoài nên
+   * không đụng ràng buộc.
+   */
+  @Column({ name: 'external_order_id', type: 'varchar', nullable: true })
+  externalOrderId: string | null;
 
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customerId: string | null;
@@ -64,6 +84,38 @@ export class SalesOrderEntity extends BaseEntity {
 
   @Column({ name: 'amount_due', type: 'numeric', precision: 18, scale: 2, default: 0 })
   amountDue: string;
+
+  /** Phí giao hàng; 0 với đơn mobile. Cùng bài học chuỗi như các cột tiền khác. */
+  @Column({ name: 'shipping_fee', type: 'numeric', precision: 18, scale: 2, default: 0 })
+  shippingFee: string;
+
+  @Column({ name: 'recipient_name', type: 'varchar', nullable: true })
+  recipientName: string | null;
+
+  @Column({ name: 'recipient_phone', type: 'varchar', nullable: true })
+  recipientPhone: string | null;
+
+  /**
+   * Địa chỉ giao là SNAPSHOT, không FK sang `geo_*` (A-07, ADR-05, AC-03).
+   *
+   * Cả MÃ lẫn TÊN đều chốt xuống đơn: `geo_wards` mang sẵn `merged_from` cho
+   * đợt sáp nhập địa giới, nên đọc lại tên theo dataset mới sẽ làm đơn cũ tự
+   * đổi nội dung. Đừng "chuẩn hoá" mấy cột tên này thành join.
+   */
+  @Column({ name: 'ship_province_code', type: 'varchar', length: 16, nullable: true })
+  shipProvinceCode: string | null;
+
+  @Column({ name: 'ship_province_name', type: 'varchar', length: 100, nullable: true })
+  shipProvinceName: string | null;
+
+  @Column({ name: 'ship_ward_code', type: 'varchar', length: 8, nullable: true })
+  shipWardCode: string | null;
+
+  @Column({ name: 'ship_ward_name', type: 'varchar', length: 100, nullable: true })
+  shipWardName: string | null;
+
+  @Column({ name: 'ship_address_line', type: 'varchar', nullable: true })
+  shipAddressLine: string | null;
 
   @Column({ type: 'varchar', nullable: true })
   note: string | null;

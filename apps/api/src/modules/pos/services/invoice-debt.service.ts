@@ -80,6 +80,32 @@ export class InvoiceDebtService {
     private readonly accountResolver: AccountResolverService,
   ) {}
 
+  /**
+   * Opens the `invoice_debts` row for an invoice left unsettled. `debtAmount`
+   * is the part still owed; omit it and the whole `invoice.amountDue` is owed.
+   *
+   * Verified 2026-09-21 (T-05-02), after the delivery fee landed in
+   * `computeAmountDue` (T-04-02) and `approve()` started copying the order's
+   * `shippingFee` onto the draft (T-05-01): this method needs NO change for
+   * COD. It never re-derives an amount — it stores what it is handed, and both
+   * production callers hand it a fee-inclusive number:
+   *
+   *   - `create-debt.step.ts` passes `totals.remainder`, and
+   *     `compute-totals.step.ts` sets `remainder = amountDue − totalPaid`
+   *     where `amountDue` already carries `shippingFeeAmount`;
+   *   - `checkout-invoice.service.ts:348` passes the v1 twin of that number.
+   *
+   * So `original_amount` equals the fee-inclusive `amount_due`, which is what
+   * the shipper actually collects (ADR-04, AC-17) and what the `/orders` grid
+   * shows under "Thu hộ" (A-17). An invoice of 1.000.000 goods − 100.000
+   * discount − 50.000 points + 30.000 fee opens a debt of 880.000, not the
+   * pre-fee 850.000; a sale whose goods part is fully discounted opens a debt
+   * of exactly the 30.000 fee, because the clamp inside `computeAmountDue`
+   * wraps the goods part only (A-22).
+   *
+   * Do NOT add the fee here. The amount arrives carrying it, so a second
+   * addition bills the customer for delivery twice.
+   */
   async createFromInvoice(
     invoice: InvoiceEntity,
     debtAmount?: number,

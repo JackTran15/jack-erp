@@ -19,7 +19,7 @@ export class JournalReturnConsumer {
   constructor(private readonly journalService: JournalService) {}
 
   @OnDomainEvent(ERP_TOPICS.JOURNAL_POST_RETURN, {
-    groupId: 'erp-api.return.journal-post',
+    groupId: 'return.journal-post',
   })
   async handle(event: DomainEvent<JournalPostReturnPayload>): Promise<void> {
     const {

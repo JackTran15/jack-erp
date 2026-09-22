@@ -29,7 +29,7 @@ export class DepositRefundConsumer {
   constructor(private readonly bankPayments: BankPaymentsService) {}
 
   @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, {
-    groupId: 'erp-api.invoice.cancelled.deposit-refund',
+    groupId: 'invoice.cancelled.deposit-refund',
   })
   async handle(event: DomainEvent<InvoiceCancelledPayload>): Promise<void> {
     const {

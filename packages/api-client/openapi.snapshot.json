@@ -28108,89 +28108,71 @@
         ]
       }
     },
-    "/v2/partner/catalog/categories/tree": {
-      "post": {
-        "operationId": "PartnerCategoryV2Controller_tree_v2",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PartnerCategoryTreeRequestDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PartnerCategoryTreeResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "api-key": []
-          }
-        ],
-        "summary": "Active product category tree with per-branch-independent product counts",
-        "tags": [
-          "Partner catalog"
-        ]
-      }
-    },
-    "/v2/partner/catalog/products/search": {
-      "post": {
-        "operationId": "PartnerProductV2Controller_search_v2",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PartnerProductSearchDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PartnerProductSearchResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "api-key": []
-          }
-        ],
-        "summary": "Search products by keyword, category, price and attributes",
-        "tags": [
-          "Partner catalog"
-        ]
-      }
-    },
-    "/v2/partner/catalog/products/{productCode}": {
+    "/admin/sales-orders": {
       "get": {
-        "operationId": "PartnerProductV2Controller_detail_v2",
+        "description": "`unassigned=true` đòi `pos.sales-order.dispatch`. Không `unassigned` đòi `pos.sales-order.read-all` — thiếu nó là 403, không phải một trang rỗng. Mỗi dòng mang kèm `branchId` + `branchName` của chi nhánh đang giữ đơn (`null` cả hai khi đơn còn trong pool); lọc bằng `branchId`.",
+        "operationId": "AdminSalesOrderController_list",
         "parameters": [
           {
-            "name": "productCode",
-            "required": true,
-            "in": "path",
-            "description": "products.code, matched exactly (case-sensitive), not products.id or a variant SKU",
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SENT",
+                "PROCESSED",
+                "REJECTED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unassigned",
+            "required": false,
+            "in": "query",
+            "description": "Chỉ lấy đơn chưa phân chi nhánh",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "uuid chi nhánh, hoặc `UNASSIGNED` cho đơn chưa phân",
             "schema": {
               "type": "string"
             }
@@ -28198,17 +28180,129 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": ""
+          }
+        },
+        "summary": "Đơn toàn chuỗi; `unassigned=true` là pool chưa phân",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/sales-orders/{id}/dispatch": {
+      "post": {
+        "description": "Chỉ set `branch_id`; trạng thái giữ nguyên `SENT` và KHÔNG có hoá đơn nháp nào sinh ra. Không cần chi nhánh đang mở ca POS (ADR-02).",
+        "operationId": "AdminSalesOrderController_dispatch",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "409": {
+            "description": "`ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc `ORDER_ALREADY_DISPATCHED` (đơn đã có chi nhánh)"
+          }
+        },
+        "summary": "Phân đơn về một chi nhánh",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/sales-orders/{id}/return": {
+      "post": {
+        "description": "Đặt `branch_id = NULL` và ghi một dòng `RETURN` kèm lý do; trạng thái GIỮ NGUYÊN `SENT` — đơn vẫn chờ xử lý, chỉ là chưa ai giữ (A-05). `reason` bắt buộc.",
+        "operationId": "AdminSalesOrderController_returnToPool",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReturnSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "403": {
+            "description": "`ORDER_NOT_HELD_BY_BRANCH` — đơn thuộc chi nhánh khác"
+          },
+          "409": {
+            "description": "`ORDER_HAS_INVOICE` (đơn đã sinh hoá đơn), `ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc `ORDER_NOT_DISPATCHED` (đơn đang ở pool)"
+          }
+        },
+        "summary": "Trả đơn về pool chưa phân",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/v2/partner/orders": {
+      "post": {
+        "description": "Kênh bán lấy từ cấu hình của API key, KHÔNG từ payload. Đơn giá do server chốt từ `items.selling_price` lúc nhận đơn — payload không có chỗ cho `unitPrice` và gửi kèm là 400 (`forbidNonWhitelisted`).",
+        "operationId": "PartnerOrderV2Controller_create_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerCreateOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`externalOrderId` đã tồn tại trên kênh này — trả lại đúng đơn cũ, không tạo đơn thứ hai (AC-06)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PartnerProductDetailDto"
+                  "$ref": "#/components/schemas/PartnerCreateOrderResponseDto"
                 }
               }
             }
           },
-          "404": {
-            "description": "Product not found — unknown code, another organization's code, or no active variant. The same response for all three."
+          "201": {
+            "description": "Đơn mới được tạo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerCreateOrderResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`GEO_CODE_UNKNOWN`, `ORDER_LINE_ITEM_UNKNOWN`, hoặc payload sai khuôn"
+          },
+          "403": {
+            "description": "`CHANNEL_INACTIVE` — key không gắn kênh dùng được"
           }
         },
         "security": [
@@ -28216,9 +28310,9 @@
             "api-key": []
           }
         ],
-        "summary": "Product detail with its attribute dimensions and variants",
+        "summary": "Đối tác đặt đơn — đơn rơi vào pool chưa phân chi nhánh",
         "tags": [
-          "Partner catalog"
+          "Partner orders"
         ]
       }
     },
@@ -28440,6 +28534,120 @@
         "summary": "Một phường/xã theo mã",
         "tags": [
           "Geo"
+        ]
+      }
+    },
+    "/v2/partner/catalog/categories/tree": {
+      "post": {
+        "operationId": "PartnerCategoryV2Controller_tree_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerCategoryTreeRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerCategoryTreeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Active product category tree with per-branch-independent product counts",
+        "tags": [
+          "Partner catalog"
+        ]
+      }
+    },
+    "/v2/partner/catalog/products/search": {
+      "post": {
+        "operationId": "PartnerProductV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PartnerProductSearchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerProductSearchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Search products by keyword, category, price and attributes",
+        "tags": [
+          "Partner catalog"
+        ]
+      }
+    },
+    "/v2/partner/catalog/products/{productCode}": {
+      "get": {
+        "operationId": "PartnerProductV2Controller_detail_v2",
+        "parameters": [
+          {
+            "name": "productCode",
+            "required": true,
+            "in": "path",
+            "description": "products.code, matched exactly (case-sensitive), not products.id or a variant SKU",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartnerProductDetailDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Product not found — unknown code, another organization's code, or no active variant. The same response for all three."
+          }
+        },
+        "security": [
+          {
+            "api-key": []
+          }
+        ],
+        "summary": "Product detail with its attribute dimensions and variants",
+        "tags": [
+          "Partner catalog"
         ]
       }
     },
@@ -42960,8 +43168,13 @@
           "depositAmount": {
             "type": "number"
           },
+          "shippingFeeAmount": {
+            "type": "number",
+            "description": "Delivery fee charged to the customer (ADR-04 / A-16). Not merchandise\nrevenue — it gets its own GL account, still open at A-21.\n\nNever discounted and never eaten by point redemption: it is added to\n`amountDue` AFTER every reduction and after the goods part has clamped at 0\n(A-22). RETURN / EXCHANGE invoices carry 0 — a collected fee is not\nrefunded (A-23).\n\nLive since T-04-02: `computeAmountDue` reads this field, so every recompute\nsite that passes an invoice entity (or an object literal carrying\n`shippingFeeAmount`) lands the fee on `amountDue`. Only web orders set it\ntoday — a counter sale leaves it 0 and the old arithmetic falls out\nunchanged. Verified 2026-09-21 (T-04-03) end to end: 1.000.000 - 100.000 -\n50.000 + 30.000 fee stores `amount_due` 880.000, and the POS grid column,\nits footer `SUM` and its money-range filter all read that same 880.000.\n\nLike every other numeric column here it is declared `number` but comes back\nfrom TypeORM as a STRING — coerce before arithmetic."
+          },
           "amountDue": {
-            "type": "number"
+            "type": "number",
+            "description": "SALE: written by `computeAmountDue` — the clamp wraps the goods part only,\nso an over-discounted order still owes the delivery fee in full (ADR-04 /\nA-22).\n\nRETURN / EXCHANGE do NOT go through `computeAmountDue`:\n`checkout-return.service.ts` sets `amountDue = max(netAmount, 0)`, which is\n0 on a refund. That is why the grids read `netAmount` for those two types\n(`invoiceSignedTotalSql` / `getInvoiceSignedTotal`), not this column."
           },
           "totalPaid": {
             "type": "number"
@@ -43054,6 +43267,7 @@
           "pointsEarned",
           "pointsReversed",
           "depositAmount",
+          "shippingFeeAmount",
           "amountDue",
           "totalPaid",
           "keptChangeAmount",
@@ -43589,8 +43803,13 @@
           "depositAmount": {
             "type": "number"
           },
+          "shippingFeeAmount": {
+            "type": "number",
+            "description": "Delivery fee charged to the customer (ADR-04 / A-16). Not merchandise\nrevenue — it gets its own GL account, still open at A-21.\n\nNever discounted and never eaten by point redemption: it is added to\n`amountDue` AFTER every reduction and after the goods part has clamped at 0\n(A-22). RETURN / EXCHANGE invoices carry 0 — a collected fee is not\nrefunded (A-23).\n\nLive since T-04-02: `computeAmountDue` reads this field, so every recompute\nsite that passes an invoice entity (or an object literal carrying\n`shippingFeeAmount`) lands the fee on `amountDue`. Only web orders set it\ntoday — a counter sale leaves it 0 and the old arithmetic falls out\nunchanged. Verified 2026-09-21 (T-04-03) end to end: 1.000.000 - 100.000 -\n50.000 + 30.000 fee stores `amount_due` 880.000, and the POS grid column,\nits footer `SUM` and its money-range filter all read that same 880.000.\n\nLike every other numeric column here it is declared `number` but comes back\nfrom TypeORM as a STRING — coerce before arithmetic."
+          },
           "amountDue": {
-            "type": "number"
+            "type": "number",
+            "description": "SALE: written by `computeAmountDue` — the clamp wraps the goods part only,\nso an over-discounted order still owes the delivery fee in full (ADR-04 /\nA-22).\n\nRETURN / EXCHANGE do NOT go through `computeAmountDue`:\n`checkout-return.service.ts` sets `amountDue = max(netAmount, 0)`, which is\n0 on a refund. That is why the grids read `netAmount` for those two types\n(`invoiceSignedTotalSql` / `getInvoiceSignedTotal`), not this column."
           },
           "totalPaid": {
             "type": "number"
@@ -43689,6 +43908,7 @@
           "pointsEarned",
           "pointsReversed",
           "depositAmount",
+          "shippingFeeAmount",
           "amountDue",
           "totalPaid",
           "keptChangeAmount",
@@ -55202,6 +55422,371 @@
           }
         }
       },
+      "DispatchSalesOrderDto": {
+        "type": "object",
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "branchId"
+        ]
+      },
+      "ReturnSalesOrderDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Vì sao chi nhánh trả đơn về pool"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "PartnerOrderCustomerDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Tên người đặt"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Số điện thoại người đặt — khoá khớp khách. `+84901234567` và `0901234567` được chuẩn hoá về cùng một khách.",
+            "maxLength": 20
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "format": "email",
+            "description": "Email người đặt"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "PartnerOrderRecipientDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Tên người nhận hàng"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "description": "Số điện thoại người nhận hàng"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
+        ]
+      },
+      "PartnerOrderShippingDto": {
+        "type": "object",
+        "properties": {
+          "provinceCode": {
+            "type": "string",
+            "maxLength": 16,
+            "description": "Mã tỉnh/thành trong `geo_provinces`"
+          },
+          "wardCode": {
+            "type": "string",
+            "maxLength": 8,
+            "description": "Mã phường/xã trong `geo_wards`"
+          },
+          "addressLine": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Số nhà / đường"
+          },
+          "fee": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Phí giao hàng thu khách, VND",
+            "example": 30000
+          }
+        },
+        "required": [
+          "provinceCode",
+          "wardCode",
+          "addressLine",
+          "fee"
+        ]
+      },
+      "PartnerOrderLineDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "`items.code` (mã SKU) thuộc tổ chức của API key — so khớp đúng từng ký tự",
+            "example": "GELLI-39-NAU"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Số lượng đặt",
+            "example": 2
+          }
+        },
+        "required": [
+          "itemCode",
+          "quantity"
+        ]
+      },
+      "PartnerCreateOrderDto": {
+        "type": "object",
+        "properties": {
+          "externalOrderId": {
+            "type": "string",
+            "description": "Mã đơn phía website. Gửi lại cùng một mã trả về đơn đã tạo (200), không tạo đơn mới.",
+            "maxLength": 100,
+            "example": "WEB-1001"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/PartnerOrderCustomerDto"
+          },
+          "recipient": {
+            "$ref": "#/components/schemas/PartnerOrderRecipientDto"
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/PartnerOrderShippingDto"
+          },
+          "lines": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerOrderLineDto"
+            }
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Ghi chú của khách"
+          }
+        },
+        "required": [
+          "externalOrderId",
+          "customer",
+          "recipient",
+          "shipping",
+          "lines"
+        ]
+      },
+      "PartnerOrderLineResponseDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string"
+          },
+          "itemCode": {
+            "type": "string",
+            "description": "`items.code` — đúng mã đã gửi"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number",
+            "description": "`items.selling_price` tại thời điểm nhận đơn, đã chốt"
+          },
+          "lineTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "itemId",
+          "itemCode",
+          "itemName",
+          "quantity",
+          "unitPrice",
+          "lineTotal"
+        ]
+      },
+      "PartnerCreateOrderResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "`sales_orders.id`"
+          },
+          "documentNumber": {
+            "type": "string",
+            "description": "Mã chứng từ, duy nhất theo tổ chức"
+          },
+          "status": {
+            "type": "string",
+            "description": "Luôn là `SENT` với đơn mới nhận"
+          },
+          "amountDue": {
+            "type": "number",
+            "description": "Tiền hàng phải thu; CHƯA gồm phí giao"
+          },
+          "shippingFee": {
+            "type": "number",
+            "description": "Phí giao hàng thu khách"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PartnerOrderLineResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "documentNumber",
+          "status",
+          "amountDue",
+          "shippingFee",
+          "lines"
+        ]
+      },
+      "ProvinceMergedFromDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ]
+      },
+      "ProvinceDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "2026_01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Hà Nội"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "example": "2026-01-01",
+            "description": "Ngày hiệu lực, YYYY-MM-DD"
+          },
+          "mergedFrom": {
+            "description": "Các tỉnh cũ đã sáp nhập vào; dùng để ánh xạ địa chỉ ghi theo mã 1995_xx",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvinceMergedFromDto"
+            }
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "isActive",
+          "effectiveFrom",
+          "mergedFrom"
+        ]
+      },
+      "ProvinceListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvinceDto"
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "WardDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "4",
+            "description": "Mã phường — chỉ duy nhất trong cặp (provinceCode, code)"
+          },
+          "name": {
+            "type": "string",
+            "example": "Phường Ba Đình"
+          },
+          "provinceCode": {
+            "type": "string",
+            "example": "2026_01"
+          },
+          "provinceName": {
+            "type": "string",
+            "nullable": true,
+            "example": "Hà Nội",
+            "description": "Tên tỉnh hiện hành; null với phường cũ (mã 1995_xx không còn là tỉnh)"
+          },
+          "districtCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mã quận/huyện, chỉ có ở phường cũ"
+          },
+          "isCurrent": {
+            "type": "boolean",
+            "description": "true khi provinceCode là một tỉnh hiện hành"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "provinceCode",
+          "provinceName",
+          "districtCode",
+          "isCurrent"
+        ]
+      },
+      "WardSearchResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WardDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
       "PartnerCategoryTreeRequestDto": {
         "type": "object",
         "properties": {}
@@ -55570,138 +56155,6 @@
           "description",
           "attributes",
           "variants"
-        ]
-      },
-      "ProvinceMergedFromDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này"
-          },
-          "name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "code",
-          "name"
-        ]
-      },
-      "ProvinceDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "example": "2026_01"
-          },
-          "name": {
-            "type": "string",
-            "example": "Hà Nội"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "effectiveFrom": {
-            "type": "string",
-            "example": "2026-01-01",
-            "description": "Ngày hiệu lực, YYYY-MM-DD"
-          },
-          "mergedFrom": {
-            "description": "Các tỉnh cũ đã sáp nhập vào; dùng để ánh xạ địa chỉ ghi theo mã 1995_xx",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProvinceMergedFromDto"
-            }
-          }
-        },
-        "required": [
-          "code",
-          "name",
-          "isActive",
-          "effectiveFrom",
-          "mergedFrom"
-        ]
-      },
-      "ProvinceListResponseDto": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProvinceDto"
-            }
-          }
-        },
-        "required": [
-          "data"
-        ]
-      },
-      "WardDto": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "example": "4",
-            "description": "Mã phường — chỉ duy nhất trong cặp (provinceCode, code)"
-          },
-          "name": {
-            "type": "string",
-            "example": "Phường Ba Đình"
-          },
-          "provinceCode": {
-            "type": "string",
-            "example": "2026_01"
-          },
-          "provinceName": {
-            "type": "string",
-            "nullable": true,
-            "example": "Hà Nội",
-            "description": "Tên tỉnh hiện hành; null với phường cũ (mã 1995_xx không còn là tỉnh)"
-          },
-          "districtCode": {
-            "type": "string",
-            "nullable": true,
-            "description": "Mã quận/huyện, chỉ có ở phường cũ"
-          },
-          "isCurrent": {
-            "type": "boolean",
-            "description": "true khi provinceCode là một tỉnh hiện hành"
-          }
-        },
-        "required": [
-          "code",
-          "name",
-          "provinceCode",
-          "provinceName",
-          "districtCode",
-          "isCurrent"
-        ]
-      },
-      "WardSearchResponseDto": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/WardDto"
-            }
-          },
-          "total": {
-            "type": "number"
-          },
-          "page": {
-            "type": "number"
-          },
-          "limit": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "data",
-          "total",
-          "page",
-          "limit"
         ]
       },
       "CreateMediaUploadDto": {

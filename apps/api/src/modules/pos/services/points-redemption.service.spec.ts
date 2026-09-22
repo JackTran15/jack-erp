@@ -164,4 +164,88 @@ describe('PointsRedemptionService', () => {
       expect(result.amountDue).toBe(100000);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Delivery fee (T-04-04, AC-25 / AC-27)
+  //
+  // Both call sites here hand `computeAmountDue` the invoice entity, so they
+  // pick `shippingFeeAmount` up without a code change — which is exactly why
+  // they need a case with a fee != 0: nothing at the call site would show if
+  // that stopped being true.
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('delivery fee', () => {
+    it('AC-25: applyRedemption recomputes amountDue with the fee still on top', async () => {
+      const invoice = invoiceStub({
+        subtotal: 100000,
+        shippingFeeAmount: 30000,
+        amountDue: 130000,
+      });
+      manager.findOne.mockResolvedValue(invoice);
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(100);
+
+      const result = await service.applyRedemption('invoice-1', 30, actor);
+
+      // 100.000 − 15.000 = 85.000 hàng, + 30.000 phí.
+      expect(result.pointsDiscountAmount).toBe(15000);
+      expect(result.amountDue).toBe(115000);
+    });
+
+    it('AC-25 / A-22: points spent to the ceiling leave the fee, not 0', async () => {
+      const invoice = invoiceStub({
+        subtotal: 100000,
+        shippingFeeAmount: 30000,
+        amountDue: 130000,
+      });
+      manager.findOne.mockResolvedValue(invoice);
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(1000);
+
+      // 200 points = 100.000đ, the whole goods subtotal.
+      const result = await service.applyRedemption('invoice-1', 200, actor);
+
+      expect(result.amountDue).toBe(30000);
+    });
+
+    it('A-22: the redemption ceiling ignores the fee — points may not buy delivery', async () => {
+      // maxDiscount = subtotal − discount − deposit = 100.000, NOT 130.000.
+      // 260 points are worth 130.000, so this must be refused.
+      manager.findOne.mockResolvedValue(
+        invoiceStub({ subtotal: 100000, shippingFeeAmount: 30000, amountDue: 130000 }),
+      );
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(1000);
+
+      await expect(
+        service.applyRedemption('invoice-1', 260, actor),
+      ).rejects.toThrow(/exceeds the redeemable amount \(100000\)/);
+    });
+
+    it('AC-25: removeRedemption gives the goods back without dropping the fee', async () => {
+      const invoice = invoiceStub({
+        subtotal: 100000,
+        shippingFeeAmount: 30000,
+        pointsRedeemed: 30,
+        pointsDiscountAmount: 15000,
+        amountDue: 115000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+
+      const result = await service.removeRedemption('invoice-1', actor);
+
+      expect(result.pointsDiscountAmount).toBe(0);
+      expect(result.amountDue).toBe(130000);
+    });
+
+    it('coerces the numeric(18,2) fee TypeORM returns as a string', async () => {
+      const invoice = invoiceStub({
+        subtotal: '100000.00' as unknown as number,
+        shippingFeeAmount: '30000.00' as unknown as number,
+        pointsRedeemed: 30,
+        pointsDiscountAmount: 15000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+
+      const result = await service.removeRedemption('invoice-1', actor);
+
+      expect(result.amountDue).toBe(130000);
+    });
+  });
 });

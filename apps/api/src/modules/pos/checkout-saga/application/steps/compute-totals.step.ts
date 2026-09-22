@@ -57,6 +57,12 @@ export function computeAmounts(ctx: CheckoutContext): CheckoutAmounts {
   const discountAmount = manualDiscountAmount + promotionDiscount;
   const pointsDiscountAmount = Number(invoice.pointsDiscountAmount ?? 0);
   const depositAmount = Number(invoice.depositAmount ?? 0);
+  // Delivery fee off the draft. Like v1's call site this one builds an object
+  // literal instead of passing `invoice`, so the fee must be threaded by hand:
+  // the parameter defaults to 0 and a forgotten fee is invisible in the code,
+  // visible only in a fee != 0 case. Never discounted and never absorbed by
+  // point redemption — computeAmountDue adds it after the goods clamp (A-22).
+  const shippingFeeAmount = Number(invoice.shippingFeeAmount ?? 0);
 
   // The promotion engine already guarantees no line's discount exceeds its
   // own gross amount (AC-29 of the promotion-programs-engine feature), but
@@ -85,8 +91,19 @@ export function computeAmounts(ctx: CheckoutContext): CheckoutAmounts {
     discountAmount,
     pointsDiscountAmount,
     depositAmount,
+    shippingFeeAmount,
   });
-  const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
+  // Earn on the goods part, never on the delivery fee (A-24). T-04-02 put the
+  // fee into `amountDue`, which silently started accruing points on shipping;
+  // the CLAWBACK base never had it (`computeReverseBase` runs on `returnedNet`,
+  // and `RefundableInvoiceHeader` carries no fee field), so a full return could
+  // not reverse everything the sale granted. v1 parity: checkout-invoice.service.ts.
+  // `enqueue-outbox` re-derives this same base for the LOYALTY_POINTS_AWARD
+  // payload — the consumer awards floor(subtotal / rate) and it must equal the
+  // `pointsEarned` persisted here, or the receipt's `pointsBalanceAfter` lies.
+  const pointsEarned = Math.floor(
+    (amountDue - shippingFeeAmount) / POINT_EARN_VND_PER_POINT,
+  );
 
   // ADR-02: computed exactly once, here — persist-invoice and enqueue-outbox both
   // read ctx.totals.pointsBlocked rather than re-deriving it. Does not need to filter

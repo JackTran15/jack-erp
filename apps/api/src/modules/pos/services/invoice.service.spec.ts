@@ -598,6 +598,89 @@ describe('InvoiceService', () => {
       expect(savedInvoice.draftLabel).toBe('Table 5');
       expect(savedInvoice.note).toBe('Updated note');
     });
+
+    // =========================================================================
+    // delivery fee (T-04-04, AC-25/AC-27)
+    //
+    // `update` recomputes the total by handing the invoice ENTITY to
+    // `computeAmountDue`, so the fee rides along with no production change here.
+    // The call site reads identically whether or not that is true, so these
+    // cases carry a fee != 0: each expected number below is short by exactly
+    // 30.000 the moment the fee stops flowing.
+    // =========================================================================
+    describe('delivery fee (T-04-04, AC-25/AC-27)', () => {
+      it('AC-25: editing the lines keeps the fee on amountDue — 1tr goods + 30k = 1.030.000', async () => {
+        const stub = invoiceStub({
+          discountAmount: 0,
+          depositAmount: 0,
+          shippingFeeAmount: 30_000,
+        });
+        invoiceRepo.findOne.mockResolvedValue(stub);
+        itemRepo.find.mockResolvedValue([]);
+
+        const dto: UpdateInvoiceDto = {
+          items: [
+            { itemId: 'item-1', itemCode: 'A', itemName: 'A', unit: 'pcs', quantity: 4, unitPrice: 250_000, lineDiscount: 0 },
+          ],
+        };
+
+        await service.update('inv-1', dto, actor);
+
+        const saveArgs = mockManager.save.mock.calls;
+        const savedInvoice = saveArgs[saveArgs.length - 1][0];
+        expect(savedInvoice.subtotal).toBe(1_000_000);
+        expect(savedInvoice.amountDue).toBe(1_030_000);
+        // Recomputing the total must not touch the fee itself.
+        expect(savedInvoice.shippingFeeAmount).toBe(30_000);
+      });
+
+      it('AC-25: a discount bigger than the goods leaves the fee payable, not 0', async () => {
+        const stub = invoiceStub({
+          discountAmount: 2_000_000,
+          depositAmount: 0,
+          shippingFeeAmount: 30_000,
+        });
+        invoiceRepo.findOne.mockResolvedValue(stub);
+        itemRepo.find.mockResolvedValue([]);
+
+        const dto: UpdateInvoiceDto = {
+          items: [
+            { itemId: 'item-1', itemCode: 'A', itemName: 'A', unit: 'pcs', quantity: 4, unitPrice: 250_000, lineDiscount: 0 },
+          ],
+        };
+
+        await service.update('inv-1', dto, actor);
+
+        const saveArgs = mockManager.save.mock.calls;
+        const savedInvoice = saveArgs[saveArgs.length - 1][0];
+        // The clamp wraps the goods part only — the shipper still collects 30k.
+        expect(savedInvoice.amountDue).toBe(30_000);
+      });
+
+      it('coerces the numeric(18,2) fee TypeORM returns as a string', async () => {
+        const stub = invoiceStub({
+          discountAmount: 0,
+          depositAmount: 0,
+          shippingFeeAmount: '30000.00' as unknown as number,
+        });
+        invoiceRepo.findOne.mockResolvedValue(stub);
+        itemRepo.find.mockResolvedValue([]);
+
+        const dto: UpdateInvoiceDto = {
+          items: [
+            { itemId: 'item-1', itemCode: 'A', itemName: 'A', unit: 'pcs', quantity: 4, unitPrice: 250_000, lineDiscount: 0 },
+          ],
+        };
+
+        await service.update('inv-1', dto, actor);
+
+        const saveArgs = mockManager.save.mock.calls;
+        const savedInvoice = saveArgs[saveArgs.length - 1][0];
+        // 1030000, not the string '100000030000.00'.
+        expect(savedInvoice.amountDue).toBe(1_030_000);
+        expect(typeof savedInvoice.amountDue).toBe('number');
+      });
+    });
   });
 
   // ===========================================================================

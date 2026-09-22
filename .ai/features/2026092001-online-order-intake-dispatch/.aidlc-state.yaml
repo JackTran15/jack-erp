@@ -1,0 +1,930 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: online-order-intake-dispatch
+slug: 2026092001-online-order-intake-dispatch
+profile: none
+created: 2026-09-20T17:20:18
+ruleset: 6
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-20T17:44:36
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-20T17:50:30
+    by: Akenzy
+    evidence: 23 assumptions, none blocking-and-pending; 29 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-20T17:53:42
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-20T18:23:35
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 29 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-20T18:24:31
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:12:49
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:13:01
+    by: claude
+    reason: scripts/bench-catalog-page.js is a pre-existing untracked file from feature 2026090805-pos-initial-load-latency, present in the working tree before T-01-01 started and untouched by it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T10:13:01
+    by: claude
+    reason: scripts/bench-catalog-page.js is a pre-existing untracked file from feature 2026090805-pos-initial-load-latency, present in the working tree before T-01-01 started and untouched by it
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:21:45
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:28:55
+    by: claude
+    reason: sales-order.service.ts - making salesperson_id/name nullable (A-04, mandated by this ticket) breaks tsc in the one file that consumes them — widened SalesOrderView.salespersonId/Name to string|null and passed ?? undefined into CreateInvoiceDto. Plan's touches - omitted the consumer. scripts/bench-catalog-page.js is pre-existing from feature 2026090805, untouched.
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T10:28:55
+    by: claude
+    reason: sales-order.service.ts - making salesperson_id/name nullable (A-04, mandated by this ticket) breaks tsc in the one file that consumes them — widened SalesOrderView.salespersonId/Name to string|null and passed ?? undefined into CreateInvoiceDto. Plan's touches - omitted the consumer. scripts/bench-catalog-page.js is pre-existing from feature 2026090805, untouched.
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:33:16
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:33:16
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:33:16
+    by: claude
+    ticket: T-04-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:40:01
+    by: claude
+    reason: Only the two files in T-02-01 touches - were written. Everything else flagged is uncommitted work from T-01-01/T-01-02/T-01-03/T-04-01 sitting in the same working tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T10:40:01
+    by: claude
+    reason: Only the two files in T-02-01 touches - were written. Everything else flagged is uncommitted work from T-01-01/T-01-02/T-01-03/T-04-01 sitting in the same working tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:40:01
+    by: claude
+    reason: Only the two files in T-04-01 touches - were written. Everything else flagged is uncommitted work from sibling tickets in the same working tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T10:40:01
+    by: claude
+    reason: Only the two files in T-04-01 touches - were written. Everything else flagged is uncommitted work from sibling tickets in the same working tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-04-01
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-21T10:40:08
+    by: claude
+    reason: Plan defect, needs a G3 reopen. (1) api_keys has no sales-channel binding (columns - id, organization_id, user_id, name, key_prefix, key_hash, roles, branch_ids, ip_whitelist, created_at, updated_at, deleted_at, created_by) and no ticket in any of the 7 UoWs adds one, so the controller has no channel to pass, sales_channel_id has no source, and CHANNEL_INACTIVE/403 has nothing to check. Needs a new ticket. (2) T-01-03 depends_on should include T-01-04 - the controller only calls SalesOrderService.createFromPartner, which T-01-04 creates in a file outside T-01-03 touches. (3) GeoModule has no exports -, so GeoService cannot be injected for the GEO_CODE_UNKNOWN check. DTO, constants and the permission seed already landed.
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:40:28
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:40:28
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T10:40:28
+    by: claude
+    ticket: T-05-03
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:45:37
+    by: claude
+    reason: Only invoice-amount.util.ts and its new spec were written for this ticket. Everything else flagged is uncommitted work from sibling tickets in the same tree (T-01-01/02/03/04, T-02-01, T-04-01, T-05-03 in flight) plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T10:45:37
+    by: claude
+    reason: Only invoice-amount.util.ts and its new spec were written for this ticket. Everything else flagged is uncommitted work from sibling tickets in the same tree (T-01-01/02/03/04, T-02-01, T-04-01, T-05-03 in flight) plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-04-02
+  - gate: G4
+    action: scope
+    at: 2026-09-21T10:50:00
+    by: claude
+    reason: Only sales-order.service.ts and its spec were written for this ticket. Everything else flagged is uncommitted sibling-ticket work in the same tree plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. AC-05 note - the fifth done-when bullet asks for a Spec and the spec is green; the live-campaign half of the Gherkin rests on SalesOrderService having no PromotionApplyService/QueryBus dependency at all, so no campaign state can reach createFromPartner.
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T10:50:00
+    by: claude
+    reason: Only sales-order.service.ts and its spec were written for this ticket. Everything else flagged is uncommitted sibling-ticket work in the same tree plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. AC-05 note - the fifth done-when bullet asks for a Spec and the spec is green; the live-campaign half of the Gherkin rests on SalesOrderService having no PromotionApplyService/QueryBus dependency at all, so no campaign state can reach createFromPartner.
+    ticket: T-01-04
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-21T10:50:17
+    by: claude
+    reason: Two plan defects. (1) done-when 4 asks for a toOrderRow test but the test file is not in touches - and tests - is []; the mapper is written pure and testable, so the fix is adding the path to the ticket, not editing around it. (2) toView()/SalesOrderView (20 fields) never reads back the columns T-01-02 added — no shippingFee, recipientName/Phone, ship_* or externalOrderId — so the grid renders 0/empty for them even for a real web order, including the column T-05-04 sources from sales_orders.shipping_fee. No ticket in any UoW adds them to the read path. Code for the 3 touches - files is written, backoffice tsc clean, API suite green.
+    ticket: T-05-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T10:57:36
+    by: Akenzy
+    reason: Construction surfaced five defects in the decomposition - (1) no ticket binds an api_key to a sales_channel, so the partner controller has no channel source; (2) no ticket adds the new sales_orders columns to SalesOrderView/toView, so the read path never returns them; (3) T-01-03 depends_on omits T-01-04 and GeoModule has no exports -; (4) T-05-03 and T-05-04 have incomplete touches -; (5) T-04-03 is scoped to sync a formula that is not duplicated.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T11:00:35
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 31 tickets, no cycles
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-21T11:00:53
+    by: claude
+    reason: Plan defect, needs a G3 reopen. (1) api_keys has no sales-channel binding (columns - id, organization_id, user_id, name,
+    ticket: T-01-03
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-21T11:00:53
+    by: claude
+    reason: Two plan defects. (1) done-when 4 asks for a toOrderRow test but the test file is not in touches - and tests - is []; th
+    ticket: T-05-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T11:01:25
+    by: Akenzy
+    reason: T-04-04 touches - is incomplete in the same way the first batch was. Its done-when requires a fee != 0 case at each of the 7 computeAmountDue call sites, but the 2 object-literal callers (compute-totals.step.ts -72, checkout-invoice.service.ts -163) do not thread the fee, so those tests cannot pass without editing production files the ticket does not declare. Its own implementation notes also ask for a comment at any call site that deliberately omits the fee.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T11:01:49
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 31 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T11:01:49
+    by: claude
+    ticket: T-05-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T11:01:49
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T11:01:49
+    by: claude
+    ticket: T-04-04
+  - gate: G4
+    action: scope
+    at: 2026-09-21T11:07:30
+    by: claude
+    reason: Only sales-order.service.ts and its spec were written for this ticket. Everything else flagged is uncommitted sibling work in the same tree (T-01-06 and T-04-04 in flight) plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. Done-when are three spec bullets, all green (26/26). Full-suite gate deferred - the tree's one tsc error is in T-04-04's in-flight compute-totals.step.spec.ts, not this ticket.
+    ticket: T-05-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T11:07:30
+    by: claude
+    reason: Only sales-order.service.ts and its spec were written for this ticket. Everything else flagged is uncommitted sibling work in the same tree (T-01-06 and T-04-04 in flight) plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. Done-when are three spec bullets, all green (26/26). Full-suite gate deferred - the tree's one tsc error is in T-04-04's in-flight compute-totals.step.spec.ts, not this ticket.
+    ticket: T-05-07
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T11:10:58
+    by: Akenzy
+    reason: Third touches - batch, plus a business question construction uncovered. (1) T-01-06 omits common/guards/auth.guard.spec.ts, the only place its done-when 3 clause 'request.user mang theo no' can be proven. (2) T-04-04 omits promotion/promotion-apply.service.spec.ts (call sites 1-2 and the only home for the promotion apply/remove round trip) and pos/services/invoice.service.spec.ts (call site 7) — 3 of 7 call sites unreachable, so its box 1 is honestly unticked at 4/7. (3) Recording new assumption A-24 - amountDue now includes the shipping fee and pointsEarned = floor(amountDue / rate), so loyalty points accrue on delivery fees. Nothing in ADR-04, A-22 or A-23 decides the earn base.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T11:11:35
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 31 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T11:14:41
+    by: claude
+    reason: Files written for this ticket are its 8 declared touches -. Everything else flagged is uncommitted sibling work in the same tree (T-04-04 follow-up in flight, T-05-03 frontend) plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T11:14:41
+    by: claude
+    reason: Files written for this ticket are its 8 declared touches -. Everything else flagged is uncommitted sibling work in the same tree (T-04-04 follow-up in flight, T-05-03 frontend) plus pre-existing scripts/bench-catalog-page.js from feature 2026090805.
+    ticket: T-01-06
+  - gate: G4
+    action: scope
+    at: 2026-09-21T11:19:43
+    by: claude
+    reason: Files written for this ticket are its 8 declared touches - (6 original + promotion-apply.service.spec.ts and invoice.service.spec.ts added in the 2026-09-21 G3 reopen). Everything else flagged is uncommitted sibling work in the same tree plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. Orchestrator ran an independent mutation check - blinding the fee in computeAmountDue turns 36 tests red across 7 suites; restored, 421 suites / 5896 green.
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T11:19:43
+    by: claude
+    reason: Files written for this ticket are its 8 declared touches - (6 original + promotion-apply.service.spec.ts and invoice.service.spec.ts added in the 2026-09-21 G3 reopen). Everything else flagged is uncommitted sibling work in the same tree plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. Orchestrator ran an independent mutation check - blinding the fee in computeAmountDue turns 36 tests red across 7 suites; restored, 421 suites / 5896 green.
+    ticket: T-04-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T11:37:45
+    by: claude
+    ticket: T-04-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T11:45:52
+    by: Akenzy
+    reason: Fourth and hopefully last touches - batch. (1) T-04-03 declares tests - [] with no spec path, so its done-when boxes 1-3 (three-way agreement, range filter at +/-1 dong, RETURN of a fee-bearing invoice) have nowhere to live; invoice-amount.util.spec.ts already exists and its own comment says 'Syncing this twin with computeAmountDue is T-04-03'. (2) T-01-03 declares verifies - [AC-02, AC-07] with tests - [] and no spec path, leaving the cross-org channel check with no regression guard. (3) Widening A-24 - the earn base includes the fee but the clawback base (computeReverseBase -> returnedNet) excludes it, so a FULL return reverses fewer points than the sale granted and the customer keeps the fee's points permanently.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T11:46:24
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 31 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T11:52:05
+    by: claude
+    reason: Files written are its 4 declared touches - (3 source + invoice-amount.util.spec.ts added in the 2026-09-21 G3 reopen). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. No arithmetic changed — the verified finding held - both twins read stored amount_due. Orchestrator rewrote the A-23 test, which as delivered hardcoded returnedNet and stayed green under mutation; it now drives the real refundableFactor and goes red when the fee is leaked into headerResidual.
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T11:52:05
+    by: claude
+    reason: Files written are its 4 declared touches - (3 source + invoice-amount.util.spec.ts added in the 2026-09-21 G3 reopen). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js from feature 2026090805. No arithmetic changed — the verified finding held - both twins read stored amount_due. Orchestrator rewrote the A-23 test, which as delivered hardcoded returnedNet and stayed green under mutation; it now drives the real refundableFactor and goes red when the fee is leaked into headerResidual.
+    ticket: T-04-03
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-21T11:56:16
+    by: claude
+    reason: Controller verified correct against a live API, but the endpoint is unreachable as shipped. Verified - (1) key lacking the permission -> 403 'Missing required permission - partner.order.create', 0 orders written; (4) POST /v2/partner/orders present in /docs-json, tag 'Partner orders', responses 200/201/400/403. Boxes (2) bogus wardCode -> 400 GEO_CODE_UNKNOWN and (3) unitPrice -> 400 'property unitPrice should not exist' PASSED ONLY after I hand-inserted a role_permissions row; that grant has been reverted. Root cause - permissions.seed.ts defines partner.order.create but org-role-permissions.ts grants it to nothing — PARTNER_PERMISSION_KEYS = ['partner.catalog.read'] and its comment says the partner role gets 'Exactly one permission'. No ticket touches that file. Either the seed must grant it (design decision - which role) or UOW-01's demo step 2 must say the operator grants it by hand. Needs a human ruling, recorded as A-25.
+    ticket: T-01-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T12:25:17
+    by: Akenzy
+    reason: Akenzy ruled on A-24 and A-25 on 2026-09-21; both rulings create work no ticket owns. A-25 - add a new 'Doi tac dat hang' role holding exactly ['partner.order.create'] in org-role-permissions.ts — that file is in no ticket's touches, and without it POST /v2/partner/orders 403s for everyone. A-24 - points earn base becomes goods-only (amountDue - shippingFeeAmount) in checkout-invoice.service.ts and compute-totals.step.ts, so the earn base matches the clawback base and a full return nets to zero points.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T12:26:24
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-21T12:26:24
+    by: claude
+    reason: Controller verified correct against a live API, but the endpoint is unreachable as shipped. Verified - (1) key lacking t
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T12:26:30
+    by: claude
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T12:26:30
+    by: claude
+    ticket: T-04-06
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T12:29:48
+    by: Akenzy
+    reason: T-04-06 touches - misses the v2 async award base. Each checkout path has a PAIR — the stored pointsEarned and the base handed to the async award — and the ticket covers only 3 of the 4 halves. v1 - checkout-invoice.service.ts -185 stores,  -408 publishes (both declared). v2 - compute-totals.step.ts -90 stores (declared), enqueue-outbox.step.ts -147 sends subtotal - totals.amountDue to LoyaltyPointsConsumer (NOT declared). Fixing only the stored half would make v2 store floor((amountDue-fee)/RATE) while awarding floor(amountDue/RATE) — a live v1/v2 divergence on an unflagged endpoint, and a break of the parity invariant compute-totals.step.ts documents in its own header. Also adding checkout-return.service.spec.ts to tests -, the only honest home for done-when 3 (computeReversePoints is private on CheckoutReturnService, so the full-return-nets-to-zero assertion cannot live in the two declared specs without re-implementing the reverse base).
+  - gate: G3
+    action: passed
+    at: 2026-09-21T12:30:06
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T12:32:51
+    by: Akenzy
+    reason: T-01-07 is wrong in two ways, both found by construction. (1) touches - declares only the constants file, but no seed reads it - roles/role_permissions rows are written by inventory.seed.ts (which seed -dev-admin actually runs and which does NOT call seedOrgBaselineData — it carries its own private upsertSeedRole/assignPermissionsToRole and spells out all seven roles), plus org-baseline-seed.core.ts, org-baseline.seed.ts, new-org.seed.ts and sync-admin-permissions.seed.ts. The ticket's 'follow org-baseline-seed.core.ts, do not add a second seeding path' rested on a false premise — the second path predates this feature. Verified - role 'Doi tac dat hang' has 0 rows after a successful seed run. (2) done-when 3 as written is worthless - SYSTEM_ADMIN_PERMISSION_KEYS = [...ALL_PERMISSION_KEYS], so 'every permission granted by at least one role' was already true on the day POST /v2/partner/orders 403'd every key (237 permissions, 0 orphans). Replacing it with the assertion that has teeth - every permission must appear in a hand-written role list or an explicit OWNER_ONLY_KEYS allowlist.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T12:33:10
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T12:42:59
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client (openapi.snapshot.json + schema.ts) which T-01-03's done-when requires. Orchestrator independently mutation-checked two of the four earn halves - reverting the v2 async award base kills 3 tests incl. the anti-drift one; reverting the v2 stored base fails the full-return assertion with Expected 0 / Received 3, the exact leak.
+    ticket: T-04-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T12:42:59
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client (openapi.snapshot.json + schema.ts) which T-01-03's done-when requires. Orchestrator independently mutation-checked two of the four earn halves - reverting the v2 async award base kills 3 tests incl. the anti-drift one; reverting the v2 stored base fails the full-return assertion with Expected 0 / Received 3, the exact leak.
+    ticket: T-04-06
+  - gate: G4
+    action: scope
+    at: 2026-09-21T12:42:59
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client (openapi.snapshot.json + schema.ts) which T-01-03's done-when requires. Orchestrator ran seed -sync-admin-permissions - role exists in all 3 orgs with exactly partner.order.create, and Đối tác still holds exactly partner.catalog.read.
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T12:42:59
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client (openapi.snapshot.json + schema.ts) which T-01-03's done-when requires. Orchestrator ran seed -sync-admin-permissions - role exists in all 3 orgs with exactly partner.order.create, and Đối tác still holds exactly partner.catalog.read.
+    ticket: T-01-07
+  - gate: G4
+    action: scope
+    at: 2026-09-21T12:42:59
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client (openapi.snapshot.json + schema.ts) which T-01-03's done-when requires. All four boxes verified against a live API with a legitimately granted key (no hand-injected role_permissions row this time).
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T12:42:59
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client (openapi.snapshot.json + schema.ts) which T-01-03's done-when requires. All four boxes verified against a live API with a legitimately granted key (no hand-injected role_permissions row this time).
+    ticket: T-01-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T12:46:41
+    by: Akenzy
+    reason: Pre-empting the defect that cost T-01-07 two rounds. T-02-02 adds a new org-level permission (A-08, sales-order.dispatch) and declares permissions.seed.ts but NOT org-role-permissions.ts — the same shape as T-01-03, where the permission existed but no role granted it and the endpoint 403'd everyone. Since T-01-07 that is now a RED SPEC rather than a production 403 - org-role-permissions.spec.ts asserts every permission sits in a hand-written role list or the explicit OWNER_ONLY_KEYS allowlist. Adding org-role-permissions.ts and its spec to T-02-02 touches - so the ticket can satisfy it instead of blocking on it.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T12:46:41
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T12:46:46
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T12:46:46
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:05:07
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client. Orchestrator re-ran OUTBOX_RELAY_DISABLED=1 test -e2e -- partner-order after T-02-02 unblocked compilation - 5/5 green including the parallel-resend case. Found A-26 - e2e builds schema via synchronize(true), so raw-SQL constraints from migrations do not exist there; the spec creates the partial unique index in beforeAll, same pattern as geo.e2e-spec.ts.
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:05:07
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client. Orchestrator re-ran OUTBOX_RELAY_DISABLED=1 test -e2e -- partner-order after T-02-02 unblocked compilation - 5/5 green including the parallel-resend case. Found A-26 - e2e builds schema via synchronize(true), so raw-SQL constraints from migrations do not exist there; the spec creates the partial unique index in beforeAll, same pattern as geo.e2e-spec.ts.
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:05:07
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client. Orchestrator verified after seed -sync-admin-permissions - both new keys granted to exactly Quan ly tong + Quan tri he thong, and Branch Manager holds 16 pos.* permissions but 0 dispatch — the deliberate withholding against the key.startsWith('pos.') filter holds. Deployment gap recorded as A-27.
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:05:07
+    by: claude
+    reason: Uncommitted sibling work from this feature shares the tree, plus pre-existing scripts/bench-catalog-page.js from feature 2026090805 and the regenerated api-client. Orchestrator verified after seed -sync-admin-permissions - both new keys granted to exactly Quan ly tong + Quan tri he thong, and Branch Manager holds 16 pos.* permissions but 0 dispatch — the deliberate withholding against the key.startsWith('pos.') filter holds. Deployment gap recorded as A-27.
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T13:30:29
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T13:30:30
+    by: claude
+    ticket: T-03-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T13:36:04
+    by: Akenzy
+    reason: T-03-01 declares tests - [] and a touches - of three production files, but all three of its done-when boxes are specs. They belong in sales-order.service.spec.ts (its describe('listForOrganization') block and build() harness already exist), which is in neither touches - nor tests -. Same shape as T-01-03, T-04-03 and T-04-04. Adding the path so the ticket can satisfy its own boxes.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T13:36:04
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T13:39:20
+    by: claude
+    ticket: T-04-05
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:39:21
+    by: claude
+    reason: Wrote 07-verification.md (its only declared touches -) plus evidence/*.png. Other flagged paths are uncommitted sibling work from this feature plus pre-existing scripts/bench-catalog-page.js. Three sources captured side by side - DB, the grid's Tong thanh toan column read from the DOM, and the footer. Recorded honestly that the demo script's 910.000 is the sales-only sum while the correct signed total with the RETURN in view is 60.000. Fixtures cleaned up after capture.
+    ticket: T-04-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:39:21
+    by: claude
+    reason: Wrote 07-verification.md (its only declared touches -) plus evidence/*.png. Other flagged paths are uncommitted sibling work from this feature plus pre-existing scripts/bench-catalog-page.js. Three sources captured side by side - DB, the grid's Tong thanh toan column read from the DOM, and the footer. Recorded honestly that the demo script's 910.000 is the sales-only sum while the correct signed total with the RETURN in view is 60.000. Fixtures cleaned up after capture.
+    ticket: T-04-05
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:41:05
+    by: claude
+    reason: Files written are its 4 declared touches - (3 production + sales-order.service.spec.ts added in the 2026-09-21 G3 reopen). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js. Orchestrator verified 422 suites / 5960 passed / 1 skipped — up by exactly the 4 new specs. Ticket's leftJoin instruction deliberately NOT followed - sales_orders.branch_id is varchar and branches.id is uuid (no Postgres operator), and an INNER JOIN would drop orders whose branch was deleted.
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:41:05
+    by: claude
+    reason: Files written are its 4 declared touches - (3 production + sales-order.service.spec.ts added in the 2026-09-21 G3 reopen). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js. Orchestrator verified 422 suites / 5960 passed / 1 skipped — up by exactly the 4 new specs. Ticket's leftJoin instruction deliberately NOT followed - sales_orders.branch_id is varchar and branches.id is uuid (no Postgres operator), and an INNER JOIN would drop orders whose branch was deleted.
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T13:41:13
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:49:48
+    by: claude
+    reason: Files written are its 4 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator drove all three visual boxes on a live app - pool grid showed exactly the 3 unassigned orders and excluded the branch-assigned one; a single dispatch moved DTW000001 to Ca Mau (status stayed SENT per ADR-02, DISPATCH trail row written with from_branch_id null) and the row left the grid 3->2 with no F5; a batch of 3 with one stolen by SQL mid-dialog returned 2 green + 1 'Don hang da duoc phan cho mot chi nhanh khac' with no raw code on screen. Evidence in evidence/viz-01, viz-05.
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:49:48
+    by: claude
+    reason: Files written are its 4 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator drove all three visual boxes on a live app - pool grid showed exactly the 3 unassigned orders and excluded the branch-assigned one; a single dispatch moved DTW000001 to Ca Mau (status stayed SENT per ADR-02, DISPATCH trail row written with from_branch_id null) and the row left the grid 3->2 with no F5; a batch of 3 with one stolen by SQL mid-dialog returned 2 green + 1 'Don hang da duoc phan cho mot chi nhanh khac' with no raw code on screen. Evidence in evidence/viz-01, viz-05.
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:51:00
+    by: claude
+    reason: Files written are its 4 declared touches - (3 code + order-mapper.test.ts added in the G3 reopen). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator verified all four boxes live - mapper test 17/17 via npx vitest; Main Branch grid showed its 3 orders WITH shipping fee and address populated (the T-05-07 columns that were empty before); switching to Ca Mau changed the grid to its 1 order without F5; pool and other-branch orders never appeared.
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:51:00
+    by: claude
+    reason: Files written are its 4 declared touches - (3 code + order-mapper.test.ts added in the G3 reopen). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator verified all four boxes live - mapper test 17/17 via npx vitest; Main Branch grid showed its 3 orders WITH shipping fee and address populated (the T-05-07 columns that were empty before); switching to Ca Mau changed the grid to its 1 order without F5; pool and other-branch orders never appeared.
+    ticket: T-05-03
+  - gate: G4
+    action: scope
+    at: 2026-09-21T13:53:19
+    by: claude
+    reason: Files written are its 3 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator ran the e2e box - partner-order 5/5 green with OUTBOX_RELAY_DISABLED=1, and the full unit suite is 422 suites / 5963 passed. Ticket premise was half wrong - approve() has copied salesChannel since T-16-01, so only the fee was missing; the fee travels on a server-only param of createDraftIn rather than CreateInvoiceDto, deliberately, so a POS client cannot declare arbitrary money payable on a counter sale.
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T13:53:19
+    by: claude
+    reason: Files written are its 3 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator ran the e2e box - partner-order 5/5 green with OUTBOX_RELAY_DISABLED=1, and the full unit suite is 422 suites / 5963 passed. Ticket premise was half wrong - approve() has copied salesChannel since T-16-01, so only the fee was missing; the fee travels on a server-only param of createDraftIn rather than CreateInvoiceDto, deliberately, so a POS client cannot declare arbitrary money payable on a counter sale.
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:01:07
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:01:07
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:01:07
+    by: claude
+    ticket: T-05-05
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T14:04:57
+    by: Akenzy
+    reason: T-05-05 cannot compile within its touches -. invoice-listing.columns.ts is a declaration registry only; salesChannel is currently classification 'placeholder' with source {kind -'placeholder', placeholder -null} (verified). The only resolver is listingCellValue/invoiceFieldValue in invoice-listing.aggregator.ts, an exhaustive switch under strict -true — adding salesChannel to the field union in the one declared file makes that switch non-exhaustive and the tree goes red (TS2366). No partial slice compiles. Adding invoice-listing.aggregator.ts and reports/invoice-order-listing.report.ts (plus the aggregator spec for value-level assertions). Also correcting ADR-03's closing sentence - it says reports join via sales_channel_id, but invoices has no such column by design — document-level reports MUST group by the snapshot string, and a join would make a renamed channel's old invoices blank or vanish, which is the exact case the snapshot exists to prevent.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T14:04:58
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T14:07:32
+    by: claude
+    reason: Wrote only navConfig.ts, its one declared touch. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator verified both boxes with two real accounts - admin (Quan tri he thong, holds dispatch) sees '/orders/dispatch  - - Dieu phoi don hang' in the sidebar and the page renders; a cashier-role user (0 dispatch grants) sees only '/orders' and typing the URL redirects to '/'. Route blocking turned out to be in scope after all — routeAccess.ts drives the guard off the same navConfig permission field, so the ticket's touches - was correct. Test user cleaned up.
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T14:07:32
+    by: claude
+    reason: Wrote only navConfig.ts, its one declared touch. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator verified both boxes with two real accounts - admin (Quan tri he thong, holds dispatch) sees '/orders/dispatch  - - Dieu phoi don hang' in the sidebar and the page renders; a cashier-role user (0 dispatch grants) sees only '/orders' and typing the URL redirects to '/'. Route blocking turned out to be in scope after all — routeAccess.ts drives the guard off the same navConfig permission field, so the ticket's touches - was correct. Test user cleaned up.
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-09-21T14:08:43
+    by: claude
+    reason: Files written are its 3 declared touches - (one doc-comment-only production file + two specs). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Like T-04-03 this closes on evidence, not a diff - invoice_debts.original_amount already carried the fee because createFromInvoice stores what it is handed and both callers pass a fee-inclusive number. Adding an adjustment would have double-billed delivery. Orchestrator confirmed create-debt.step.ts is byte-unmodified and the suite is 422 suites / 5987 passed.
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T14:08:43
+    by: claude
+    reason: Files written are its 3 declared touches - (one doc-comment-only production file + two specs). Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Like T-04-03 this closes on evidence, not a diff - invoice_debts.original_amount already carried the fee because createFromInvoice stores what it is handed and both callers pass a fee-inclusive number. Adding an adjustment would have double-billed delivery. Orchestrator confirmed create-debt.step.ts is byte-unmodified and the suite is 422 suites / 5987 passed.
+    ticket: T-05-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:08:58
+    by: claude
+    ticket: T-02-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:08:58
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:08:58
+    by: claude
+    ticket: T-06-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T14:17:28
+    by: claude
+    reason: Wrote only admin-dispatch.e2e-spec.ts, its one declared touch. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator re-ran it - 4/4 green with OUTBOX_RELAY_DISABLED=1, including a concurrency case (two parallel dispatches to different branches -> one 200, one 409, exactly one event row). Agent deliberately did NOT recreate CHK_sales_order_dispatch_events_shape because none of AC-11/12/13 needs DB-level shape rejection — service-level assertions plus row counts cover them; A-26 still applies to any future test that does need it.
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T14:17:28
+    by: claude
+    reason: Wrote only admin-dispatch.e2e-spec.ts, its one declared touch. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator re-ran it - 4/4 green with OUTBOX_RELAY_DISABLED=1, including a concurrency case (two parallel dispatches to different branches -> one 200, one 409, exactly one event row). Agent deliberately did NOT recreate CHK_sales_order_dispatch_events_shape because none of AC-11/12/13 needs DB-level shape rejection — service-level assertions plus row counts cover them; A-26 still applies to any future test that does need it.
+    ticket: T-02-05
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T14:19:22
+    by: Akenzy
+    reason: T-06-01 box 3 is unimplementable and contradicts A-05, verified in code - approve() writes invoice_id in the SAME update as status=PROCESSED, and VALID_TRANSITIONS[PROCESSED] = [] — so 'an order with a draft invoice' is always PROCESSED, and returning it to the pool would need a PROCESSED->SENT step that A-05 forbids and the transition table blocks. The draft-delete path also lives in pos/, outside the ticket. Dropping the box and recording the contradiction; any invoice_id, draft or issued, is a hard 409 ORDER_HAS_INVOICE. Also adding ORDER_NOT_DISPATCHED to the error taxonomy - 'return an order nobody holds' is a distinct state from ORDER_NOT_DISPATCHABLE (status != SENT), and collapsing them would make two unrelated causes indistinguishable to the client.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T14:19:32
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T14:20:16
+    by: claude
+    reason: Files written are its 4 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Box 3 was dropped by ruling after I verified the contradiction in code (approve writes invoice_id with status=PROCESSED; VALID_TRANSITIONS[PROCESSED]=[]), replaced with the honest assertion that ANY invoice_id is a hard 409. ORDER_NOT_DISPATCHED added to the 03-logical-design taxonomy. No new permission key — reuses dispatch OR approve, because AC-21's actor is the branch cashier who deliberately lacks dispatch.
+    ticket: T-06-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T14:20:16
+    by: claude
+    reason: Files written are its 4 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Box 3 was dropped by ruling after I verified the contradiction in code (approve writes invoice_id with status=PROCESSED; VALID_TRANSITIONS[PROCESSED]=[]), replaced with the honest assertion that ANY invoice_id is a hard 409. ORDER_NOT_DISPATCHED added to the 03-logical-design taxonomy. No new permission key — reuses dispatch OR approve, because AC-21's actor is the branch cashier who deliberately lacks dispatch.
+    ticket: T-06-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:30:15
+    by: claude
+    ticket: T-07-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T14:32:12
+    by: claude
+    reason: Files written are its 5 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator drove all boxes live - /orders/all showed 5 orders across 4 scopes with the Chi nhanh column rendering Main Branch, Ca Mau, Can Tho, (Chua phan) and (Chi nhanh da xoa) for an order pointed at a deleted branch — distinct from pool, which matters because such an order never returns to the pool; the branch filter sent branchId=UNASSIGNED and returned only the pool row; /orders has no Chi nhanh column, so the orgOnly filtering holds.
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T14:32:12
+    by: claude
+    reason: Files written are its 5 declared touches -. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Orchestrator drove all boxes live - /orders/all showed 5 orders across 4 scopes with the Chi nhanh column rendering Main Branch, Ca Mau, Can Tho, (Chua phan) and (Chi nhanh da xoa) for an order pointed at a deleted branch — distinct from pool, which matters because such an order never returns to the pool; the branch filter sent branchId=UNASSIGNED and returned only the pool row; /orders has no Chi nhanh column, so the orgOnly filtering holds.
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:32:21
+    by: claude
+    ticket: T-05-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T14:32:21
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-09-21T14:33:44
+    by: claude
+    reason: Wrote 07-verification.md (its one declared touch) plus evidence/*.png and evidence/scripts/*. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Three shots, each with DOM asserts rather than eyeballed images, and the reproduction steps + the actual Playwright/SQL scripts are checked in so someone else can rerun it from scratch. The deleted-branch row is the one that proves T-03-01's keyed-read decision - an INNER JOIN would have made that exact row vanish.
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T14:33:44
+    by: claude
+    reason: Wrote 07-verification.md (its one declared touch) plus evidence/*.png and evidence/scripts/*. Everything else flagged is uncommitted sibling work plus pre-existing scripts/bench-catalog-page.js and the regenerated api-client. Three shots, each with DOM asserts rather than eyeballed images, and the reproduction steps + the actual Playwright/SQL scripts are checked in so someone else can rerun it from scratch. The deleted-branch row is the one that proves T-03-01's keyed-read decision - an INNER JOIN would have made that exact row vanish.
+    ticket: T-03-03
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-21T15:12:11
+    by: claude
+    reason: Implementer killed mid-run by a session rate limit (HTTP 429, resets 2 -50pm Asia/Saigon). Verified it wrote nothing - sales-order.service.ts carries only T-06-01's returnToPool, tsc clean, suite unchanged at 5999. No partial state to unwind — re-dispatch when the limit resets.
+    ticket: T-07-01
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-21T15:12:12
+    by: claude
+    reason: Implementer killed mid-run by the same session rate limit (429, resets 2 -50pm Asia/Saigon) before writing anything — order-columns.ts still has shippingPartner with no hide flag and only T-03-02's orgOnly. tsc clean, suite unchanged at 5999. Re-dispatch when the limit resets.
+    ticket: T-05-04
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T15:29:17
+    by: Akenzy
+    reason: T-07-01's touches - declares only sales-order.service.ts + spec, but its own implementation note says CancelInvoiceService.cancel may need an optional manager param 'theo dung loi createDraftIn/applyRedemptionIn'. Verified - cancel(id, dto, actor) has NO manager param and uses this.invoiceRepo, so it cannot join the order's transaction. Without that, the ticket's core safety property — 'Don CANCELLED ma hoa don con song la trang thai khong duoc phep ton tai' — is unachievable, and done-when 3 (invoice refuses -> order keeps its old status via rollback) cannot pass. Adding cancel-invoice.service.ts and its spec. CancelInvoiceService is already exported from PosModule (line 174), so no module change. Also recording that this ticket opens PROCESSED -> CANCELLED in VALID_TRANSITIONS, which the ticket explicitly sanctions and requires be written down.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T15:29:17
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-21T15:29:17
+    by: claude
+    reason: Implementer killed mid-run by a session rate limit (HTTP 429, resets 2 -50pm Asia/Saigon). Verified it wrote nothing - s
+    ticket: T-07-01
+  - gate: G4
+    action: scope
+    at: 2026-09-21T15:35:12
+    by: claude
+    reason: Implemented directly by the orchestrator after the subagent was killed by a session rate limit. Files - sales-order.service.ts + spec, and cancel-invoice.service.ts (added to touches - in the 2026-09-21 G3 reopen because cancel(id,dto,actor) had no manager param and so could not join the order's transaction — without it done-when 3 is unreachable). Opened PROCESSED -> CANCELLED, recorded in the ticket and in VALID_TRANSITIONS' comment; PROCESSED -> SENT stays closed and a spec pins that. 4 new specs, mutation-checked - dropping the manager and swallowing the refusal turns exactly the two load-bearing tests red. Suite 6003 passed, tsc clean.
+    ticket: T-07-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T15:35:12
+    by: claude
+    reason: Implemented directly by the orchestrator after the subagent was killed by a session rate limit. Files - sales-order.service.ts + spec, and cancel-invoice.service.ts (added to touches - in the 2026-09-21 G3 reopen because cancel(id,dto,actor) had no manager param and so could not join the order's transaction — without it done-when 3 is unreachable). Opened PROCESSED -> CANCELLED, recorded in the ticket and in VALID_TRANSITIONS' comment; PROCESSED -> SENT stays closed and a spec pins that. 4 new specs, mutation-checked - dropping the manager and swallowing the refusal turns exactly the two load-bearing tests red. Suite 6003 passed, tsc clean.
+    ticket: T-07-01
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-21T16:18:19
+    by: claude
+    reason: Implementer killed mid-run by the same session rate limit (429, resets 2 -50pm Asia/Saigon) before writing anything — or
+    ticket: T-05-04
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T16:18:50
+    by: Akenzy
+    reason: T-05-04 switches cod's renderer from text to money, which requires OrderRow.cod to become a number. The value is PRODUCED by toOrderRow in _lib/order-mapper.ts (currently formatOrderMoney(amountDue), a vi-VN string), and that file is not in touches - — so the type flip cannot compile without it. Two earlier tickets (T-05-03, T-03-02) both flagged this exact collision and deliberately left it. Adding order-mapper.ts and its existing test file so the flip lands in one piece instead of half-done.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T16:18:50
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T16:21:36
+    by: claude
+    reason: Implemented directly by the orchestrator after its subagent was killed by the session rate limit. Files - order-columns.ts, _mock/orders.mock.ts, order-mapper.ts + its test (the last two added in the 2026-09-21 G3 reopen — cod's producer had to move with its type or the money renderer could not compile). A-20 honoured - the 8 shipping columns carry hidden - true and stay in ORDER_COLUMNS with their widths, filters and labels intact; both ORDER_COLUMN_ORDER and ORDERS_ALL_COLUMN_ORDER filter them out. Verified live - grid keeps Thu ho + Phi GH thu khach, leaks none of the 8, and Thu ho renders 1.030.000 matching amount_due. Three mapper assertions changed BECAUSE the cod contract changed by design (text->money, string->number), not from regression; 17/17 vitest green.
+    ticket: T-05-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T16:21:36
+    by: claude
+    reason: Implemented directly by the orchestrator after its subagent was killed by the session rate limit. Files - order-columns.ts, _mock/orders.mock.ts, order-mapper.ts + its test (the last two added in the 2026-09-21 G3 reopen — cod's producer had to move with its type or the money renderer could not compile). A-20 honoured - the 8 shipping columns carry hidden - true and stay in ORDER_COLUMNS with their widths, filters and labels intact; both ORDER_COLUMN_ORDER and ORDERS_ALL_COLUMN_ORDER filter them out. Verified live - grid keeps Thu ho + Phi GH thu khach, leaks none of the 8, and Thu ho renders 1.030.000 matching amount_due. Three mapper assertions changed BECAUSE the cod contract changed by design (text->money, string->number), not from regression; 17/17 vitest green.
+    ticket: T-05-04
+  - gate: G4
+    action: scope
+    at: 2026-09-21T16:24:17
+    by: claude
+    reason: Box 2 verified live by the orchestrator - registered a brand-new ZALO channel through the CRUD path with NO migration, and the invoice report returned three distinct groups — Tai cua hang (the NULL mapping), Website cong ty, Zalo OA. The Zalo invoice was created BEFORE the channel was registered and still grouped correctly, which proves the resolver never consults sales_channels. Also confirmed A-21 posture - HD-CH-WEB has amount_due 1.030.000 but revenue.total 1.000.000 — the 30.000 fee stays out of merchandise revenue. Evidence written into 07-verification.md; fixtures cleaned up.
+    ticket: T-05-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T16:24:17
+    by: claude
+    reason: Box 2 verified live by the orchestrator - registered a brand-new ZALO channel through the CRUD path with NO migration, and the invoice report returned three distinct groups — Tai cua hang (the NULL mapping), Website cong ty, Zalo OA. The Zalo invoice was created BEFORE the channel was registered and still grouped correctly, which proves the resolver never consults sales_channels. Also confirmed A-21 posture - HD-CH-WEB has amount_due 1.030.000 but revenue.total 1.000.000 — the 30.000 fee stays out of merchandise revenue. Evidence written into 07-verification.md; fixtures cleaned up.
+    ticket: T-05-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T16:57:05
+    by: claude
+    ticket: T-05-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T16:57:05
+    by: claude
+    ticket: T-06-02
+  - gate: G4
+    action: scope
+    at: 2026-09-21T18:28:20
+    by: claude
+    reason: Agent stalled at 600s leaving a 389-line spec; orchestrator finished it. Wrote only online-order-fulfilment.e2e-spec.ts, its one declared touch. 3/3 green with OUTBOX_RELAY_DISABLED=1. Walks partner intake -> pool -> dispatch -> approve -> COD checkout and asserts real DB numbers - invoice shipping_fee_amount 30000 and copied sales_channel, amount_due 1.030.000, invoice_debts.original_amount AND remaining_amount both 1.030.000 (not 1.000.000, not a double-counted 1.060.000), and points_earned = floor(1.000.000/rate) — goods only, per A-24. Four fixture problems fixed along the way, see report.
+    ticket: T-05-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T18:28:20
+    by: claude
+    reason: Agent stalled at 600s leaving a 389-line spec; orchestrator finished it. Wrote only online-order-fulfilment.e2e-spec.ts, its one declared touch. 3/3 green with OUTBOX_RELAY_DISABLED=1. Walks partner intake -> pool -> dispatch -> approve -> COD checkout and asserts real DB numbers - invoice shipping_fee_amount 30000 and copied sales_channel, amount_due 1.030.000, invoice_debts.original_amount AND remaining_amount both 1.030.000 (not 1.000.000, not a double-counted 1.060.000), and points_earned = floor(1.000.000/rate) — goods only, per A-24. Four fixture problems fixed along the way, see report.
+    ticket: T-05-06
+  - gate: G4
+    action: scope
+    at: 2026-09-21T20:06:45
+    by: claude
+    reason: Agent wrote the toolbar + dialog and honestly left both observed-behaviour boxes unticked; orchestrator drove them live. Verified - button disabled with nothing ticked, enabled on a 'Cho xu ly' row, and disabled on a 'Da xu ly' row that has invoice_id — with the tooltip naming the alternative (cancel the order). Full cycle through the UI return - exactly 3 dispatch-event rows (DISPATCH Main Branch / RETURN with reason 'Het hang tai chi nhanh' / DISPATCH Ca Mau), order back to branch_id NULL with status still SENT after the return. Results written into 07-verification.md replacing the agent's CHUA CHAY placeholder.
+    ticket: T-06-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T20:06:45
+    by: claude
+    reason: Agent wrote the toolbar + dialog and honestly left both observed-behaviour boxes unticked; orchestrator drove them live. Verified - button disabled with nothing ticked, enabled on a 'Cho xu ly' row, and disabled on a 'Da xu ly' row that has invoice_id — with the tooltip naming the alternative (cancel the order). Full cycle through the UI return - exactly 3 dispatch-event rows (DISPATCH Main Branch / RETURN with reason 'Het hang tai chi nhanh' / DISPATCH Ca Mau), order back to branch_id NULL with status still SENT after the return. Results written into 07-verification.md replacing the agent's CHUA CHAY placeholder.
+    ticket: T-06-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T20:07:26
+    by: claude
+    ticket: T-07-02
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T20:12:03
+    by: Akenzy
+    reason: T-07-02 is blocked by two defects in T-07-01 (which I implemented), both verified. (1) SalesOrderService.cancel is owner-only - it calls salespersonOf(actor) then isOwn(), which is 'order.salespersonId === me || order.createdBy === me'. createFromPartner writes salespersonId NULL and createdBy = the API key's shadow user, and nothing reassigns it — so NO backoffice user can ever cancel a web order; every call 404s. That contradicts A-14, which says the canceller is the ERP user. getById already has the right relaxation via scopeOf (returns {} for a holder of approve); cancel must use it. (2) INVOICE_NOT_CANCELLABLE exists ONLY in sales-order.service.spec.ts -562 as my own mock — production CancelInvoiceService throws plain BadRequestException with English text that leaks raw enum values (PAID, SALE). My T-07-01 rollback spec therefore asserts against a code reality never emits. Widening T-07-02 to carry both API fixes so the UI ticket can actually be built.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T20:12:04
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G3
+    action: reopened
+    at: 2026-09-21T20:14:37
+    by: Akenzy
+    reason: Changing CancelInvoiceService's two guards from BadRequestException to ConflictException({code -'INVOICE_NOT_CANCELLABLE'}) breaks 5 tests in cancel-invoice.service.spec.ts that assert the old 400. The ADR error taxonomy in 03-logical-design.md lists INVOICE_NOT_CANCELLABLE as 409, so production was the side that disagreed with the design, not the design. Adding that spec to T-07-02's touches so the expectations move with the contract instead of being worked around.
+  - gate: G3
+    action: passed
+    at: 2026-09-21T20:14:38
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 33 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-21T20:33:27
+    by: claude
+    reason: Files written are its declared touches - — the two frontend files by the agent, and the four API files (sales-order.service.ts + spec, cancel-invoice.service.ts + spec) by the orchestrator after the agent correctly stopped on two defects in my T-07-01 - cancel() was owner-only and 404'd every backoffice user on every web order (now scopeOf, matching getById; 'cancel đơn của NGƯỜI KHÁC → 404' still passes), and INVOICE_NOT_CANCELLABLE existed only in my spec mock (production now throws it as 409 per the ADR taxonomy). Orchestrator drove all boxes live - reason required; a SENT web order cancelled from /orders with toast and row flip; an INVOICED order cancelled and its invoice HD-CANCEL-01 went to cancelled carrying the same reason (ADR-06 through the UI); dialog headline names the real invoice code and lists stock/points/debt reversal with no-undo; the shared detail-panel button is present on /orders, /orders/dispatch and /orders/all. Suite 6003 green.
+    ticket: T-07-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-21T20:33:27
+    by: claude
+    reason: Files written are its declared touches - — the two frontend files by the agent, and the four API files (sales-order.service.ts + spec, cancel-invoice.service.ts + spec) by the orchestrator after the agent correctly stopped on two defects in my T-07-01 - cancel() was owner-only and 404'd every backoffice user on every web order (now scopeOf, matching getById; 'cancel đơn của NGƯỜI KHÁC → 404' still passes), and INVOICE_NOT_CANCELLABLE existed only in my spec mock (production now throws it as 409 per the ADR taxonomy). Orchestrator drove all boxes live - reason required; a SENT web order cancelled from /orders with toast and row flip; an INVOICED order cancelled and its invoice HD-CANCEL-01 went to cancelled carrying the same reason (ADR-06 through the UI); dialog headline names the real invoice code and lists stock/points/debt reversal with no-undo; the shared detail-panel button is present on /orders, /orders/dispatch and /orders/all. Suite 6003 green.
+    ticket: T-07-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-21T20:39:41
+    by: claude
+    ticket: T-07-03
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-21T21:04:04
+    by: claude
+    reason: Happy-path e2e is 10/11 assertions green and fails only on the async stock reversal (99->100). Root cause is a PRE-EXISTING repo defect, verified - stock-return.consumer.ts -59 hardcodes groupId 'erp-api.invoice.cancelled.stock-return' (loyalty-points-reverse.consumer.ts likewise) instead of reading KAFKA_CONSUMER_GROUP_PREFIX like stock-deduction.consumer.ts does, so every API instance on the machine joins the same Kafka group and the user's  -4177 dev server consumes the e2e's invoice.cancelled event into its own DB. Stopping my own  -4188 did not help;  -4177 is not mine to kill. The blocked case (settled return -> refused, stock re-read unchanged) is fully green, 9/9. Unblock by fixing the two consumers (separate ticket) or running e2e with no other API instance up.
+    ticket: T-07-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T12:09:58
+    by: Akenzy
+    reason: run_sales_flow.py mục E đo được - pos-web PATCH hoá đơn nháp từ approve() làm mất giảm dòng (khách bị tính dư 70.000) — thêm T-05-08
+  - gate: G3
+    action: passed
+    at: 2026-09-22T12:10:12
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 34 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T12:10:12
+    by: claude
+    ticket: T-05-08
+  - gate: G4
+    action: scope
+    at: 2026-09-22T12:10:13
+    by: claude
+    ticket: T-05-08
+  - gate: G4
+    action: scope
+    at: 2026-09-22T12:10:22
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature, thay đổi thật của T-05-08 chỉ ở sales-order.service.ts + spec
+    ticket: T-05-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T12:10:22
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature, thay đổi thật của T-05-08 chỉ ở sales-order.service.ts + spec
+    ticket: T-05-08
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T12:39:01
+    by: Akenzy
+    reason: T-07-03 đỏ vì (1) 14 consumer hardcode groupId 'erp-api.*' nên e2e chia group với API dev, (2) fixture e2e không có kho chính/vị trí mặc định nên consumer hoàn tồn bỏ qua — thêm T-07-04 cho (1), sửa fixture trong T-07-03 cho (2)
+  - gate: G3
+    action: passed
+    at: 2026-09-22T12:39:01
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 35 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T12:39:09
+    by: claude
+    ticket: T-07-04
+  - gate: G4
+    action: scope
+    at: 2026-09-22T12:39:09
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-07-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T12:39:09
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-07-04
+  - gate: G4
+    action: ticket unblocked
+    at: 2026-09-22T12:39:09
+    by: claude
+    reason: Happy-path e2e is 10/11 assertions green and fails only on the async stock reversal (99->100). Root cause is a PRE-EXIST
+    ticket: T-07-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T12:39:21
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-07-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T12:39:21
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-07-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T12:42:14
+    by: Akenzy
+    reason: run_sales_flow.py - lưới /mobile và /admin sales-orders luôn trả invoiceCode=null → cột Hóa đơn trên OrdersAllPage trống — thêm T-05-09
+  - gate: G3
+    action: passed
+    at: 2026-09-22T12:42:14
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 36 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T12:42:14
+    by: claude
+    ticket: T-05-09
+  - gate: G4
+    action: scope
+    at: 2026-09-22T12:42:15
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-05-09
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T12:42:15
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-05-09
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T14:51:25
+    by: Akenzy
+    reason: Yêu cầu 2026-09-22 - dòng đơn đối tác nhận itemCode (mã SKU) thay vì itemId (UUID) — thêm T-01-08, sửa ADR/taxonomy và docs
+  - gate: G3
+    action: passed
+    at: 2026-09-22T14:51:25
+    by: Akenzy
+    evidence: graph valid - 7 UoW, 37 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T14:51:25
+    by: claude
+    ticket: T-01-08
+  - gate: G4
+    action: scope
+    at: 2026-09-22T15:05:36
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-01-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T15:05:36
+    by: claude
+    reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
+    ticket: T-01-08

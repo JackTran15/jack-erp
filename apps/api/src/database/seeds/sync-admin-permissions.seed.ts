@@ -18,6 +18,7 @@ import {
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
   LEGACY_STAFF_ROLE_NAME,
+  PARTNER_ORDER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
   SYSTEM_ADMIN_PERMISSION_KEYS,
@@ -31,9 +32,16 @@ const PERMISSION_KEYS_BY_ROLE_NAME: Record<string, string[]> = {
   [SEED_ROLE_NAMES.SALES]: SALES_PERMISSION_KEYS,
   [SEED_ROLE_NAMES.CASHIER]: CASHIER_PERMISSION_KEYS,
   [SEED_ROLE_NAMES.WAREHOUSE]: WAREHOUSE_PERMISSION_KEYS,
+  [SEED_ROLE_NAMES.PARTNER_ORDER]: PARTNER_ORDER_PERMISSION_KEYS,
 };
 
-/** Roles added after the single "Nhân viên" role was split, with their descriptions. */
+/**
+ * Roles that did not exist when an organization was first seeded, with their
+ * descriptions — created here for every existing organization. Thu ngân / kho
+ * came from the "Nhân viên" split; "Đối tác đặt hàng" came later, when
+ * `partner.order.create` turned out to be granted by no role at all and
+ * POST /v2/partner/orders answered 403 to every API key.
+ */
 const ROLES_TO_BACKFILL: { name: string; description: string }[] = [
   {
     name: SEED_ROLE_NAMES.CASHIER,
@@ -43,6 +51,10 @@ const ROLES_TO_BACKFILL: { name: string; description: string }[] = [
   {
     name: SEED_ROLE_NAMES.WAREHOUSE,
     description: 'Phiếu nhập, phiếu xuất, chuyển kho, kiểm kê kho, báo cáo kho',
+  },
+  {
+    name: SEED_ROLE_NAMES.PARTNER_ORDER,
+    description: 'Đối tác đặt hàng — chỉ tạo đơn qua API key, không đọc bảng giá',
   },
 ];
 
