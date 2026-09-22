@@ -8,7 +8,7 @@ import { InvoiceItemEntity, ItemDirection } from '../../../entities/invoice-item
 import { ItemEntity } from '../../../../inventory/location/item.entity';
 import { MembershipCardService } from '../../../../customer/services/membership-card.service';
 import { resolveBranchItemLocations } from '../../../services/resolve-branch-item-locations';
-import { InvoiceCheckoutPromotionEntity } from '../../infrastructure/invoice-checkout-promotion.entity';
+import { persistAppliedPromotions } from '../../infrastructure/applied-promotion-writer';
 
 const round = (v: number): number => Math.round(v * 100) / 100;
 
@@ -96,49 +96,16 @@ export class PersistInvoiceStep implements CheckoutStep {
     await manager.getRepository(InvoiceEntity).save(invoice);
 
     await this.persistGifts(ctx, manager, invoice, items);
-    await this.persistLinePromotionDiscounts(ctx, manager, items);
-    await this.persistPromotionSnapshot(ctx, manager, invoice);
+    // Per-line promotion_discount + the invoice_checkout_promotions snapshot,
+    // through the writer shared with CheckoutReturnService (ADR-02).
+    await persistAppliedPromotions(manager, {
+      actor: ctx.actor,
+      invoiceId: invoice.id,
+      items,
+      appliedPrograms: (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[],
+    });
   }
 
-  /**
-   * Writes the engine's per-line allocation onto the lines themselves.
-   *
-   * The same numbers also go into `invoice_checkout_promotions.line_discounts`
-   * just below, and the duplication is deliberate: the jsonb is a per-programme
-   * snapshot used when reprinting an invoice, while this column is the per-line
-   * value every downstream consumer needs — above all the return refund, which
-   * used to read the gross `lineTotal` and pay out more cash than the customer
-   * ever handed over. Keeping both writes adjacent so a change to one is
-   * visible next to the other.
-   *
-   * Does NOT touch `lineTotal`: `subtotal = SUM(lineTotal)` is an invariant
-   * several reports depend on (see the entity comment and ADR-01).
-   */
-  private async persistLinePromotionDiscounts(
-    ctx: CheckoutContext,
-    manager: EntityManager,
-    items: InvoiceItemEntity[],
-  ): Promise<void> {
-    const appliedPrograms = (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[];
-    if (appliedPrograms.length === 0) return;
-
-    // Summed, not assigned: several programmes can discount the same line.
-    const byLineId = new Map<string, number>();
-    for (const program of appliedPrograms) {
-      for (const ld of program.lineDiscounts ?? []) {
-        byLineId.set(ld.lineId, (byLineId.get(ld.lineId) ?? 0) + Number(ld.discountAmount ?? 0));
-      }
-    }
-    if (byLineId.size === 0) return;
-
-    const touched = items.filter((item) => byLineId.has(item.id));
-    for (const item of touched) {
-      item.promotionDiscount = round(byLineId.get(item.id)!);
-    }
-    if (touched.length > 0) {
-      await manager.save(touched);
-    }
-  }
 
   /**
    * One invoice line per gift offer, appended after the ordinary lines so
@@ -232,34 +199,5 @@ export class PersistInvoiceStep implements CheckoutStep {
 
     await manager.save(giftEntities);
     items.push(...giftEntities);
-  }
-
-  /** One audit row per applied program, gift-granting or not. */
-  private async persistPromotionSnapshot(
-    ctx: CheckoutContext,
-    manager: EntityManager,
-    invoice: InvoiceEntity,
-  ): Promise<void> {
-    const appliedPrograms = (ctx.promotion?.appliedPrograms ?? []) as AppliedProgram[];
-    if (appliedPrograms.length === 0) return;
-
-    const promotionRepo = manager.getRepository(InvoiceCheckoutPromotionEntity);
-    const snapshotRows = appliedPrograms.map((program) =>
-      promotionRepo.create({
-        organizationId: ctx.actor.organizationId,
-        branchId: ctx.actor.branchId,
-        createdBy: ctx.actor.userId,
-        invoiceId: invoice.id,
-        programId: program.programId,
-        code: program.code,
-        name: program.name,
-        type: program.type,
-        priority: program.priority,
-        discountAmount: round(program.discountAmount),
-        lineDiscounts: program.lineDiscounts,
-        gifts: program.gifts,
-      }),
-    );
-    await promotionRepo.save(snapshotRows);
   }
 }
