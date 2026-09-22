@@ -203,8 +203,8 @@ def ac03_laptop_flip(page):
     cancel(page)
 
 
-def ac05_body_scroll(page):
-    page.set_viewport_size({"width": 1440, "height": 720})
+def ac05_body_scroll(page, height=720):
+    page.set_viewport_size({"width": 1440, "height": height})
     open_edit(page, "Thu khác")
     page.wait_for_selector("#field-displayOrder", timeout=10000)
     body = page.locator("form.space-y-4").locator("xpath=..")
@@ -217,11 +217,20 @@ def ac05_body_scroll(page):
     f = rect(page, "#field-displayOrder")
     dlg = rect(page, '[role="dialog"]')
     footer = rect(page, 'button:has-text("Hủy bỏ")')
+    scrolled = body.evaluate("el => el.scrollTop")
     reachable = f["bottom"] <= footer["top"] and f["top"] >= dlg["top"]
-    page.screenshot(path=str(OUT / "AC-05-laptop-body-scrolled.png"))
-    record("AC-05 laptop: modal body scrolls, Thứ tự hiển thị reachable",
-           reachable and info["overflowY"] in ("auto", "scroll"), body=info, field=f, footer_top=footer["top"])
+    overflowing = info["scrollHeight"] > info["clientHeight"] + 4
+    page.screenshot(path=str(OUT / f"AC-05-h{height}-body-scrolled.png"))
+    record(f"AC-05 @{height}px: modal body scrolls, Thứ tự hiển thị reachable",
+           reachable and info["overflowY"] in ("auto", "scroll") and (scrolled > 0 or not overflowing),
+           body=info, field=f, footer_top=footer["top"], scroll_top=scrolled, overflowing=overflowing)
     cancel(page)
+
+
+def ac05_body_scroll_short(page):
+    # A viewport short enough that the 8-field form does not fit the dialog body:
+    # this is where an overflow-visible body left the last fields unreachable.
+    ac05_body_scroll(page, height=560)
 
 
 def ac06_item_categories(page):
@@ -241,9 +250,11 @@ def ac06_item_categories(page):
     page.wait_for_selector(POP, state="detached", timeout=5000)
     val = page.input_value("#field-parentGroupId")
     page.screenshot(path=str(OUT / "AC-06-item-category-dialog.png"))
-    record("AC-06 Nhóm hàng hoá dialog: list within dialog+viewport, pick keeps dialog",
-           n > 0 and within(pop, dlg) and within(pop, vp) and val and page.locator('[role="dialog"]').count() == 1,
-           options=n, picked=val, dialog_title=title, row=row_text)
+    body_overflow = page.locator("form.space-y-4").locator("xpath=..").evaluate("el => getComputedStyle(el).overflowY")
+    record("AC-06 Nhóm hàng hoá dialog: list within dialog+viewport, pick keeps dialog, body overflow-auto",
+           n > 0 and within(pop, dlg) and within(pop, vp) and val and page.locator('[role="dialog"]').count() == 1
+           and body_overflow == "auto",
+           options=n, picked=val, dialog_title=title, body_overflow=body_overflow)
     cancel(page)
 
 
@@ -300,7 +311,7 @@ def main():
         errors = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         login(page)
-        for step in (ac01_ac04, ac02, ac03_laptop_flip, ac05_body_scroll,
+        for step in (ac01_ac04, ac02, ac03_laptop_flip, ac05_body_scroll, ac05_body_scroll_short,
                      ac06_item_categories, ac07_stock_filter_popover, ac08_item_create_page):
             try:
                 step(page)

@@ -52,3 +52,14 @@ history:
     at: 2026-09-22T15:10:21
     by: Claude
     ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T15:10:51
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-22T15:13:14
+    by: Claude
+    reason: Ô cuối chờ Akenzy - 07-verification.md không chạy được vì local-backoffice ghim  -3000 đang phục vụ checkout erp2; code và 3 ô còn lại đã xong (capture-evidence.py xanh AC-05, AC-06)
+    ticket: T-01-02
