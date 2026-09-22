@@ -5,7 +5,7 @@ slug: 2026092101-untracked-location-summary-report
 profile: none
 created: 2026-09-21T20:35:15
 ruleset: 7
-current_gate: G3
+current_gate: G4
 history:
   - gate: G0
     action: passed
@@ -87,3 +87,8 @@ history:
     at: 2026-09-21T21:21:26
     by: Akenzy
     ticket: T-02-02
+  - gate: G4
+    action: passed
+    at: 2026-09-22T09:31:27
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 4 tickets done, all UoW checklists ticked

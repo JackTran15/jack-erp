@@ -14,3 +14,4 @@
 {"action": "ticket in_progress", "at": "2026-09-21T21:08:49", "base": "fa142add52ced4390e0b4476ed5ce961d5a8d4a5", "by": "Akenzy", "gate": "G4", "id": "3aa70f202991", "ticket": "T-02-02", "ts": "2026-09-21T21:08:49.959037"}
 {"action": "scope", "at": "2026-09-21T21:21:26", "base": "fa142add52ced4390e0b4476ed5ce961d5a8d4a5", "by": "Akenzy", "gate": "G4", "id": "c3ef219a4e4b", "ticket": "T-02-02", "ts": "2026-09-21T21:21:26.159216", "verdict": "clean"}
 {"action": "ticket done (review bypassed)", "at": "2026-09-21T21:21:26", "by": "Akenzy", "gate": "G4", "id": "c5fca3ce0c41", "ticket": "T-02-02", "ts": "2026-09-21T21:21:26.161852"}
+{"action": "passed", "at": "2026-09-22T09:31:27", "by": "Akenzy", "evidence": "no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 4 tickets done, all UoW checklists ticked", "gate": "G4", "id": "2a7749a072db", "ts": "2026-09-22T09:31:27.965375"}
