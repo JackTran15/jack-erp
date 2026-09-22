@@ -221,6 +221,7 @@ const exchangeDto = (
 
 describe('CheckoutReturnService — debt offset routing', () => {
   let service: CheckoutReturnService;
+  let module: TestingModule;
   let invoiceRepo: { findOne: jest.Mock };
   let itemRepo: { find: jest.Mock };
   let dataSource: { transaction: jest.Mock };
@@ -335,7 +336,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
     tempWarehouseFulfillPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
 
     const noop = { publish: jest.fn().mockResolvedValue(undefined) };
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         CheckoutReturnService,
         { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
@@ -2279,6 +2280,61 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect(result.discountAmount).toBe(0);
       expect(snapshotRepo.save).not.toHaveBeenCalled();
       expect(result.netAmount).toBe(-485000);
+    });
+
+    /**
+     * T-03-06 — `preview()` is the first half of `checkout()` and nothing
+     * else: the seven totals, no transaction, no document number, no event.
+     */
+    describe('preview() — dry-run (AC-28)', () => {
+      it('returns the totals the post would settle on, and writes nothing', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+        const numbering = module.get(DocumentNumberingService) as { generate: jest.Mock };
+
+        const totals = await service.preview('exc-1', { excludedProgramIds: [] }, actor);
+
+        expect(totals).toEqual({
+          returnSubtotal: 685000,
+          newSubtotal: 200000,
+          newPromotionDiscount: 60000,
+          newNet: 140000,
+          returnedNet: 685000,
+          netAmount: -545000,
+          refundedAmount: 545000,
+        });
+        expect(dataSource.transaction).not.toHaveBeenCalled();
+        expect(numbering.generate).not.toHaveBeenCalled();
+        expect(mockManager.save).not.toHaveBeenCalled();
+        expect(snapshotRepo.save).not.toHaveBeenCalled();
+        expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+        expect(loyaltyAwardPublisher.publish).not.toHaveBeenCalled();
+        expect(stockReturnInPublisher.publish).not.toHaveBeenCalled();
+        expect(stockDeductionPublisher.publish).not.toHaveBeenCalled();
+      });
+
+      it('hands the ids to the engine and is stable across two calls with the same input', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+        const first = await service.preview('exc-1', { selectedProgramIds: ['sel-1'] }, actor);
+        const second = await service.preview('exc-1', { selectedProgramIds: ['sel-1'] }, actor);
+
+        expect(second).toEqual(first);
+        expect(queryBus.execute).toHaveBeenCalledTimes(2);
+        for (const [query] of queryBus.execute.mock.calls) {
+          expect(query.dto.selectedProgramIds).toEqual(['sel-1']);
+          expect(query.dto.lines.map((l: { lineId: string }) => l.lineId)).toEqual(['exc-out']);
+        }
+      });
+
+      it('agrees with checkout() on the posted netAmount for the same ids', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+        const previewed = await service.preview('exc-1', {}, actor);
+
+        const posted = await service.checkout('exc-1', cashDto(), actor);
+
+        expect(posted.netAmount).toBe(previewed.netAmount);
+        expect(posted.refundedAmount).toBe(previewed.refundedAmount);
+      });
     });
 
     it('a pure RETURN (no OUT line) never calls the engine (AC-14)', async () => {

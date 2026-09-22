@@ -139,11 +139,25 @@ export class CheckoutReturnService {
     private readonly membershipCardService: MembershipCardService,
   ) {}
 
-  async checkout(
+  /**
+   * Everything `checkout()` needs to know before it decides anything: the
+   * draft, its lines, the original invoice, the engine's verdict on the OUT
+   * lines and the totals. Shared with `preview()` so the dry-run and the post
+   * cannot disagree by construction.
+   */
+  private async prepare(
     id: string,
-    dto: CheckoutReturnDto,
+    ids: ProgramSelection,
     actor: ActorContext,
-  ): Promise<InvoiceEntity> {
+  ): Promise<{
+    invoice: InvoiceEntity;
+    items: InvoiceItemEntity[];
+    outItems: InvoiceItemEntity[];
+    originalInvoice: InvoiceEntity | null;
+    originalItems: InvoiceItemEntity[];
+    evaluation: EvaluateCartResponse | null;
+    totals: ComputedTotals;
+  }> {
     const invoice = await this.invoiceRepo.findOne({
       where: { id, organizationId: actor.organizationId },
     });
@@ -204,7 +218,7 @@ export class CheckoutReturnService {
     // through the engine; they keep the original invoice's allocation.
     const outItems = items.filter((it) => it.direction === ItemDirection.OUT);
     const evaluation = outItems.length
-      ? await this.evaluateNewLines(invoice, outItems, dto, actor)
+      ? await this.evaluateNewLines(invoice, outItems, ids, actor)
       : null;
 
     const totals = this.computeTotals(
@@ -220,6 +234,37 @@ export class CheckoutReturnService {
           .join(', ')}] discount=${totals.newPromotionDiscount} newNet=${totals.newNet}`,
       );
     }
+
+    return { invoice, items, outItems, originalInvoice, originalItems, evaluation, totals };
+  }
+
+  /**
+   * Dry-run of `checkout()`: the first half of it — load, validate, original
+   * invoice, engine on the OUT lines, `computeTotals` — and nothing after.
+   * Writes nothing, mints no number, emits no event; the same draft and the
+   * same ids give the same numbers until a programme changes state between two
+   * calls (the same read-outside-transaction posture the post itself has).
+   *
+   * This is the ONLY number the POS uses to decide the money direction and the
+   * payment ceiling of an exchange (2026092102 ADR-03/05) — hence a method on
+   * this service rather than a re-computation anywhere else.
+   */
+  async preview(
+    id: string,
+    ids: ProgramSelection,
+    actor: ActorContext,
+  ): Promise<ComputedTotals> {
+    const { totals } = await this.prepare(id, ids, actor);
+    return totals;
+  }
+
+  async checkout(
+    id: string,
+    dto: CheckoutReturnDto,
+    actor: ActorContext,
+  ): Promise<InvoiceEntity> {
+    const { invoice, items, outItems, originalInvoice, originalItems, evaluation, totals } =
+      await this.prepare(id, dto, actor);
 
     // `refundMethod` no longer decides the fate of the whole refund — it names the
     // fund that pays out whatever is left AFTER the original invoice's debt has
