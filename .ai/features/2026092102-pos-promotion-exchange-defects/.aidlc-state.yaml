@@ -217,3 +217,18 @@ history:
     at: 2026-09-22T11:06:01
     by: Akenzy
     ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T11:06:09
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:16:20
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:16:20
+    by: Akenzy
+    ticket: T-04-03

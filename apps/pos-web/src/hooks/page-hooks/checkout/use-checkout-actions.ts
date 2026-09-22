@@ -8,6 +8,7 @@ import { usePaymentAccountsQuery } from "@erp/pos/hooks/react-query/use-query-ac
 import {
   useCheckoutInvoiceMutation,
   useCheckoutReturnMutation,
+  useCheckoutReturnPreviewMutation,
   useCreateExchangeInvoiceMutation,
   useCreateInvoiceMutation,
   useCreateReturnInvoiceMutation,
@@ -24,7 +25,6 @@ import { deriveSettlement } from "@erp/pos/lib/page-libs/checkout/checkoutSettle
 import {
   getOversellSaleLines,
   paymentLabel,
-  payloadLineSubtotal,
 } from "@erp/pos/lib/page-libs/checkout/checkoutUtils";
 import { validateCheckout } from "@erp/pos/lib/page-libs/checkout/checkoutValidation";
 import {
@@ -107,6 +107,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
   const createReturnMutation = useCreateReturnInvoiceMutation();
   const createExchangeMutation = useCreateExchangeInvoiceMutation();
   const checkoutReturnMutation = useCheckoutReturnMutation();
+  const checkoutReturnPreviewMutation = useCheckoutReturnPreviewMutation();
   const deleteInvoiceMutation = useDeleteInvoiceMutation();
   // "NV Thu ngân" trên bản in — user đang đăng nhập.
   const currentUserQuery = useCurrentUserQuery();
@@ -317,10 +318,9 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             // Hạn thanh toán chỉ có nghĩa khi tính vào công nợ.
             dueDate: p.debt ? p.paymentDueDate : null,
             creditDays: p.debt ? p.creditDays : null,
-            // CTKM tùy chọn — chỉ luồng SALE (đơn trả/đổi có bài toán hoàn
-            // khuyến mại riêng, ngoài phạm vi UOW-02, giống preview evaluate).
+            // CTKM tùy chọn / đã bỏ hẳn (UOW-09) — cùng hai mảng này đi tới
+            // `checkout-return` ở nhánh đổi/trả bên dưới (2026092102 ADR-01).
             selectedProgramIds: promotionDraft.selectedProgramIds,
-            // CTKM đã bỏ hẳn (UOW-09) — cùng phạm vi SALE-only như trên.
             excludedProgramIds: promotionDraft.excludedProgramIds,
           });
           if (!checkoutResolve.ok) {
@@ -360,19 +360,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
             return;
           }
 
-          // Phải trừ KM dòng, và phải trừ đúng cách BE trừ: hai số này quyết định
-          // chiều tiền (`net`) mà `buildCheckoutReturnPayload` chọn, nên chúng là
-          // bản sao của `returnSubtotal`/`newSubtotal` mà BE tính lại từ payload.
-          // Cộng gộp ở đây là nửa còn lại của bug KM dòng bị đánh rơi.
-          const returnSubtotal = returnLines.reduce(
-            (s, l) => s + payloadLineSubtotal(l),
-            0,
-          );
-          const newSubtotal = newLines.reduce(
-            (s, l) => s + payloadLineSubtotal(l),
-            0,
-          );
-
           // Không có hóa đơn gốc thì không có công nợ nào để cấn, và phần chênh
           // khách phải bù thì thu đủ chứ không ghi nợ (ADR-03). `PaymentSection`
           // đã ẩn hai ô tương ứng, nhưng draft persist xuống localStorage nên
@@ -386,21 +373,6 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
           // Trước đây luồng nhanh ghép 1 phiếu SALE + 1 phiếu RETURN: bốn call
           // không atomic, và phiếu SALE bị ép thu đủ giá trị hàng mua nên tiền
           // qua quỹ là gross-in/gross-out thay vì net.
-          const checkoutResolve = buildCheckoutReturnPayload({
-            netAmount: newSubtotal - returnSubtotal,
-            paymentLines: p.paymentLines,
-            // Đơn ĐỔI net>0: tích "Tính vào công nợ" (DebtCheckRow) → ghi phần
-            // chênh chưa thu vào công nợ khách, kèm hạn nợ như đơn bán nợ.
-            putOnDebt,
-            dueDate: putOnDebt ? p.paymentDueDate : null,
-            creditDays: putOnDebt ? p.creditDays : null,
-            note,
-          });
-          if (!checkoutResolve.ok) {
-            toast.error(describeResolveError(checkoutResolve.error));
-            return;
-          }
-
           let invoiceId: string;
           if (newLines.length > 0) {
             // Đổi hàng theo hóa đơn thì BẮT BUỘC có hóa đơn gốc — thiếu là bug
@@ -436,6 +408,79 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
               }),
             );
             invoiceId = created.id;
+          }
+          // Chiều tiền và trần thanh toán lấy từ dry-run của CHÍNH
+          // `checkout-return` (2026092102 ADR-03): cùng load → evaluate CTKM dòng
+          // mua thêm → computeTotals, không ghi. FE không còn công thức riêng —
+          // hai vế (hoàn theo `refundableUnitPrice`, mua thêm sau CTKM) đều do
+          // BE tính. Preview CTKM của POS (`/v2/promotions/evaluate`) chỉ phục
+          // vụ hiển thị: có hỏng cũng không chặn ở đây (ADR-05).
+          const programIds = {
+            ...(promotionDraft.selectedProgramIds.length > 0
+              ? { selectedProgramIds: promotionDraft.selectedProgramIds }
+              : {}),
+            ...(promotionDraft.excludedProgramIds.length > 0
+              ? { excludedProgramIds: promotionDraft.excludedProgramIds }
+              : {}),
+          };
+          const discardCreatedDraft = async () => {
+            // Không post được thì phiếu vừa tạo là mồ côi — dọn, nuốt lỗi như
+            // nhánh dọn `sourceInvoiceId` bên dưới.
+            try {
+              await deleteInvoiceMutation.mutateAsync(invoiceId);
+            } catch {
+              // Nuốt có chủ đích.
+            }
+          };
+          let preview;
+          try {
+            preview = await checkoutReturnPreviewMutation.mutateAsync({
+              id: invoiceId,
+              body: programIds,
+            });
+          } catch {
+            toast.error(CHECKOUT_TOASTS.RETURN_PREVIEW_FAILED);
+            await discardCreatedDraft();
+            return;
+          }
+          if (
+            Math.sign(preview.netAmount) !== Math.sign(settlementGrandTotal) ||
+            Math.abs(preview.netAmount) !== settlementAbs
+          ) {
+            // Panel lệch BE (thường vì preview CTKM của POS chưa/không tải được)
+            // — không chặn, số gửi đi là số BE; ghi lại để QA thấy trong console.
+            console.warn(
+              `[checkout-return] panel ${settlementGrandTotal} ≠ BE preview ${preview.netAmount}`,
+            );
+          }
+          // BE từ chối Σpayments > netAmount: kẹp từng dòng theo phần còn lại của
+          // min(số panel, số BE) — cùng cách luồng bán kẹp theo `amountDue`; phần
+          // vượt là tiền thừa trả khách, không vào sổ. net ≤ 0 thì mapper không
+          // gửi payments.
+          let remaining =
+            preview.netAmount > 0
+              ? Math.min(settlementAbs, preview.netAmount)
+              : 0;
+          const cappedLines = p.paymentLines.map((line) => {
+            const applied = Math.min(Math.max(0, line.amount), remaining);
+            remaining -= applied;
+            return { ...line, amount: applied };
+          });
+          const checkoutResolve = buildCheckoutReturnPayload({
+            netAmount: preview.netAmount,
+            paymentLines: cappedLines,
+            ...programIds,
+            // Đơn ĐỔI net>0: tích "Tính vào công nợ" (DebtCheckRow) → ghi phần
+            // chênh chưa thu vào công nợ khách, kèm hạn nợ như đơn bán nợ.
+            putOnDebt,
+            dueDate: putOnDebt ? p.paymentDueDate : null,
+            creditDays: putOnDebt ? p.creditDays : null,
+            note,
+          });
+          if (!checkoutResolve.ok) {
+            toast.error(describeResolveError(checkoutResolve.error));
+            await discardCreatedDraft();
+            return;
           }
           const posted = await checkoutReturnMutation.mutateAsync({
             id: invoiceId,
@@ -515,6 +560,7 @@ export const useCheckoutActions = (): UseCheckoutActionsResult => {
       createReturnMutation,
       createExchangeMutation,
       checkoutReturnMutation,
+      checkoutReturnPreviewMutation,
       deleteInvoiceMutation,
       currentUser,
       branches,

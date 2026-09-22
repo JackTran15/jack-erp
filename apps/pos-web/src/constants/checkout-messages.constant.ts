@@ -94,6 +94,9 @@ export const CHECKOUT_TOASTS = {
   EXCHANGE_NEEDS_ORIGINAL: "Đổi hàng theo hóa đơn cần chọn hóa đơn gốc.",
   PAYMENT_FAILED: "Không thu được tiền",
   RETURN_FAILED: "Không ghi nhận được đổi trả",
+  /** `POST /invoices/:id/checkout-return/preview` lỗi — không có số BE nào để dựng payload (2026092102 ADR-03). */
+  RETURN_PREVIEW_FAILED:
+    "Không lấy được số tiền đổi trả từ máy chủ — vui lòng thử lại.",
   DRAFT_SAVE_FAILED: "Không lưu được hóa đơn lưu tạm",
   ESTIMATE_FAILED: "Không in được hóa đơn tạm tính",
   /** BE 400 khi POST /invoices/:id/redeem-points (thẻ/balance/giá trị đơn). */
