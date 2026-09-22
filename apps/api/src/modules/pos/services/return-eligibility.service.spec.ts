@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { DataSource } from 'typeorm';
 import { ReturnEligibilityService } from './return-eligibility.service';
 import {
   InvoiceEntity,
@@ -26,6 +27,11 @@ const actor: ActorContext = {
   roles: [],
 };
 
+/** `invoice_checkout_promotions` is read through the DataSource; no rows by default. */
+const noSnapshotDataSource = (rows: unknown[] = []) => ({
+  getRepository: jest.fn().mockReturnValue({ find: jest.fn().mockResolvedValue(rows) }),
+});
+
 describe('ReturnEligibilityService.getOutstandingDebt', () => {
   let service: ReturnEligibilityService;
   let invoiceRepo: { findOne: jest.Mock };
@@ -44,6 +50,7 @@ describe('ReturnEligibilityService.getOutstandingDebt', () => {
           useValue: { find: jest.fn() },
         },
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
+        { provide: DataSource, useValue: noSnapshotDataSource() },
       ],
     }).compile();
 
@@ -160,6 +167,7 @@ describe('ReturnEligibilityService.getEligibleLines', () => {
           provide: getRepositoryToken(InvoiceDebtEntity),
           useValue: { findOne: jest.fn() },
         },
+        { provide: DataSource, useValue: noSnapshotDataSource() },
       ],
     }).compile();
 
@@ -263,6 +271,88 @@ describe('ReturnEligibilityService.getEligibleLines', () => {
   });
 });
 
+/**
+ * 2026092102 / T-02-01 (AC-05/AC-06) — each eligible line names the programmes
+ * the original checkout allocated to it, read from `invoice_checkout_promotions`
+ * so the POS can label a return line without re-running the engine.
+ */
+describe('ReturnEligibilityService.getEligibleLines promotions', () => {
+  let invoiceRepo: { findOne: jest.Mock };
+  let itemRepo: { find: jest.Mock };
+
+  async function build(snapshotRows: unknown[]) {
+    invoiceRepo = { findOne: jest.fn() };
+    itemRepo = { find: jest.fn() };
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        ReturnEligibilityService,
+        { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
+        { provide: getRepositoryToken(InvoiceItemEntity), useValue: itemRepo },
+        {
+          provide: getRepositoryToken(InvoiceDebtEntity),
+          useValue: { findOne: jest.fn() },
+        },
+        { provide: DataSource, useValue: noSnapshotDataSource(snapshotRows) },
+      ],
+    }).compile();
+    return module.get(ReturnEligibilityService);
+  }
+
+  const items = () => [
+    line({ id: 'a', quantity: 2, unitPrice: 685000, promotionDiscount: 411000, lineTotal: 1370000 }),
+    line({ id: 'b', quantity: 1, unitPrice: 100000, lineTotal: 100000 }),
+  ];
+
+  it('maps a snapshot lineDiscount onto its line as a per-unit discount and skips an unknown lineId (AC-05)', async () => {
+    const service = await build([
+      {
+        programId: 'P1',
+        code: 'KM000001',
+        name: 'Giảm giá hàng hóa 30%',
+        type: 'ITEM_DISCOUNT',
+        discountAmount: '411000.00',
+        lineDiscounts: [
+          { lineId: 'a', discountAmount: 411000, unitPriceAfter: 479500 },
+          { lineId: 'ghost', discountAmount: 1, unitPriceAfter: 0 },
+        ],
+      },
+    ]);
+    invoiceRepo.findOne.mockResolvedValue(invoiceOf({}));
+    itemRepo.find.mockResolvedValue(items());
+
+    const lines = await service.getEligibleLines('inv-1', actor);
+
+    expect(lines.find((l) => l.originalInvoiceItemId === 'a')!.promotions).toEqual([
+      { programId: 'P1', code: 'KM000001', name: 'Giảm giá hàng hóa 30%', type: 'ITEM_DISCOUNT', unitDiscount: 205500 },
+    ]);
+    expect(lines.find((l) => l.originalInvoiceItemId === 'b')!.promotions).toEqual([]);
+    // Display only — the money is untouched.
+    expect(lines.find((l) => l.originalInvoiceItemId === 'a')!.refundableUnitPrice).toBe(479500);
+  });
+
+  it('returns [] on every line when the invoice has no snapshot (AC-06)', async () => {
+    const service = await build([]);
+    invoiceRepo.findOne.mockResolvedValue(invoiceOf({}));
+    itemRepo.find.mockResolvedValue(items());
+
+    const lines = await service.getEligibleLines('inv-1', actor);
+
+    expect(lines.map((l) => l.promotions)).toEqual([[], []]);
+  });
+
+  it('returns [] when a snapshot row carries lineDiscounts NULL (AC-06)', async () => {
+    const service = await build([
+      { programId: 'P1', code: 'KM000001', name: 'Old', type: 'INVOICE_DISCOUNT', discountAmount: '10.00', lineDiscounts: null },
+    ]);
+    invoiceRepo.findOne.mockResolvedValue(invoiceOf({}));
+    itemRepo.find.mockResolvedValue(items());
+
+    const lines = await service.getEligibleLines('inv-1', actor);
+
+    expect(lines.map((l) => l.promotions)).toEqual([[], []]);
+  });
+});
+
 describe('ReturnEligibilityService.assertLineEligible', () => {
   let service: ReturnEligibilityService;
   let itemRepo: { find: jest.Mock; findOne: jest.Mock };
@@ -282,6 +372,7 @@ describe('ReturnEligibilityService.assertLineEligible', () => {
           provide: getRepositoryToken(InvoiceDebtEntity),
           useValue: { findOne: jest.fn() },
         },
+        { provide: DataSource, useValue: noSnapshotDataSource() },
       ],
     }).compile();
 

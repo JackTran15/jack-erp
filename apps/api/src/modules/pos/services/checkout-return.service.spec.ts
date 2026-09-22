@@ -1151,6 +1151,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         invoiceRepo as never,
         itemRepo as never,
         debtRepo as never,
+        // No promotion snapshot on the staged original — `promotions: []`.
+        { getRepository: () => ({ find: async () => [] }) } as never,
       );
       const quoted = (await eligibility.getEligibleLines('orig-1', actor)).find(
         (l) => l.originalInvoiceItemId === 'orig-line-1',
@@ -1171,6 +1173,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         invoiceRepo as never,
         itemRepo as never,
         debtRepo as never,
+        // No promotion snapshot on the staged original — `promotions: []`.
+        { getRepository: () => ({ find: async () => [] }) } as never,
       );
 
       const lines = await eligibility.getEligibleLines('orig-1', actor);

@@ -67,3 +67,28 @@ history:
     at: 2026-09-22T09:58:56
     by: Akenzy
     ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T09:59:09
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T10:01:14
+    by: Akenzy
+    reason: T-02-01 - ReturnEligibilityService gains a DataSource ctor param; checkout-return.service.spec.ts constructs it directly at two spots and must pass a 4th arg for api tsc to stay green — add that spec to T-02-01 touches
+  - gate: G3
+    action: passed
+    at: 2026-09-22T10:01:14
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:07:26
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:07:26
+    by: Akenzy
+    ticket: T-02-01
