@@ -21,6 +21,8 @@ import type {
   CancelInvoiceBody,
   CheckoutInvoiceBody,
   CheckoutReturnBody,
+  CheckoutReturnPreview,
+  CheckoutReturnPreviewBody,
   CreateExchangeInvoiceBody,
   CreateInvoiceBody,
   CreateReturnInvoiceBody,
@@ -319,6 +321,22 @@ export function useCreateExchangeInvoiceMutation(): UseMutationResult<
   return useMutation<InvoiceRow, Error, CreateExchangeInvoiceBody>({
     mutationFn: (body) =>
       invoiceService.createExchange(body, invoiceCreateIdempotencyKey(body)),
+  });
+}
+
+interface CheckoutReturnPreviewVars {
+  id: string;
+  body: CheckoutReturnPreviewBody;
+}
+
+/** Dry-run — không ghi, không invalidate gì (2026092102 ADR-03). */
+export function useCheckoutReturnPreviewMutation(): UseMutationResult<
+  CheckoutReturnPreview,
+  Error,
+  CheckoutReturnPreviewVars
+> {
+  return useMutation<CheckoutReturnPreview, Error, CheckoutReturnPreviewVars>({
+    mutationFn: ({ id, body }) => invoiceService.previewCheckoutReturn(id, body),
   });
 }
 

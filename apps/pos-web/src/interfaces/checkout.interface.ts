@@ -2,6 +2,7 @@ import type { EvaluateCartResponse } from "@erp/shared-interfaces";
 import type { PaymentLine } from "@erp/pos/components/common/PosPaymentMethodRow/PosPaymentMethodRow";
 import type { PaymentMethod } from "@erp/pos/constants/checkout.constant";
 import type { CustomerRow } from "@erp/pos/interfaces/customer.interface";
+import type { ReturnLinePromotion } from "@erp/pos/interfaces/return-goods.interface";
 import type { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import type { PosProductKind } from "@erp/pos/types/catalog.type";
 import type { VoucherFormResult } from "@erp/pos/dtos/voucher.dto";
@@ -63,6 +64,12 @@ export interface CartLine {
    * Vắng mặt (hóa đơn cũ / trả nhanh không có hóa đơn gốc) → bằng `unitPrice`.
    */
   refundableUnitPrice?: number;
+  /**
+   * Chỉ dòng `isReturnCredit`: CTKM hóa đơn gốc đã phân bổ cho dòng (snapshot
+   * qua `eligible-returns`), để vẽ nhãn "Tên CTKM (số giảm)" dưới tên như dòng
+   * bán. Snapshot bất biến nên không re-fetch; draft cũ không có → không nhãn.
+   */
+  returnPromotions?: ReturnLinePromotion[];
   /**
    * Đơn trả `regular`: id của dòng hóa đơn bán gốc (`invoice_items.id`) mà dòng
    * trả này tham chiếu. Bắt buộc để BE cộng `returned_quantity` đúng dòng. Bỏ

@@ -1,7 +1,7 @@
 import { PromotionProgramType } from '@erp/shared-interfaces';
 import { PromotionProgram } from '../model/promotion-program';
 import { CartContext } from '../model/cart';
-import { AppliedProgram, AvailableProgram, PromotionEvaluation, SkippedProgram } from '../model/evaluation';
+import { AppliedProgram, AvailableProgram, PromotionEvaluation, SkippedProgram, SkippedProgramReason } from '../model/evaluation';
 import { roundVnd } from '../model/value-objects/money';
 import { CartState } from './cart-state';
 import { sumLines } from './discount-math';
@@ -41,7 +41,7 @@ export class PromotionResolver {
       if (result.eligible) {
         eligible.push(program);
       } else {
-        skipped.push({ programId: program.id!, name: program.name, reason: result.reason });
+        skipped.push(this.skip(program, result.reason));
       }
     }
 
@@ -55,7 +55,7 @@ export class PromotionResolver {
     const excluded = eligible.filter((p) => excludedIds.has(p.id!));
     const remaining = eligible.filter((p) => !excludedIds.has(p.id!));
     for (const program of excluded) {
-      skipped.push({ programId: program.id!, name: program.name, reason: 'EXCLUDED_BY_CASHIER' });
+      skipped.push(this.skip(program, 'EXCLUDED_BY_CASHIER'));
     }
 
     const runnable = remaining.filter((p) => p.autoApply || cart.selectedProgramIds.includes(p.id!));
@@ -96,9 +96,10 @@ export class PromotionResolver {
       type: program.type,
       autoApply: program.autoApply,
       estimatedDiscount: this.estimateDiscount(program, cart),
+      description: program.description,
     }));
     for (const program of notSelected) {
-      skipped.push({ programId: program.id!, name: program.name, reason: 'NOT_SELECTED' });
+      skipped.push(this.skip(program, 'NOT_SELECTED'));
     }
 
     const subtotal = roundVnd(sumLines(cart.lines));
@@ -128,16 +129,11 @@ export class PromotionResolver {
     const result = this.strategyFor(program.type).compute(program, cart, state);
 
     if (result.status === 'not_met') {
-      skipped.push({ programId: program.id!, name: program.name, reason: 'CONDITION_NOT_MET' });
+      skipped.push(this.skip(program, 'CONDITION_NOT_MET'));
       return;
     }
     if (result.status === 'resource_taken') {
-      skipped.push({
-        programId: program.id!,
-        name: program.name,
-        reason: 'RESOURCE_TAKEN',
-        takenBy: state.lineOwner(result.takenByLineId),
-      });
+      skipped.push(this.skip(program, 'RESOURCE_TAKEN', state.lineOwner(result.takenByLineId)));
       return;
     }
 
@@ -156,19 +152,35 @@ export class PromotionResolver {
     const isTaken = kind === 'gift' ? state.isGiftSlotTaken() : state.isInvoiceDiscountTaken();
     if (isTaken) {
       const owner = kind === 'gift' ? state.giftSlotOwner() : state.invoiceDiscountOwner();
-      skipped.push({ programId: program.id!, name: program.name, reason: 'RESOURCE_TAKEN', takenBy: owner });
+      skipped.push(this.skip(program, 'RESOURCE_TAKEN', owner));
       return;
     }
 
     const result = this.strategyFor(program.type).compute(program, cart, state);
     if (result.status !== 'applied') {
-      skipped.push({ programId: program.id!, name: program.name, reason: 'CONDITION_NOT_MET' });
+      skipped.push(this.skip(program, 'CONDITION_NOT_MET'));
       return;
     }
 
     if (kind === 'gift') state.claimGiftSlot(program.id!);
     else state.claimInvoiceDiscount(program.id!);
     applied.push(this.toAppliedProgram(program, result));
+  }
+
+  /**
+   * The one place a `SkippedProgram` is built — every reason goes through here so
+   * none of them can drop `type`/`description`, which the POS modal needs to
+   * label a skipped row the same way it labels an applied one.
+   */
+  private skip(program: PromotionProgram, reason: SkippedProgramReason, takenBy?: string): SkippedProgram {
+    return {
+      programId: program.id!,
+      name: program.name,
+      type: program.type,
+      description: program.description,
+      reason,
+      ...(takenBy !== undefined ? { takenBy } : {}),
+    };
   }
 
   private estimateDiscount(program: PromotionProgram, cart: CartContext): number {
@@ -189,6 +201,7 @@ export class PromotionResolver {
       discountAmount: result.outcome.discountAmount,
       lineDiscounts: result.outcome.lineDiscounts,
       gifts: result.outcome.gifts,
+      description: program.description,
       // Only INVOICE_DISCOUNT has one mode/value at program level — see the
       // docblock on AppliedProgram.discountMode. Others stay undefined.
       ...(program.type === PromotionProgramType.INVOICE_DISCOUNT

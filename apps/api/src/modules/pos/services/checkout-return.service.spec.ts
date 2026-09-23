@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
+import { QueryBus } from '@nestjs/cqrs';
 import { DataSource } from 'typeorm';
 import { CheckoutReturnService } from './checkout-return.service';
 import { ReturnEligibilityService } from './return-eligibility.service';
@@ -220,6 +221,7 @@ const exchangeDto = (
 
 describe('CheckoutReturnService — debt offset routing', () => {
   let service: CheckoutReturnService;
+  let module: TestingModule;
   let invoiceRepo: { findOne: jest.Mock };
   let itemRepo: { find: jest.Mock };
   let dataSource: { transaction: jest.Mock };
@@ -247,8 +249,21 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let stockReturnInPublisher: { publish: jest.Mock };
   let stockDeductionPublisher: { publish: jest.Mock };
   let tempWarehouseFulfillPublisher: { publish: jest.Mock };
+  // 2026092102 — `EvaluateCartQuery` on the OUT lines. Empty evaluation by
+  // default so every pre-existing case keeps `promotionDiscount = 0`.
+  let queryBus: { execute: jest.Mock };
 
   beforeEach(async () => {
+    queryBus = {
+      execute: jest.fn().mockResolvedValue({
+        subtotal: 0,
+        promotionDiscount: 0,
+        amountAfterPromotion: 0,
+        appliedPrograms: [],
+        availablePrograms: [],
+        skippedPrograms: [],
+      }),
+    };
     debtRow = {
       id: 'debt-1',
       invoiceId: 'orig-1',
@@ -321,7 +336,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
     tempWarehouseFulfillPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
 
     const noop = { publish: jest.fn().mockResolvedValue(undefined) };
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         CheckoutReturnService,
         { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
@@ -329,6 +344,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: getRepositoryToken(PosSessionEntity), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
         { provide: DataSource, useValue: dataSource },
+        { provide: QueryBus, useValue: queryBus },
         { provide: DocumentNumberingService, useValue: { generate: jest.fn().mockResolvedValue('RET-0001') } },
         { provide: WebSocketEmitterService, useValue: { emitToBranch: jest.fn() } },
         { provide: CustomerCreditService, useValue: { issue: jest.fn() } },
@@ -1151,6 +1167,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         invoiceRepo as never,
         itemRepo as never,
         debtRepo as never,
+        // No promotion snapshot on the staged original — `promotions: []`.
+        { getRepository: () => ({ find: async () => [] }) } as never,
       );
       const quoted = (await eligibility.getEligibleLines('orig-1', actor)).find(
         (l) => l.originalInvoiceItemId === 'orig-line-1',
@@ -1171,6 +1189,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         invoiceRepo as never,
         itemRepo as never,
         debtRepo as never,
+        // No promotion snapshot on the staged original — `promotions: []`.
+        { getRepository: () => ({ find: async () => [] }) } as never,
       );
 
       const lines = await eligibility.getEligibleLines('orig-1', actor);
@@ -2127,6 +2147,209 @@ describe('CheckoutReturnService — debt offset routing', () => {
    * the till, 465.000 still owed. Before this feature the whole 765.000 left the
    * drawer while the 465.000 debt stayed open — 930.000 lost on a 765.000 sale.
    */
+  /**
+   * 2026092102 / T-03-02 — the exchange's "Mua thêm" (OUT) lines go through the
+   * promotion engine (ADR-01) and the money is settled on `newNet`; the returned
+   * (IN) lines never do (AC-14).
+   */
+  describe('promotions on the OUT lines of an exchange (2026092102, ADR-01)', () => {
+    /** Return 685.000 (sold without promotion), buy 2 × 100.000. */
+    const promoExchangeItems = (): InvoiceItemEntity[] => [
+      { ...exchangeItems()[0], id: 'exc-in', unitPrice: 685000, lineTotal: 685000 } as InvoiceItemEntity,
+      { ...exchangeItems()[1], id: 'exc-out', unitPrice: 100000, quantity: 2, lineTotal: 200000 } as InvoiceItemEntity,
+    ];
+
+    const evaluationWith30Percent = () => ({
+      subtotal: 200000,
+      promotionDiscount: 60000,
+      amountAfterPromotion: 140000,
+      appliedPrograms: [
+        {
+          programId: 'prog-30',
+          code: 'KM000001',
+          name: 'Giảm giá hàng hóa 30%',
+          type: 'ITEM_DISCOUNT',
+          priority: 100,
+          discountAmount: 60000,
+          lineDiscounts: [{ lineId: 'exc-out', discountAmount: 60000, unitPriceAfter: 70000 }],
+          gifts: [],
+        },
+      ],
+      availablePrograms: [],
+      skippedPrograms: [],
+    });
+
+    // `persistAppliedPromotions` writes the snapshot through
+    // `manager.getRepository(InvoiceCheckoutPromotionEntity)`.
+    let snapshotRepo: { create: jest.Mock; save: jest.Mock };
+
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue(promoExchangeItems());
+      snapshotRepo = {
+        create: jest.fn().mockImplementation((data) => ({ id: 'snap-1', ...data })),
+        save: jest.fn().mockImplementation((rows) => Promise.resolve(rows)),
+      };
+      mockManager.getRepository = jest.fn().mockReturnValue(snapshotRepo);
+    });
+
+    it('evaluates only the OUT lines, with the cashier\'s selected/excluded ids and the customer', async () => {
+      await service.checkout(
+        'exc-1',
+        { ...cashDto(), selectedProgramIds: ['sel-1'], excludedProgramIds: ['exc-9'] } as never,
+        actor,
+      );
+
+      expect(queryBus.execute).toHaveBeenCalledTimes(1);
+      const [query] = queryBus.execute.mock.calls[0];
+      expect(query.dto.customerId).toBe('cust-1');
+      expect(query.dto.selectedProgramIds).toEqual(['sel-1']);
+      expect(query.dto.excludedProgramIds).toEqual(['exc-9']);
+      expect(query.dto.lines).toEqual([
+        expect.objectContaining({ lineId: 'exc-out', itemId: 'item-new', quantity: 2, unitPrice: 100000 }),
+      ]);
+      expect(query.actor).toBe(actor);
+    });
+
+    it('settles on newNet: 200.000 − 60.000 − 685.000 ⇒ netAmount −545.000, refundedAmount 545.000 (AC-10 shape)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.netAmount).toBe(-545000);
+      expect(result.refundedAmount).toBe(545000);
+      // Gross stays on the header: `subtotal = Σ lineTotal` is untouched by the engine.
+      expect(result.subtotal).toBe(200000);
+      expect(cashRefundPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 545000 }),
+        actor,
+      );
+    });
+
+    /**
+     * T-03-03 — what the transaction leaves behind: the OUT line's
+     * promotion_discount, one snapshot row keyed on the exchange, the header
+     * discount (A-07), and points + the loyalty award on newNet (A-02).
+     */
+    it('writes promotion_discount on the OUT line and one snapshot row for the exchange (AC-16/AC-18 shape)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      const savedOut = mockManager.save.mock.calls
+        .flatMap(([arg]) => (Array.isArray(arg) ? arg : [arg]))
+        .find((e: InvoiceItemEntity) => e.id === 'exc-out');
+      expect(savedOut).toBeDefined();
+      expect(Number(savedOut.promotionDiscount)).toBe(60000);
+      expect(Number(savedOut.lineTotal)).toBe(200000);
+
+      expect(snapshotRepo.save).toHaveBeenCalledTimes(1);
+      const [rows] = snapshotRepo.save.mock.calls[0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        invoiceId: result.id,
+        programId: 'prog-30',
+        code: 'KM000001',
+        name: 'Giảm giá hàng hóa 30%',
+        type: 'ITEM_DISCOUNT',
+        discountAmount: 60000,
+        lineDiscounts: [{ lineId: 'exc-out', discountAmount: 60000, unitPriceAfter: 70000 }],
+      });
+
+      expect(result.discountAmount).toBe(60000);
+    });
+
+    it('earns points on newNet and publishes the award on the same base (AC-15)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.pointsEarned).toBe(Math.floor(140000 / POINT_EARN_VND_PER_POINT));
+      expect(result.pointsEarned).not.toBe(Math.floor(200000 / POINT_EARN_VND_PER_POINT));
+      expect(loyaltyAwardPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: 'cust-1', subtotal: 140000 }),
+        actor,
+      );
+    });
+
+    it('with no programme applied the header discount stays 0 and nothing is snapshotted', async () => {
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.discountAmount).toBe(0);
+      expect(snapshotRepo.save).not.toHaveBeenCalled();
+      expect(result.netAmount).toBe(-485000);
+    });
+
+    /**
+     * T-03-06 — `preview()` is the first half of `checkout()` and nothing
+     * else: the seven totals, no transaction, no document number, no event.
+     */
+    describe('preview() — dry-run (AC-28)', () => {
+      it('returns the totals the post would settle on, and writes nothing', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+        const numbering = module.get(DocumentNumberingService) as { generate: jest.Mock };
+
+        const totals = await service.preview('exc-1', { excludedProgramIds: [] }, actor);
+
+        expect(totals).toEqual({
+          returnSubtotal: 685000,
+          newSubtotal: 200000,
+          newPromotionDiscount: 60000,
+          newNet: 140000,
+          returnedNet: 685000,
+          netAmount: -545000,
+          refundedAmount: 545000,
+        });
+        expect(dataSource.transaction).not.toHaveBeenCalled();
+        expect(numbering.generate).not.toHaveBeenCalled();
+        expect(mockManager.save).not.toHaveBeenCalled();
+        expect(snapshotRepo.save).not.toHaveBeenCalled();
+        expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+        expect(loyaltyAwardPublisher.publish).not.toHaveBeenCalled();
+        expect(stockReturnInPublisher.publish).not.toHaveBeenCalled();
+        expect(stockDeductionPublisher.publish).not.toHaveBeenCalled();
+      });
+
+      it('hands the ids to the engine and is stable across two calls with the same input', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+        const first = await service.preview('exc-1', { selectedProgramIds: ['sel-1'] }, actor);
+        const second = await service.preview('exc-1', { selectedProgramIds: ['sel-1'] }, actor);
+
+        expect(second).toEqual(first);
+        expect(queryBus.execute).toHaveBeenCalledTimes(2);
+        for (const [query] of queryBus.execute.mock.calls) {
+          expect(query.dto.selectedProgramIds).toEqual(['sel-1']);
+          expect(query.dto.lines.map((l: { lineId: string }) => l.lineId)).toEqual(['exc-out']);
+        }
+      });
+
+      it('agrees with checkout() on the posted netAmount for the same ids', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+        const previewed = await service.preview('exc-1', {}, actor);
+
+        const posted = await service.checkout('exc-1', cashDto(), actor);
+
+        expect(posted.netAmount).toBe(previewed.netAmount);
+        expect(posted.refundedAmount).toBe(previewed.refundedAmount);
+      });
+    });
+
+    it('a pure RETURN (no OUT line) never calls the engine (AC-14)', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'ret-1' ? returnDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue([inLineStub()]);
+
+      const result = await service.checkout('ret-1', cashDto(), actor);
+
+      expect(queryBus.execute).not.toHaveBeenCalled();
+      expect(result.refundedAmount).toBe(200);
+    });
+  });
+
   describe('debt-first refund split (QA #8)', () => {
     const DUE = 765_000;
 

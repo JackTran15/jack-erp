@@ -2,9 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { promotionService } from "@erp/pos/services/promotion.service";
 import { buildEvaluateCartLines } from "@erp/pos/lib/page-libs/checkout/evaluateCartPayload";
-import { CheckoutVariantEnum } from "@erp/pos/types/checkout.type";
 import {
-  selectCheckoutVariant,
   selectCustomerDraft,
   selectPromotionDraft,
   selectPurchaseCart,
@@ -29,15 +27,16 @@ const DEBOUNCE_MS = 300;
  *    phản hồi chậm của giỏ hàng cũ có thể về sau và ghi đè số của giỏ mới, tức
  *    là hiện sai tiền cho khách.
  * 3. **Không bao giờ ném lỗi ra ngoài** — hỏng thì rơi vào `unavailable`, thu
- *    ngân vẫn bấm Thu tiền được vì server mới là nơi chốt số (ADR-06 của
- *    `checkout-saga`).
+ *    ngân vẫn bấm Thu tiền / Thanh toán được vì server mới là nơi chốt số
+ *    (ADR-06 của `checkout-saga`; ADR-05 của 2026092102 cho phiếu đổi).
  *
- * Chỉ chạy ở luồng SALE: đơn trả/đổi có bài toán hoàn khuyến mại riêng, ngoài
- * phạm vi feature này.
+ * Chạy ở mọi variant. Ở tab đổi trả chỉ phần **mua thêm** đi vào engine —
+ * `buildEvaluateCartLines` bỏ dòng `isReturnCredit`, còn `returnCart` của đổi
+ * trả nhanh là mảng riêng không nằm trong `selectPurchaseCart`. Giỏ chỉ có
+ * dòng trả vẫn gọi với `lines: []` để modal load được danh sách CTKM.
  */
 export function useCheckoutPromotionPreview(): void {
   const cart = usePosCheckoutSessionStore(selectPurchaseCart);
-  const variant = usePosCheckoutSessionStore(selectCheckoutVariant);
   const customer = usePosCheckoutSessionStore(
     (s) => selectCustomerDraft(s).selectedCustomer,
   );
@@ -63,20 +62,10 @@ export function useCheckoutPromotionPreview(): void {
   const selectedProgramIdsKey = JSON.stringify(selectedProgramIds);
   const excludedProgramIdsKey = JSON.stringify(excludedProgramIds);
   const customerId = customer?.id;
-  const isSale = variant === CheckoutVariantEnum.SALE;
 
   useEffect(() => {
     abortRef.current?.abort();
 
-    if (!isSale) {
-      // Đơn trả/đổi: bài toán hoàn khuyến mại riêng, ngoài phạm vi hook này.
-      updateDraftSlice("promotionPreview", () => ({
-        status: "idle",
-        data: null,
-        error: null,
-      }));
-      return;
-    }
     // Giỏ rỗng vẫn gọi evaluate (BE chấp nhận `lines: []`) — dialog "Chương
     // trình khuyến mãi" phải load được danh sách CTKM (đa số sẽ hiện "Chưa đủ
     // điều kiện") ngay cả khi thu ngân chưa quét hàng nào, không phải chờ dòng
@@ -129,7 +118,6 @@ export function useCheckoutPromotionPreview(): void {
   }, [
     cartKey,
     customerId,
-    isSale,
     updateDraftSlice,
     retrySeq,
     selectedProgramIdsKey,

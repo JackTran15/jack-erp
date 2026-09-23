@@ -30,6 +30,7 @@ export function buildInvoiceReturnCartLines(
       maxQty: item.allowedQty,
       isReturnCredit: true,
       originalInvoiceItemId: item.id,
+      returnPromotions: item.promotions,
     });
   }
   return lines;

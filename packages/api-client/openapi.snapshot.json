@@ -16536,6 +16536,47 @@
         ]
       }
     },
+    "/invoices/{id}/checkout-return/preview": {
+      "post": {
+        "operationId": "InvoiceController_previewCheckoutReturn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutReturnPreviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutReturnPreviewResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Dry-run of `checkout-return`: the totals the post below would settle on,\nfrom the same code path, without writing anything (2026092102 ADR-03).\nA read-only POST — the global IdempotencyInterceptor still applies: same\nkey + same body replays, same key + different body is a 409, exactly as\n`/v2/promotions/evaluate` behaves.",
+        "tags": [
+          "Invoice"
+        ]
+      }
+    },
     "/invoices/{id}/checkout-return": {
       "post": {
         "operationId": "InvoiceController_checkoutReturn",
@@ -44242,9 +44283,86 @@
           "newLines"
         ]
       },
+      "CheckoutReturnPreviewDto": {
+        "type": "object",
+        "properties": {
+          "selectedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "CheckoutReturnPreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "returnSubtotal": {
+            "type": "number",
+            "description": "Gross value of the returned (IN) lines."
+          },
+          "newSubtotal": {
+            "type": "number",
+            "description": "Gross value of the \"Mua thêm\" (OUT) lines — what `invoice.subtotal` will carry."
+          },
+          "newPromotionDiscount": {
+            "type": "number",
+            "description": "What the promotion engine takes off the OUT lines."
+          },
+          "newNet": {
+            "type": "number",
+            "description": "`newSubtotal − newPromotionDiscount`."
+          },
+          "returnedNet": {
+            "type": "number",
+            "description": "What the customer actually paid for the returned lines (net of the original's discounts)."
+          },
+          "netAmount": {
+            "type": "number",
+            "description": "`newNet − returnedNet`: > 0 the customer pays, 0 even swap, < 0 the store refunds."
+          },
+          "refundedAmount": {
+            "type": "number",
+            "description": "`max(returnedNet − newNet, 0)`."
+          }
+        },
+        "required": [
+          "returnSubtotal",
+          "newSubtotal",
+          "newPromotionDiscount",
+          "newNet",
+          "returnedNet",
+          "netAmount",
+          "refundedAmount"
+        ]
+      },
       "CheckoutReturnDto": {
         "type": "object",
         "properties": {
+          "selectedProgramIds": {
+            "description": "Promotion programmes the cashier ticked for the \"Mua thêm\" (OUT) lines —\nsame meaning as `CheckoutV2Dto.selectedProgramIds` (pos-promotion-apply\nADR-03): an `auto_apply=false` programme only runs when listed here, and a\nlisted programme wins a contested resource ahead of priority. The server\nevaluates the OUT lines itself (2026092102 ADR-01); no amount is accepted\nfrom the client.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "description": "Programmes the cashier un-ticked — kept out of the race entirely (ADR-07).",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "refundMethod": {
             "type": "string",
             "description": "Which fund pays out the refund. It does NOT decide whether the original\ninvoice's outstanding debt is settled — that happens on every return, ahead\nof any payout, and is reported back as `offsetAmount`.\n\n`OFFSET` is accepted as a legacy alias of `CASH` so older POS builds keep\nworking; the resulting document is identical either way.",

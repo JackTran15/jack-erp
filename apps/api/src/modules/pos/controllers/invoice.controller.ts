@@ -7,6 +7,7 @@ import {
   Param,
   Body,
   Query,
+  HttpCode,
   ParseUUIDPipe,
   UseInterceptors,
   UseGuards,
@@ -37,6 +38,10 @@ import { CustomerDebtLedgerRowDto } from '../dto/customer-debt-ledger-row.dto';
 import { CreateReturnInvoiceDto } from '../dto/create-return-invoice.dto';
 import { CreateExchangeInvoiceDto } from '../dto/create-exchange-invoice.dto';
 import { CheckoutReturnDto } from '../dto/checkout-return.dto';
+import {
+  CheckoutReturnPreviewDto,
+  CheckoutReturnPreviewResponseDto,
+} from '../dto/checkout-return-preview.dto';
 import { RedeemPointsDto } from '../dto/redeem-points.dto';
 import { InvoiceType } from '../entities/invoice.entity';
 import { DebtStatus } from '../entities/invoice-debt.entity';
@@ -262,6 +267,25 @@ export class InvoiceController {
     @Actor() actor: ActorContext,
   ) {
     return this.createExchangeInvoiceService.create(dto, actor);
+  }
+
+  /**
+   * Dry-run of `checkout-return`: the totals the post below would settle on,
+   * from the same code path, without writing anything (2026092102 ADR-03).
+   * A read-only POST — the global IdempotencyInterceptor still applies: same
+   * key + same body replays, same key + different body is a 409, exactly as
+   * `/v2/promotions/evaluate` behaves.
+   */
+  @Post(':id/checkout-return/preview')
+  @RequirePermission('pos.return.create')
+  @HttpCode(200)
+  @ApiOkResponse({ type: CheckoutReturnPreviewResponseDto })
+  previewCheckoutReturn(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CheckoutReturnPreviewDto,
+    @Actor() actor: ActorContext,
+  ): Promise<CheckoutReturnPreviewResponseDto> {
+    return this.checkoutReturnService.preview(id, dto, actor);
   }
 
   @Post(':id/checkout-return')

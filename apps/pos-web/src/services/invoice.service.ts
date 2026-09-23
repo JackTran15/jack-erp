@@ -3,6 +3,8 @@ import type {
   CancelInvoiceBody,
   CheckoutInvoiceBody,
   CheckoutReturnBody,
+  CheckoutReturnPreview,
+  CheckoutReturnPreviewBody,
   CheckoutV2Body,
   CheckoutV2Response,
   CreateExchangeInvoiceBody,
@@ -185,6 +187,32 @@ export const invoiceService = {
     idempotencyKey: string,
   ): Promise<InvoiceRow> =>
     http.post<InvoiceRow>("/invoices/exchanges", body, { idempotencyKey }),
+
+  /**
+   * `POST /invoices/:id/checkout-return/preview` — dry-run của `checkoutReturn`:
+   * cùng load → evaluate CTKM dòng mua thêm → `computeTotals`, không ghi gì.
+   * Đây là số DUY NHẤT dùng để dựng payload `checkout-return` (chiều tiền, trần
+   * `payments`) — 2026092102 ADR-03. Không gửi idempotency key cố định: mỗi lần
+   * bấm Thanh toán là một lần hỏi lại BE.
+   */
+  previewCheckoutReturn: (
+    id: string,
+    body: CheckoutReturnPreviewBody,
+  ): Promise<CheckoutReturnPreview> =>
+    http
+      .post<CheckoutReturnPreview>(
+        `/invoices/${encodeURIComponent(id)}/checkout-return/preview`,
+        body,
+      )
+      .then((raw) => ({
+        returnSubtotal: Number(raw.returnSubtotal) || 0,
+        newSubtotal: Number(raw.newSubtotal) || 0,
+        newPromotionDiscount: Number(raw.newPromotionDiscount) || 0,
+        newNet: Number(raw.newNet) || 0,
+        returnedNet: Number(raw.returnedNet) || 0,
+        netAmount: Number(raw.netAmount) || 0,
+        refundedAmount: Number(raw.refundedAmount) || 0,
+      })),
 
   /** `POST /invoices/:id/checkout-return` — tất toán đơn trả/đổi. */
   checkoutReturn: (id: string, body: CheckoutReturnBody): Promise<InvoiceRow> =>

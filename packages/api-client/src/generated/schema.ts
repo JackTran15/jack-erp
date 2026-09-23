@@ -5686,6 +5686,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/invoices/{id}/checkout-return/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry-run of `checkout-return`: the totals the post below would settle on,
+         *     from the same code path, without writing anything (2026092102 ADR-03).
+         *     A read-only POST — the global IdempotencyInterceptor still applies: same
+         *     key + same body replays, same key + different body is a 409, exactly as
+         *     `/v2/promotions/evaluate` behaves.
+         */
+        post: operations["InvoiceController_previewCheckoutReturn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invoices/{id}/checkout-return": {
         parameters: {
             query?: never;
@@ -14796,7 +14819,38 @@ export interface components {
             /** @description New items being purchased (direction=OUT). Same shape as a normal SALE. */
             newLines: components["schemas"]["CreateInvoiceItemDto"][];
         };
+        CheckoutReturnPreviewDto: {
+            selectedProgramIds?: string[];
+            excludedProgramIds?: string[];
+        };
+        CheckoutReturnPreviewResponseDto: {
+            /** @description Gross value of the returned (IN) lines. */
+            returnSubtotal: number;
+            /** @description Gross value of the "Mua thêm" (OUT) lines — what `invoice.subtotal` will carry. */
+            newSubtotal: number;
+            /** @description What the promotion engine takes off the OUT lines. */
+            newPromotionDiscount: number;
+            /** @description `newSubtotal − newPromotionDiscount`. */
+            newNet: number;
+            /** @description What the customer actually paid for the returned lines (net of the original's discounts). */
+            returnedNet: number;
+            /** @description `newNet − returnedNet`: > 0 the customer pays, 0 even swap, < 0 the store refunds. */
+            netAmount: number;
+            /** @description `max(returnedNet − newNet, 0)`. */
+            refundedAmount: number;
+        };
         CheckoutReturnDto: {
+            /**
+             * @description Promotion programmes the cashier ticked for the "Mua thêm" (OUT) lines —
+             *     same meaning as `CheckoutV2Dto.selectedProgramIds` (pos-promotion-apply
+             *     ADR-03): an `auto_apply=false` programme only runs when listed here, and a
+             *     listed programme wins a contested resource ahead of priority. The server
+             *     evaluates the OUT lines itself (2026092102 ADR-01); no amount is accepted
+             *     from the client.
+             */
+            selectedProgramIds?: string[];
+            /** @description Programmes the cashier un-ticked — kept out of the race entirely (ADR-07). */
+            excludedProgramIds?: string[];
             /**
              * @description Which fund pays out the refund. It does NOT decide whether the original
              *     invoice's outstanding debt is settled — that happens on every return, ahead
@@ -29086,6 +29140,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvoiceEntity"];
+                };
+            };
+        };
+    };
+    InvoiceController_previewCheckoutReturn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutReturnPreviewDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutReturnPreviewResponseDto"];
                 };
             };
         };

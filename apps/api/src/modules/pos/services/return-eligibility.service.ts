@@ -5,8 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import type { PromotionProgramType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
+import { InvoiceCheckoutPromotionEntity } from '../checkout-saga/infrastructure/invoice-checkout-promotion.entity';
 import {
   InvoiceEntity,
   InvoiceStatus,
@@ -26,6 +28,21 @@ import {
 export interface OutstandingDebt {
   /** What the customer still owes on this invoice; 0 when it was paid in full. */
   remainingDebt: number;
+}
+
+/**
+ * One promotion programme's share of ONE unit of an eligible line, read from
+ * the original invoice's `invoice_checkout_promotions` snapshot. Lets the POS
+ * label a return line "Giảm giá hàng hóa 30% (205.500)" the way the sale line
+ * was labelled, without re-running the engine on a posted document.
+ */
+export interface EligibleLinePromotion {
+  programId: string;
+  code: string;
+  name: string;
+  type: PromotionProgramType;
+  /** `lineDiscounts[].discountAmount / quantity` of the sold line, 2dp. */
+  unitDiscount: number;
 }
 
 export interface EligibleLine {
@@ -50,7 +67,16 @@ export interface EligibleLine {
   soldQuantity: number;
   returnedQuantity: number;
   maxReturnable: number;
+  /**
+   * Programmes the snapshot allocated to this line, in the order the engine
+   * applied them. `[]` when the sale carried no snapshot (no promotion, or a
+   * pre-snapshot invoice). Display only — `refundableUnitPrice` already nets
+   * these out.
+   */
+  promotions: EligibleLinePromotion[];
 }
+
+const round2 = (v: number) => Math.round(v * 100) / 100;
 
 /**
  * Both kinds carry sold (OUT) lines. An EXCHANGE's "bought extra" lines are a
@@ -80,6 +106,9 @@ export class ReturnEligibilityService {
     private readonly itemRepo: Repository<InvoiceItemEntity>,
     @InjectRepository(InvoiceDebtEntity)
     private readonly debtRepo: Repository<InvoiceDebtEntity>,
+    // `InvoiceCheckoutPromotionEntity` is not in PosModule's `forFeature` —
+    // read through the DataSource, same as `InvoiceService.findOne`.
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -160,6 +189,12 @@ export class ReturnEligibilityService {
     // both kinds and there is no second path to drift.
     const returnable = items.filter((it) => it.direction === ItemDirection.OUT);
 
+    const promotionsByLine = await this.loadLinePromotions(
+      originalInvoiceId,
+      items,
+      actor,
+    );
+
     return returnable.map((it) => {
       const sold = Number(it.quantity);
       const returned = Number(it.returnedQuantity ?? 0);
@@ -176,8 +211,48 @@ export class ReturnEligibilityService {
         soldQuantity: sold,
         returnedQuantity: returned,
         maxReturnable: Math.max(sold - returned, 0),
+        promotions: promotionsByLine.get(it.id) ?? [],
       };
     });
+  }
+
+  /**
+   * `invoice_items.id → programmes allocated to it`, from the original invoice's
+   * checkout snapshot. Every programme type is listed (an INVOICE_DISCOUNT's
+   * allocation is netted out of `refundableUnitPrice` just like an item one —
+   * A-12). A snapshot row with `lineDiscounts` NULL, a `lineId` that matches no
+   * item, or a zero-quantity line contributes nothing.
+   */
+  private async loadLinePromotions(
+    invoiceId: string,
+    items: InvoiceItemEntity[],
+    actor: ActorContext,
+  ): Promise<Map<string, EligibleLinePromotion[]>> {
+    const snapshots = await this.dataSource
+      .getRepository(InvoiceCheckoutPromotionEntity)
+      .find({
+        where: { invoiceId, organizationId: actor.organizationId },
+        order: { priority: 'ASC', createdAt: 'ASC' },
+      });
+
+    const quantityByLine = new Map(items.map((it) => [it.id, Number(it.quantity)]));
+    const byLine = new Map<string, EligibleLinePromotion[]>();
+    for (const row of snapshots) {
+      for (const ld of row.lineDiscounts ?? []) {
+        const quantity = quantityByLine.get(ld.lineId);
+        if (!quantity) continue;
+        const list = byLine.get(ld.lineId) ?? [];
+        list.push({
+          programId: row.programId,
+          code: row.code,
+          name: row.name,
+          type: row.type as PromotionProgramType,
+          unitDiscount: round2(Number(ld.discountAmount) / quantity),
+        });
+        byLine.set(ld.lineId, list);
+      }
+    }
+    return byLine;
   }
 
   /**

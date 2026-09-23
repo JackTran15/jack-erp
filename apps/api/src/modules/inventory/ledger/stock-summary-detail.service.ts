@@ -176,6 +176,15 @@ export class StockSummaryDetailService {
         INNER JOIN locations loc
           ON loc.id = sle.location_id AND loc.storage_id = $3 AND loc.is_active = true
         WHERE sle.organization_id = $1 AND sle.posted_at < $5
+          -- A pair explicitly stopped ("Ngừng theo dõi") is not a row, whatever
+          -- its history: stopping only flips the flag, the ledger rows stay.
+          AND NOT EXISTS (
+            SELECT 1 FROM stock_balances ut
+            WHERE ut.organization_id = $1
+              AND ut.item_id = sle.item_id
+              AND ut.location_id = sle.location_id
+              AND ut.is_tracked = false
+          )
         ${EXCLUDE_VOIDED_DOCS_SQL}
       ),
       balance AS (
