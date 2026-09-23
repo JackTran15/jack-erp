@@ -688,6 +688,30 @@ describe('SalesOrderService', () => {
     expect(branch.listQb.andWhere).not.toHaveBeenCalledWith('(so.salespersonId = :sp OR so.createdBy = :me)', expect.anything());
   });
 
+  it('list: `read-all` cũng thấy TRỌN chi nhánh, không bị bó về đơn của mình', async () => {
+    // Màn chi tiết cửa hàng của app quản lý đọc bằng khoá này. Thiếu vế
+    // `read-all` ở `scopeOf` thì nó nhận danh sách RỖNG mà không có lỗi nào —
+    // hỏng câm, và đó là lý do test này tồn tại.
+    const manager = build({ canApprove: false, canReadAll: true });
+    await manager.service.list({}, actor);
+
+    expect(manager.listQb.andWhere).not.toHaveBeenCalledWith(
+      '(so.salespersonId = :sp OR so.createdBy = :me)',
+      expect.anything(),
+    );
+  });
+
+  it('list: `branchId` trên query THẮNG chi nhánh đang làm việc của người gọi', async () => {
+    const other = build({ canApprove: true });
+    await other.service.list({ branchId: 'br-9' }, actor);
+    expect(other.listQb.andWhere).toHaveBeenCalledWith('so.branchId = :branch', { branch: 'br-9' });
+
+    // Vắng khoá thì giữ nguyên hành vi cũ: chi nhánh của `X-Branch-Id`.
+    const current = build({ canApprove: true });
+    await current.service.list({}, actor);
+    expect(current.listQb.andWhere).toHaveBeenCalledWith('so.branchId = :branch', { branch: 'br-1' });
+  });
+
   /**
    * Đường ĐỌC của đơn web (T-05-07). `createFromPartner` GHI đủ tám cột đơn web
    * từ T-01-02, nhưng trước ticket này `toView` không đọc lại cột nào — lưới
