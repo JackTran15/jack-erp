@@ -1,5 +1,5 @@
 import { Transform, Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsISO8601, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { SalesOrderStatus } from '../entities/sales-order.entity';
 
 /**
@@ -39,6 +39,22 @@ export class SalesOrderListQueryDto {
   @IsOptional()
   @IsEnum(SalesOrderStatus)
   status?: SalesOrderStatus;
+
+  /**
+   * Chi nhánh cần xem, thay cho chi nhánh đang làm việc của người gọi.
+   *
+   * App quản lý mở đơn của MỘT cửa hàng từ màn chi tiết cửa hàng, mà cửa hàng
+   * đó thường không phải cửa hàng đang chọn trên thanh điều hướng — tức không
+   * phải `X-Branch-Id`. Vắng khoá này thì rơi về chi nhánh của người gọi, đúng
+   * hành vi cũ của lưới POS.
+   *
+   * **KHÔNG nới quyền:** `BranchScopeGuard` đọc `query.branchId` TRƯỚC header
+   * (`common/utils/branch-request.util.ts`) và vẫn đòi id đó nằm trong tập chi
+   * nhánh được phân công; gửi chi nhánh lạ vẫn là 403.
+   */
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
 
   @IsOptional()
   @IsISO8601()

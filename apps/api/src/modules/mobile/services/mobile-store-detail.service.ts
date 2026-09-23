@@ -8,6 +8,7 @@ import {
   InvoiceStatus,
   InvoiceType,
 } from '../../pos/entities/invoice.entity';
+import { SalesOrderStatus } from '../../sales-order/entities/sales-order.entity';
 import { MobileInventoryKind } from '../dto/mobile-inventory-product-list.query.dto';
 import {
   MobilePaymentSplitDto,
@@ -114,6 +115,7 @@ export class MobileStoreDetailService {
       salesPayments,
       debtPayments,
       [pending],
+      [pendingOrder],
       newCustomerItems,
       [newCustomerTotals],
       inventory,
@@ -123,6 +125,7 @@ export class MobileStoreDetailService {
       this.dataSource.query<PaymentRow[]>(SALES_PAYMENTS_SQL, params),
       this.dataSource.query<PaymentRow[]>(DEBT_PAYMENTS_SQL, params),
       this.dataSource.query<CountRow[]>(PENDING_UNPAID_SQL, [org, [branchId]]),
+      this.dataSource.query<CountRow[]>(PENDING_ORDER_SQL, [org, [branchId]]),
       this.dataSource.query<MobileStoreNewCustomerDto[]>(
         newCustomerItemsSql(lines),
         [...params, NEW_CUSTOMER_LIMIT],
@@ -155,6 +158,7 @@ export class MobileStoreDetailService {
         debt: splitOf(debtPayments),
       },
       pendingUnpaidCount: Number(pending?.count ?? 0),
+      pendingOrderCount: Number(pendingOrder?.count ?? 0),
       newCustomers: {
         count: Number(newCustomerTotals?.count ?? 0),
         totalAmount: round2(newCustomerTotals?.totalAmount ?? 0),
@@ -260,6 +264,22 @@ const PENDING_UNPAID_SQL = `
     AND i.branch_id = ANY($2::text[])
     AND i.is_draft = false
     AND i.status IN ('${InvoiceStatus.DEBT}', '${InvoiceStatus.PARTIAL_DEBT}')
+`;
+
+/**
+ * Đơn hàng đang CHỜ XỬ LÝ — cũng không có mệnh đề ngày, cùng lý do
+ * {@link PENDING_UNPAID_SQL}: đây là việc còn tồn, không phải việc của một kỳ.
+ *
+ * Chỉ đếm `SENT`. `PROCESSED` mà hoá đơn còn nháp là "hộp thư thu ngân"
+ * (`awaitingCashier` của `/mobile/sales-orders`), một câu hỏi khác — người quản
+ * lý hỏi "còn bao nhiêu đơn chưa ai nhận", không hỏi "thu ngân còn dở mấy đơn".
+ */
+const PENDING_ORDER_SQL = `
+  SELECT COUNT(*)::int AS count
+  FROM sales_orders so
+  WHERE so.organization_id = $1
+    AND so.branch_id = ANY($2::text[])
+    AND so.status = '${SalesOrderStatus.SENT}'
 `;
 
 /** CTE khách tạo tại cửa hàng trong kỳ — dùng chung cho hai câu dưới. */

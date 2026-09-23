@@ -106,6 +106,12 @@ export class MobileStoreDetailResponseDto {
   @ApiProperty({ description: 'Hoá đơn còn nợ của cửa hàng — KHÔNG theo kỳ, là trạng thái hiện tại' })
   pendingUnpaidCount!: number;
 
+  @ApiProperty({
+    description:
+      'Đơn hàng tư vấn gửi lên đang CHỜ XỬ LÝ (`sales_orders.status = SENT`) — cũng không theo kỳ, cùng lý do `pendingUnpaidCount`',
+  })
+  pendingOrderCount!: number;
+
   @ApiProperty({ type: MobileStoreNewCustomersDto })
   newCustomers!: MobileStoreNewCustomersDto;
 

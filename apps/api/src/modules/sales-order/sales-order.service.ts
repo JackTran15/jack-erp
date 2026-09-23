@@ -722,7 +722,10 @@ export class SalesOrderService {
     const qb = this.orders
       .createQueryBuilder('so')
       .where('so.organizationId = :org', { org: actor.organizationId })
-      .andWhere('so.branchId = :branch', { branch: this.branchOf(actor) });
+      // `query.branchId` thắng `X-Branch-Id`: app quản lý xem đơn của một cửa
+      // hàng KHÁC cửa hàng đang làm việc. Guard đã kiểm id đó thuộc tập phân
+      // công của người gọi, nên ở đây không kiểm lại.
+      .andWhere('so.branchId = :branch', { branch: query.branchId ?? this.branchOf(actor) });
 
     // Tư vấn thấy đơn CỦA MÌNH (ghi công bán cho mình, hoặc do mình tạo cho
     // người khác); người có quyền duyệt (thu ngân) thấy mọi đơn của chi nhánh
@@ -1372,8 +1375,17 @@ export class SalesOrderService {
 
   /** `{ salespersonId }` khi phải thu hẹp về đơn của mình; `{}` khi thấy cả chi nhánh. */
   private async scopeOf(actor: ActorContext): Promise<{ salespersonId?: string }> {
-    const canApprove = await this.rbac.hasPermission(actor.userId, actor.organizationId, SALES_ORDER_PERMISSIONS.approve);
-    if (canApprove) return {};
+    // Hai quyền cùng mở TRỌN chi nhánh, vì hai lý do khác nhau:
+    // - `approve` là thu ngân: phải thấy mọi đơn gửi tới để nhận xử lý;
+    // - `read-all` là người đọc toàn chuỗi (quản lý): thấy được mọi đơn của mọi
+    //   chi nhánh ở `/admin/sales-orders` thì bó họ về "đơn của mình" ở đường
+    //   này là vô nghĩa — và đó là ca khiến màn chi tiết cửa hàng của app quản
+    //   lý trả danh sách RỖNG mà không có lỗi nào.
+    const [canApprove, canReadAll] = await Promise.all([
+      this.rbac.hasPermission(actor.userId, actor.organizationId, SALES_ORDER_PERMISSIONS.approve),
+      this.rbac.hasPermission(actor.userId, actor.organizationId, SALES_ORDER_PERMISSIONS.readAll),
+    ]);
+    if (canApprove || canReadAll) return {};
     const profile = await this.profiles.findOne({
       where: { userId: actor.userId, organizationId: actor.organizationId },
       select: ['id'],
