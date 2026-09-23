@@ -160,22 +160,40 @@ export class CheckoutInvoiceService {
     const discountAmount = Number(invoice.discountAmount ?? 0);
     const pointsDiscountAmount = Number(invoice.pointsDiscountAmount ?? 0);
     const depositAmount = Number(invoice.depositAmount ?? 0);
+    // Delivery fee off the draft. This call site builds an object literal rather
+    // than passing `invoice`, so the fee has to be threaded explicitly — leaving
+    // it out is silent (the parameter defaults to 0) and only a fee != 0 case
+    // catches it. Added after the goods part clamps at 0, so a discount big
+    // enough to swallow the merchandise still leaves the fee payable (A-22).
+    const shippingFeeAmount = Number(invoice.shippingFeeAmount ?? 0);
     const amountDue = computeAmountDue({
       subtotal,
       discountAmount,
       pointsDiscountAmount,
       depositAmount,
+      shippingFeeAmount,
     });
 
     const round = (v: number) => Math.round(v * 100) / 100;
     const totalPaid = round(dto.payments.reduce((sum, p) => sum + p.amount, 0));
     const remainder = round(amountDue - totalPaid);
 
-    // Loyalty earn is based on the amount actually payable after all discounts
+    // Loyalty earn is based on the goods actually payable after all discounts
     // (subtotal − discountAmount − pointsDiscountAmount − depositAmount), so a
     // point-redemption discount reduces what is earned. Persisted for display and
     // passed as the async award base so the awarded balance matches this value.
-    const pointsEarned = Math.floor(amountDue / POINT_EARN_VND_PER_POINT);
+    //
+    // The delivery fee is taken back out of `amountDue` (A-24): T-04-02 put it in,
+    // which silently started accruing points on shipping. The CLAWBACK base never
+    // had it — `computeReverseBase` runs on `returnedNet`, and
+    // `RefundableInvoiceHeader` carries no fee field — so earning on the fee left a
+    // full return unable to reverse everything it granted (88 earned vs 85
+    // reversible on the demo invoice), and `Math.min(derived, pointsEarned)` is an
+    // UPPER bound so it cannot close a gap in this direction. Earning on the goods
+    // part restores `pointsEarned − pointsReversed = 0` on a full return without
+    // touching the reverse side.
+    const pointsEarnBase = amountDue - shippingFeeAmount;
+    const pointsEarned = Math.floor(pointsEarnBase / POINT_EARN_VND_PER_POINT);
 
     // `payments` are what settles the invoice, never what was tendered: cash the
     // customer hands over above `amountDue` either goes back as change (invisible
@@ -286,7 +304,7 @@ export class CheckoutInvoiceService {
 
         // Snapshot the balance this invoice leaves the customer on. The earn is
         // applied by an async consumer (see loyaltyPointsPublisher below) awarding
-        // floor(amountDue / rate) — the same number as `pointsEarned` — so
+        // floor(pointsEarnBase / rate) — the same number as `pointsEarned` — so
         // projecting it here is exact, and the receipt (printed straight from this
         // response) can show it. Read before redeemPointsForInvoice: that call
         // re-validates the balance and throws, rolling back the whole checkout, so
@@ -397,8 +415,13 @@ export class CheckoutInvoiceService {
       {
         invoiceId: updatedInvoice.id,
         customerId: updatedInvoice.customerId,
-        // Earn base = amountDue (net of all discounts, incl. point redemption).
-        subtotal: amountDue,
+        // Earn base = the goods part of amountDue (net of all discounts, incl.
+        // point redemption, minus the delivery fee — A-24). MUST stay the exact
+        // numerator `pointsEarned` was floored from: the consumer awards
+        // floor(subtotal / rate) and `pointsBalanceAfter` on the printed receipt
+        // was projected from `pointsEarned`, so any drift between the two prints a
+        // balance the card never reaches.
+        subtotal: pointsEarnBase,
         issuedAt: updatedInvoice.issuedAt,
         branchId: updatedInvoice.branchId,
       },

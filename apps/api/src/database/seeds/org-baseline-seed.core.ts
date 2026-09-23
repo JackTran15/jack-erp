@@ -17,6 +17,7 @@ import {
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
+  PARTNER_ORDER_PERMISSION_KEYS,
   PARTNER_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
   SYSTEM_ADMIN_PERMISSION_KEYS,
@@ -35,6 +36,7 @@ export interface OrgBaselineSeedIds {
   roleCashier: string;
   roleWarehouse: string;
   rolePartner: string;
+  rolePartnerOrder: string;
   defaultAccount: Record<AccountingDefaultAccountRole, string>;
   paymentAccount: Record<string, string>;
 }
@@ -160,7 +162,7 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     [IDS.user, IDS.organization, adminEmail, adminPasswordHash],
   );
 
-  // ── RBAC: 7 seed roles + their permission sets ──
+  // ── RBAC: 8 seed roles + their permission sets ──
   await upsertSeedRole(
     IDS.roleSystemAdmin,
     IDS.organization,
@@ -223,6 +225,21 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     false,
   );
   await assignPermissionsToRole(IDS.rolePartner, PARTNER_PERMISSION_KEYS);
+
+  // Separate from the role above on purpose: a key issued to place orders must
+  // not also be able to read the catalogue, which exposes the price list. A key
+  // may hold either role or both.
+  await upsertSeedRole(
+    IDS.rolePartnerOrder,
+    IDS.organization,
+    SEED_ROLE_NAMES.PARTNER_ORDER,
+    'Đối tác đặt hàng — chỉ tạo đơn qua API key, không đọc bảng giá',
+    false,
+  );
+  await assignPermissionsToRole(
+    IDS.rolePartnerOrder,
+    PARTNER_ORDER_PERMISSION_KEYS,
+  );
 
   // ── Assign the admin user the System Admin role ──
   await AppDataSource.query(

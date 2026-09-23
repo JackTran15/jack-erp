@@ -11,8 +11,8 @@ import { isDynamicColumnKey } from './invoice-report.columns';
  *  - `backed`      — a real field/aggregate in the current schema.
  *  - `derived`     — computed server-side from backed fields.
  *  - `placeholder` — no backing data yet (marketplace fees, collect-on-behalf,
- *    bank-account string, sales channel, fee). Returns a deterministic 0/null
- *    until a future epic adds the data. Mirrors the MISA column set 1:1.
+ *    bank-account string, fee). Returns a deterministic 0/null until a future
+ *    epic adds the data. Mirrors the MISA column set 1:1.
  */
 export type ListingClassification = 'backed' | 'derived' | 'placeholder';
 export type ListingBandId = 'revenue' | 'customerPayment' | 'platform';
@@ -27,7 +27,17 @@ export type ListingInvoiceField =
   | 'discountAmount'
   | 'pointsDiscountAmount'
   | 'totalPaid'
-  | 'note';
+  | 'note'
+  /**
+   * `invoices.sales_channel` — the channel label SNAPSHOTTED onto the invoice
+   * at sale time (ADR-03), a free-form varchar with no FK. Deliberately NOT a
+   * lookup into `sales_channels`: that table is the declaration, the varchar is
+   * the record. Registering a channel is one data row, so this column never
+   * needs a migration or a code change to report a new one (AC-28), and an
+   * invoice whose channel was later renamed or deleted keeps reporting under
+   * the label it was sold with instead of going blank.
+   */
+  | 'salesChannel';
 
 /** Inline-resolved relation value (joined object inlined per row, not a root map). */
 export type ListingRelation =
@@ -92,7 +102,8 @@ export const INVOICE_LISTING_COLUMNS: ListingColumnDef[] = [
   { key: 'payment.bankAccount', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
   { key: 'customer', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'customerName' } },
   { key: 'customerPhone', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'customerPhone' } },
-  { key: 'salesChannel', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'placeholder', source: { kind: 'placeholder', placeholder: null } },
+  // STRING, not ENUM: the set of channels is data, not a compiled-in whitelist.
+  { key: 'salesChannel', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'invoiceField', field: 'salesChannel' } },
   { key: 'cashier', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'cashier' } },
   { key: 'salesperson', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'relation', rel: 'salesperson' } },
   { key: 'note', group: 'customerPayment', type: ReportColumnDataType.STRING, classification: 'backed', source: { kind: 'invoiceField', field: 'note' } },

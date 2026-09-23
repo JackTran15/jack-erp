@@ -2,11 +2,13 @@ import {
   IsString,
   IsArray,
   IsOptional,
+  IsUUID,
   MinLength,
   MaxLength,
   ArrayMinSize,
   Matches,
 } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 const IPV4_OR_CIDR = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
 
@@ -34,4 +36,10 @@ export class UpdateApiKeyDto {
   @IsString({ each: true })
   @Matches(IPV4_OR_CIDR, { each: true })
   ipWhitelist?: string[];
+
+  /** Sales channel this key speaks for; omitted = leave as-is. */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  salesChannelId?: string;
 }

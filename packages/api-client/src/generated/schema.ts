@@ -9438,51 +9438,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v2/partner/catalog/categories/tree": {
+    "/admin/sales-orders": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** Active product category tree with per-branch-independent product counts */
-        post: operations["PartnerCategoryV2Controller_tree_v2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v2/partner/catalog/products/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Search products by keyword, category, price and attributes */
-        post: operations["PartnerProductV2Controller_search_v2"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v2/partner/catalog/products/{productCode}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Product detail with its attribute dimensions and variants */
-        get: operations["PartnerProductV2Controller_detail_v2"];
+        /**
+         * Đơn toàn chuỗi; `unassigned=true` là pool chưa phân
+         * @description `unassigned=true` đòi `pos.sales-order.dispatch`. Không `unassigned` đòi `pos.sales-order.read-all` — thiếu nó là 403, không phải một trang rỗng. Mỗi dòng mang kèm `branchId` + `branchName` của chi nhánh đang giữ đơn (`null` cả hai khi đơn còn trong pool); lọc bằng `branchId`.
+         */
+        get: operations["AdminSalesOrderController_list"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sales-orders/{id}/dispatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Phân đơn về một chi nhánh
+         * @description Chỉ set `branch_id`; trạng thái giữ nguyên `SENT` và KHÔNG có hoá đơn nháp nào sinh ra. Không cần chi nhánh đang mở ca POS (ADR-02).
+         */
+        post: operations["AdminSalesOrderController_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sales-orders/{id}/return": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Trả đơn về pool chưa phân
+         * @description Đặt `branch_id = NULL` và ghi một dòng `RETURN` kèm lý do; trạng thái GIỮ NGUYÊN `SENT` — đơn vẫn chờ xử lý, chỉ là chưa ai giữ (A-05). `reason` bắt buộc.
+         */
+        post: operations["AdminSalesOrderController_returnToPool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/partner/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đối tác đặt đơn — đơn rơi vào pool chưa phân chi nhánh
+         * @description Kênh bán lấy từ cấu hình của API key, KHÔNG từ payload. Đơn giá do server chốt từ `items.selling_price` lúc nhận đơn — payload không có chỗ cho `unitPrice` và gửi kèm là 400 (`forbidNonWhitelisted`).
+         */
+        post: operations["PartnerOrderV2Controller_create_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9552,6 +9581,57 @@ export interface paths {
         };
         /** Một phường/xã theo mã */
         get: operations["GeoController_findWard_v2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/partner/catalog/categories/tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Active product category tree with per-branch-independent product counts */
+        post: operations["PartnerCategoryV2Controller_tree_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/partner/catalog/products/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search products by keyword, category, price and attributes */
+        post: operations["PartnerProductV2Controller_search_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/partner/catalog/products/{productCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Product detail with its attribute dimensions and variants */
+        get: operations["PartnerProductV2Controller_detail_v2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -14349,6 +14429,37 @@ export interface components {
              */
             pointsBalanceAfter?: number | null;
             depositAmount: number;
+            /**
+             * @description Delivery fee charged to the customer (ADR-04 / A-16). Not merchandise
+             *     revenue — it gets its own GL account, still open at A-21.
+             *
+             *     Never discounted and never eaten by point redemption: it is added to
+             *     `amountDue` AFTER every reduction and after the goods part has clamped at 0
+             *     (A-22). RETURN / EXCHANGE invoices carry 0 — a collected fee is not
+             *     refunded (A-23).
+             *
+             *     Live since T-04-02: `computeAmountDue` reads this field, so every recompute
+             *     site that passes an invoice entity (or an object literal carrying
+             *     `shippingFeeAmount`) lands the fee on `amountDue`. Only web orders set it
+             *     today — a counter sale leaves it 0 and the old arithmetic falls out
+             *     unchanged. Verified 2026-09-21 (T-04-03) end to end: 1.000.000 - 100.000 -
+             *     50.000 + 30.000 fee stores `amount_due` 880.000, and the POS grid column,
+             *     its footer `SUM` and its money-range filter all read that same 880.000.
+             *
+             *     Like every other numeric column here it is declared `number` but comes back
+             *     from TypeORM as a STRING — coerce before arithmetic.
+             */
+            shippingFeeAmount: number;
+            /**
+             * @description SALE: written by `computeAmountDue` — the clamp wraps the goods part only,
+             *     so an over-discounted order still owes the delivery fee in full (ADR-04 /
+             *     A-22).
+             *
+             *     RETURN / EXCHANGE do NOT go through `computeAmountDue`:
+             *     `checkout-return.service.ts` sets `amountDue = max(netAmount, 0)`, which is
+             *     0 on a refund. That is why the grids read `netAmount` for those two types
+             *     (`invoiceSignedTotalSql` / `getInvoiceSignedTotal`), not this column.
+             */
             amountDue: number;
             totalPaid: number;
             keptChangeAmount: number;
@@ -14545,6 +14656,37 @@ export interface components {
              */
             pointsBalanceAfter?: number | null;
             depositAmount: number;
+            /**
+             * @description Delivery fee charged to the customer (ADR-04 / A-16). Not merchandise
+             *     revenue — it gets its own GL account, still open at A-21.
+             *
+             *     Never discounted and never eaten by point redemption: it is added to
+             *     `amountDue` AFTER every reduction and after the goods part has clamped at 0
+             *     (A-22). RETURN / EXCHANGE invoices carry 0 — a collected fee is not
+             *     refunded (A-23).
+             *
+             *     Live since T-04-02: `computeAmountDue` reads this field, so every recompute
+             *     site that passes an invoice entity (or an object literal carrying
+             *     `shippingFeeAmount`) lands the fee on `amountDue`. Only web orders set it
+             *     today — a counter sale leaves it 0 and the old arithmetic falls out
+             *     unchanged. Verified 2026-09-21 (T-04-03) end to end: 1.000.000 - 100.000 -
+             *     50.000 + 30.000 fee stores `amount_due` 880.000, and the POS grid column,
+             *     its footer `SUM` and its money-range filter all read that same 880.000.
+             *
+             *     Like every other numeric column here it is declared `number` but comes back
+             *     from TypeORM as a STRING — coerce before arithmetic.
+             */
+            shippingFeeAmount: number;
+            /**
+             * @description SALE: written by `computeAmountDue` — the clamp wraps the goods part only,
+             *     so an over-discounted order still owes the delivery fee in full (ADR-04 /
+             *     A-22).
+             *
+             *     RETURN / EXCHANGE do NOT go through `computeAmountDue`:
+             *     `checkout-return.service.ts` sets `amountDue = max(netAmount, 0)`, which is
+             *     0 on a refund. That is why the grids read `netAmount` for those two types
+             *     (`invoiceSignedTotalSql` / `getInvoiceSignedTotal`), not this column.
+             */
             amountDue: number;
             totalPaid: number;
             keptChangeAmount: number;
@@ -18971,6 +19113,140 @@ export interface components {
         CancelSalesOrderDto: {
             reason?: string;
         };
+        DispatchSalesOrderDto: {
+            /** Format: uuid */
+            branchId: string;
+        };
+        ReturnSalesOrderDto: {
+            /** @description Vì sao chi nhánh trả đơn về pool */
+            reason: string;
+        };
+        PartnerOrderCustomerDto: {
+            /** @description Tên người đặt */
+            name: string;
+            /** @description Số điện thoại người đặt — khoá khớp khách. `+84901234567` và `0901234567` được chuẩn hoá về cùng một khách. */
+            phone: string;
+            /**
+             * Format: email
+             * @description Email người đặt
+             */
+            email?: string;
+        };
+        PartnerOrderRecipientDto: {
+            /** @description Tên người nhận hàng */
+            name: string;
+            /** @description Số điện thoại người nhận hàng */
+            phone: string;
+        };
+        PartnerOrderShippingDto: {
+            /** @description Mã tỉnh/thành trong `geo_provinces` */
+            provinceCode: string;
+            /** @description Mã phường/xã trong `geo_wards` */
+            wardCode: string;
+            /** @description Số nhà / đường */
+            addressLine: string;
+            /**
+             * @description Phí giao hàng thu khách, VND
+             * @example 30000
+             */
+            fee: number;
+        };
+        PartnerOrderLineDto: {
+            /**
+             * @description `items.code` (mã SKU) thuộc tổ chức của API key — so khớp đúng từng ký tự
+             * @example GELLI-39-NAU
+             */
+            itemCode: string;
+            /**
+             * @description Số lượng đặt
+             * @example 2
+             */
+            quantity: number;
+        };
+        PartnerCreateOrderDto: {
+            /**
+             * @description Mã đơn phía website. Gửi lại cùng một mã trả về đơn đã tạo (200), không tạo đơn mới.
+             * @example WEB-1001
+             */
+            externalOrderId: string;
+            customer: components["schemas"]["PartnerOrderCustomerDto"];
+            recipient: components["schemas"]["PartnerOrderRecipientDto"];
+            shipping: components["schemas"]["PartnerOrderShippingDto"];
+            lines: components["schemas"]["PartnerOrderLineDto"][];
+            /** @description Ghi chú của khách */
+            note?: string;
+        };
+        PartnerOrderLineResponseDto: {
+            itemId: string;
+            /** @description `items.code` — đúng mã đã gửi */
+            itemCode: string;
+            itemName: string;
+            quantity: number;
+            /** @description `items.selling_price` tại thời điểm nhận đơn, đã chốt */
+            unitPrice: number;
+            lineTotal: number;
+        };
+        PartnerCreateOrderResponseDto: {
+            /** @description `sales_orders.id` */
+            id: string;
+            /** @description Mã chứng từ, duy nhất theo tổ chức */
+            documentNumber: string;
+            /** @description Luôn là `SENT` với đơn mới nhận */
+            status: string;
+            /** @description Tiền hàng phải thu; CHƯA gồm phí giao */
+            amountDue: number;
+            /** @description Phí giao hàng thu khách */
+            shippingFee: number;
+            lines: components["schemas"]["PartnerOrderLineResponseDto"][];
+        };
+        ProvinceMergedFromDto: {
+            /** @description Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này */
+            code: string;
+            name: string;
+        };
+        ProvinceDto: {
+            /** @example 2026_01 */
+            code: string;
+            /** @example Hà Nội */
+            name: string;
+            isActive: boolean;
+            /**
+             * @description Ngày hiệu lực, YYYY-MM-DD
+             * @example 2026-01-01
+             */
+            effectiveFrom: string;
+            /** @description Các tỉnh cũ đã sáp nhập vào; dùng để ánh xạ địa chỉ ghi theo mã 1995_xx */
+            mergedFrom: components["schemas"]["ProvinceMergedFromDto"][];
+        };
+        ProvinceListResponseDto: {
+            data: components["schemas"]["ProvinceDto"][];
+        };
+        WardDto: {
+            /**
+             * @description Mã phường — chỉ duy nhất trong cặp (provinceCode, code)
+             * @example 4
+             */
+            code: string;
+            /** @example Phường Ba Đình */
+            name: string;
+            /** @example 2026_01 */
+            provinceCode: string;
+            /**
+             * @description Tên tỉnh hiện hành; null với phường cũ (mã 1995_xx không còn là tỉnh)
+             * @example Hà Nội
+             */
+            provinceName: string | null;
+            /** @description Mã quận/huyện, chỉ có ở phường cũ */
+            districtCode: string | null;
+            /** @description true khi provinceCode là một tỉnh hiện hành */
+            isCurrent: boolean;
+        };
+        WardSearchResponseDto: {
+            data: components["schemas"]["WardDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
         PartnerCategoryTreeRequestDto: Record<string, never>;
         PartnerCategoryNodeDto: {
             /** @description Category id, stable across requests */
@@ -19086,54 +19362,6 @@ export interface components {
             description: string | null;
             attributes: components["schemas"]["PartnerAttributeDto"][];
             variants: components["schemas"]["PartnerVariantDto"][];
-        };
-        ProvinceMergedFromDto: {
-            /** @description Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này */
-            code: string;
-            name: string;
-        };
-        ProvinceDto: {
-            /** @example 2026_01 */
-            code: string;
-            /** @example Hà Nội */
-            name: string;
-            isActive: boolean;
-            /**
-             * @description Ngày hiệu lực, YYYY-MM-DD
-             * @example 2026-01-01
-             */
-            effectiveFrom: string;
-            /** @description Các tỉnh cũ đã sáp nhập vào; dùng để ánh xạ địa chỉ ghi theo mã 1995_xx */
-            mergedFrom: components["schemas"]["ProvinceMergedFromDto"][];
-        };
-        ProvinceListResponseDto: {
-            data: components["schemas"]["ProvinceDto"][];
-        };
-        WardDto: {
-            /**
-             * @description Mã phường — chỉ duy nhất trong cặp (provinceCode, code)
-             * @example 4
-             */
-            code: string;
-            /** @example Phường Ba Đình */
-            name: string;
-            /** @example 2026_01 */
-            provinceCode: string;
-            /**
-             * @description Tên tỉnh hiện hành; null với phường cũ (mã 1995_xx không còn là tỉnh)
-             * @example Hà Nội
-             */
-            provinceName: string | null;
-            /** @description Mã quận/huyện, chỉ có ở phường cũ */
-            districtCode: string | null;
-            /** @description true khi provinceCode là một tỉnh hiện hành */
-            isCurrent: boolean;
-        };
-        WardSearchResponseDto: {
-            data: components["schemas"]["WardDto"][];
-            total: number;
-            page: number;
-            limit: number;
         };
         CreateMediaUploadDto: {
             /**
@@ -35791,60 +36019,21 @@ export interface operations {
             };
         };
     };
-    PartnerCategoryV2Controller_tree_v2: {
+    AdminSalesOrderController_list: {
         parameters: {
-            query?: never;
+            query?: {
+                page?: number;
+                limit?: number;
+                status?: "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+                from?: string;
+                to?: string;
+                /** @description Chỉ lấy đơn chưa phân chi nhánh */
+                unassigned?: boolean;
+                /** @description uuid chi nhánh, hoặc `UNASSIGNED` cho đơn chưa phân */
+                branchId?: string;
+            };
             header?: never;
             path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PartnerCategoryTreeRequestDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PartnerCategoryTreeResponseDto"];
-                };
-            };
-        };
-    };
-    PartnerProductV2Controller_search_v2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PartnerProductSearchDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PartnerProductSearchResponseDto"];
-                };
-            };
-        };
-    };
-    PartnerProductV2Controller_detail_v2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description products.code, matched exactly (case-sensitive), not products.id or a variant SKU */
-                productCode: string;
-            };
             cookie?: never;
         };
         requestBody?: never;
@@ -35853,12 +36042,105 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
+                content?: never;
+            };
+        };
+    };
+    AdminSalesOrderController_dispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchSalesOrderDto"];
+            };
+        };
+        responses: {
+            /** @description `ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc `ORDER_ALREADY_DISPATCHED` (đơn đã có chi nhánh) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminSalesOrderController_returnToPool: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnSalesOrderDto"];
+            };
+        };
+        responses: {
+            /** @description `ORDER_NOT_HELD_BY_BRANCH` — đơn thuộc chi nhánh khác */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `ORDER_HAS_INVOICE` (đơn đã sinh hoá đơn), `ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc `ORDER_NOT_DISPATCHED` (đơn đang ở pool) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PartnerOrderV2Controller_create_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerCreateOrderDto"];
+            };
+        };
+        responses: {
+            /** @description `externalOrderId` đã tồn tại trên kênh này — trả lại đúng đơn cũ, không tạo đơn thứ hai (AC-06) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
                 content: {
-                    "application/json": components["schemas"]["PartnerProductDetailDto"];
+                    "application/json": components["schemas"]["PartnerCreateOrderResponseDto"];
                 };
             };
-            /** @description Product not found — unknown code, another organization's code, or no active variant. The same response for all three. */
-            404: {
+            /** @description Đơn mới được tạo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerCreateOrderResponseDto"];
+                };
+            };
+            /** @description `GEO_CODE_UNKNOWN`, `ORDER_LINE_ITEM_UNKNOWN`, hoặc payload sai khuôn */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `CHANNEL_INACTIVE` — key không gắn kênh dùng được */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -35969,6 +36251,81 @@ export interface operations {
                 };
             };
             /** @description Không có phường/xã với mã này (trong thời kỳ đã chọn) */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PartnerCategoryV2Controller_tree_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerCategoryTreeRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerCategoryTreeResponseDto"];
+                };
+            };
+        };
+    };
+    PartnerProductV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PartnerProductSearchDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerProductSearchResponseDto"];
+                };
+            };
+        };
+    };
+    PartnerProductV2Controller_detail_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description products.code, matched exactly (case-sensitive), not products.id or a variant SKU */
+                productCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PartnerProductDetailDto"];
+                };
+            };
+            /** @description Product not found — unknown code, another organization's code, or no active variant. The same response for all three. */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -111,7 +111,40 @@ export class InvoiceEntity extends BaseEntity {
   @Column({ name: 'deposit_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Deposit collected upfront (e.g. on layaway)' })
   depositAmount: number;
 
-  @Column({ name: 'amount_due', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Final amount the customer owes (subtotal - discountAmount - pointsDiscountAmount - depositAmount)' })
+  /**
+   * Delivery fee charged to the customer (ADR-04 / A-16). Not merchandise
+   * revenue — it gets its own GL account, still open at A-21.
+   *
+   * Never discounted and never eaten by point redemption: it is added to
+   * `amountDue` AFTER every reduction and after the goods part has clamped at 0
+   * (A-22). RETURN / EXCHANGE invoices carry 0 — a collected fee is not
+   * refunded (A-23).
+   *
+   * Live since T-04-02: `computeAmountDue` reads this field, so every recompute
+   * site that passes an invoice entity (or an object literal carrying
+   * `shippingFeeAmount`) lands the fee on `amountDue`. Only web orders set it
+   * today — a counter sale leaves it 0 and the old arithmetic falls out
+   * unchanged. Verified 2026-09-21 (T-04-03) end to end: 1.000.000 - 100.000 -
+   * 50.000 + 30.000 fee stores `amount_due` 880.000, and the POS grid column,
+   * its footer `SUM` and its money-range filter all read that same 880.000.
+   *
+   * Like every other numeric column here it is declared `number` but comes back
+   * from TypeORM as a STRING — coerce before arithmetic.
+   */
+  @Column({ name: 'shipping_fee_amount', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Delivery fee collected from the customer; added to amountDue after all discounts (ADR-04)' })
+  shippingFeeAmount: number;
+
+  /**
+   * SALE: written by `computeAmountDue` — the clamp wraps the goods part only,
+   * so an over-discounted order still owes the delivery fee in full (ADR-04 /
+   * A-22).
+   *
+   * RETURN / EXCHANGE do NOT go through `computeAmountDue`:
+   * `checkout-return.service.ts` sets `amountDue = max(netAmount, 0)`, which is
+   * 0 on a refund. That is why the grids read `netAmount` for those two types
+   * (`invoiceSignedTotalSql` / `getInvoiceSignedTotal`), not this column.
+   */
+  @Column({ name: 'amount_due', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Final amount the customer owes (max(0, subtotal - discountAmount - pointsDiscountAmount - depositAmount) + shippingFeeAmount)' })
   amountDue: number;
 
   @Column({ name: 'total_paid', type: 'numeric', precision: 18, scale: 2, default: 0, comment: 'Total amount collected across all payment lines' })

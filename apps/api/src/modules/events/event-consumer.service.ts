@@ -106,7 +106,9 @@ export class EventConsumerManager implements OnModuleInit, OnModuleDestroy {
 
         if (!meta) continue;
 
-        const groupId = meta.options?.groupId ?? `${prefix}.${meta.topic}`;
+        // Explicit ids are suffixes — the prefix is what lets two instances
+        // (dev API vs Jest e2e) run against one broker without sharing groups.
+        const groupId = `${prefix}.${meta.options?.groupId ?? meta.topic}`;
         const boundHandler = (instance as Record<string, Function>)[methodName].bind(instance);
 
         this.pendingHandlers.push({

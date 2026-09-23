@@ -131,6 +131,56 @@ describe('AuthGuard', () => {
       });
     });
 
+    /**
+     * T-01-06: `salesChannelId` là DANH TÍNH kênh của key, đi cùng `apiKeyId`
+     * theo đúng quy ước sẵn có — KHÔNG phải một quyền. Controller partner đọc
+     * nó ở đây để biết đơn thuộc kênh nào; không có nó thì
+     * `sales_orders.sales_channel_id` không có nguồn.
+     */
+    it('carries the key’s salesChannelId through to request.user', async () => {
+      apiKeyAuth.validate.mockResolvedValue({
+        kind: 'ok',
+        actor: {
+          apiKeyId: 'key-1',
+          organizationId: 'org-1',
+          userId: 'shadow-user-1',
+          branchIds: [],
+          salesChannelId: 'channel-web',
+        },
+      });
+      const request: any = {
+        headers: { 'x-api-key': 'raw-secret' },
+        ip: '203.0.113.5',
+      };
+
+      await guard.canActivate(contextWith(request));
+
+      expect(request.user.salesChannelId).toBe('channel-web');
+    });
+
+    it('leaves salesChannelId null for a key bound to no channel', async () => {
+      apiKeyAuth.validate.mockResolvedValue({
+        kind: 'ok',
+        actor: {
+          apiKeyId: 'key-2',
+          organizationId: 'org-1',
+          userId: 'shadow-user-1',
+          branchIds: [],
+          salesChannelId: null,
+        },
+      });
+      const request: any = {
+        headers: { 'x-api-key': 'raw-secret' },
+        ip: '203.0.113.5',
+      };
+
+      const allowed = await guard.canActivate(contextWith(request));
+
+      // Mọi key đang tồn tại đều rơi vào ca này — xác thực không đổi hành vi.
+      expect(allowed).toBe(true);
+      expect(request.user.salesChannelId).toBeNull();
+    });
+
     it('rejects an unknown key with 401', async () => {
       apiKeyAuth.validate.mockResolvedValue({ kind: 'not_found' });
       const request: any = {

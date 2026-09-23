@@ -75,6 +75,11 @@ export default async function globalSetup() {
   process.env.JWT_REFRESH_SECRET = 'e2e-test-refresh-secret';
   process.env.REDIS_HOST = process.env.REDIS_HOST || 'localhost';
   process.env.REDIS_PORT = process.env.REDIS_PORT || '6379';
+  // Own consumer groups per run: a dev API on the same broker shares every
+  // `erp-api.*` group and would take this run's events into ITS database
+  // (T-07-03 went red exactly like that). `fromBeginning: false` means a fresh
+  // group starts at the latest offset, so only this run's events are seen.
+  process.env.KAFKA_CONSUMER_GROUP_PREFIX = `erp-e2e-${Date.now()}`;
 
   // `-d postgres` because psql otherwise connects to a database named after the
   // user, which does not exist — the probe always failed and fell through to

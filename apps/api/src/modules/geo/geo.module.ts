@@ -15,5 +15,8 @@ import { WardEntity } from './ward.entity';
   imports: [TypeOrmModule.forFeature([ProvinceEntity, WardEntity])],
   controllers: [GeoController],
   providers: [GeoService],
+  // Cửa ghi cho đối tác (`PartnerOrderV2Controller`) tra tên tỉnh/phường để
+  // chốt snapshot xuống đơn (ADR-05), nên `GeoService` phải ra khỏi module này.
+  exports: [GeoService],
 })
 export class GeoModule {}

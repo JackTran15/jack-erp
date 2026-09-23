@@ -41,6 +41,8 @@ import { JournalReturnPublisher } from '../../accounting/publishers/journal-retu
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
+import { ComputeTotalsStep } from '../checkout-saga/application/steps/compute-totals.step';
+import { CheckoutContext } from '../checkout-saga/application/checkout-step';
 
 const actor = {
   userId: 'user-1',
@@ -89,6 +91,13 @@ const returnDraftStub = (overrides: Partial<InvoiceEntity> = {}): InvoiceEntity 
  * Pass overrides here rather than spreading afterwards, so the derivation sees the
  * final `amountDue`. Set `pointsEarned` explicitly to model a sale whose accrual a
  * promotion blocked.
+ *
+ * T-04-06: the delivery fee comes back OUT of the earn base, because the checkout
+ * paths stopped accruing on it (A-24). Every fixture in this file predates the fee
+ * column and leaves it unset, so `amountDue − 0` is the identity and not one
+ * derived number here moves; the subtraction only matters for a fee-bearing
+ * fixture, where the old form would quietly hand the reverse side a cap that the
+ * checkout no longer writes.
  */
 const originalStub = (
   status: InvoiceStatus,
@@ -110,7 +119,10 @@ const originalStub = (
     ...base,
     pointsEarned:
       overrides.pointsEarned ??
-      Math.floor(Number(base.amountDue ?? 0) / POINT_EARN_VND_PER_POINT),
+      Math.floor(
+        (Number(base.amountDue ?? 0) - Number(base.shippingFeeAmount ?? 0)) /
+          POINT_EARN_VND_PER_POINT,
+      ),
   } as InvoiceEntity;
 };
 
@@ -1463,6 +1475,161 @@ describe('CheckoutReturnService — debt offset routing', () => {
         expect.anything(),
         actor,
       );
+    });
+  });
+
+  /**
+   * T-04-06 / A-24 — the two sides meeting again on a fee-bearing invoice.
+   *
+   * Nothing in this block changes the return path; `computeReversePoints` and
+   * `computeReverseBase` were always right. What broke was the EARN side: T-04-02
+   * put the delivery fee into `amountDue`, and both checkout paths floored their
+   * earn from `amountDue`, so points started accruing on shipping. The reverse
+   * base never saw the fee — `computeReverseBase` runs on `returnedNet`, and
+   * `RefundableInvoiceHeader` has no fee field — so on the demo invoice the sale
+   * granted 88 points and the fullest possible return could only take back 85.
+   * `Math.min(derived, pointsEarned)` is an UPPER bound, so it cannot recover the
+   * difference: the customer kept 3 points for goods they no longer own, on every
+   * returned delivery, forever.
+   *
+   * `pointsEarned` here is produced by the REAL `ComputeTotalsStep` rather than
+   * typed in, so this asserts the production earn rule against the production
+   * reverse rule. `ComputeTotalsStep` needs no DI, which is why it is the earn
+   * side used; `checkout-invoice.service.spec.ts` separately pins v1 to the same
+   * numbers.
+   */
+  describe('full return of a fee-bearing invoice nets to zero (T-04-06, A-24)', () => {
+    /** The UOW-04 demo sale: 1tr hàng, 100k giảm giá, 50k điểm, 30k phí GH. */
+    const earnOnTheDemoSale = async (): Promise<{
+      pointsEarned: number;
+      amountDue: number;
+    }> => {
+      const saleCtx = {
+        actor,
+        input: {
+          invoiceId: 'orig-1',
+          payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 880_000 }],
+        },
+        correlationId: 'c1',
+        idempotencyKey: 'orig-1',
+        dryRun: false,
+        invoice: {
+          id: 'orig-1',
+          customerId: 'cust-1',
+          discountAmount: 100_000,
+          pointsDiscountAmount: 50_000,
+          depositAmount: 0,
+          shippingFeeAmount: 30_000,
+        },
+        items: [
+          {
+            id: 'orig-line-0',
+            quantity: 1,
+            unitPrice: 1_000_000,
+            lineTotal: 1_000_000,
+            lineDiscount: 0,
+          },
+        ],
+      } as unknown as CheckoutContext;
+
+      await new ComputeTotalsStep().execute(saleCtx);
+      return {
+        pointsEarned: saleCtx.totals!.pointsEarned,
+        amountDue: saleCtx.totals!.amountDue,
+      };
+    };
+
+    /** Hands every line of that sale back. */
+    const setupFullReturnOfTheDemoSale = (pointsEarned: number) =>
+      setupReturn({
+        original: {
+          subtotal: 1_000_000,
+          discountAmount: 100_000,
+          pointsDiscountAmount: 50_000,
+          shippingFeeAmount: 30_000 as unknown as number,
+          amountDue: 880_000,
+          totalPaid: 880_000,
+          pointsEarned,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 1_000_000,
+            lineTotal: 1_000_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+    it('pointsEarned − pointsReversed = 0 when the whole fee-bearing invoice comes back', async () => {
+      const { pointsEarned, amountDue } = await earnOnTheDemoSale();
+      setupFullReturnOfTheDemoSale(pointsEarned);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const pointsReversed = savedInvoice().pointsReversed as number;
+
+      // The whole point of the ticket. The fee is still collected (amountDue
+      // keeps it) but never earned on, so the reverse base — returnedNet, which
+      // has never included the fee — lands exactly on the earn.
+      expect(pointsEarned - pointsReversed).toBe(0);
+
+      // Pinned absolutely as well, so "both wrong by the same amount" fails.
+      expect(amountDue).toBe(880_000);
+      expect(pointsEarned).toBe(85); // goods 850.000, not the 880.000 payable
+      expect(pointsReversed).toBe(85);
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotalDelta: 850_000, points: 85 }),
+        actor,
+      );
+    });
+
+    it('records the defect: earning on the fee leaves 3 points behind that the cap cannot take', async () => {
+      // 88 is what `floor(amountDue / rate)` produced before A-24. Everything
+      // else is identical, so this isolates the earn base as the cause — and it
+      // fails the moment someone restores the fee to the earn.
+      setupFullReturnOfTheDemoSale(88);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const pointsReversed = savedInvoice().pointsReversed as number;
+
+      // Math.min caps at the derived 85, never lifts to the earned 88.
+      expect(pointsReversed).toBe(85);
+      expect(88 - pointsReversed).toBe(3);
+    });
+
+    it('a fee-less invoice still reverses exactly what it earned', async () => {
+      // The safety net: no fee means `amountDue − 0`, so both sides are the
+      // pre-T-04-02 numbers to the đồng.
+      setupReturn({
+        original: {
+          subtotal: 1_000_000,
+          discountAmount: 100_000,
+          pointsDiscountAmount: 50_000,
+          amountDue: 850_000,
+          totalPaid: 850_000,
+          // pointsEarned omitted on purpose — originalStub derives it.
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 1_000_000,
+            lineTotal: 1_000_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().pointsReversed).toBe(85);
     });
   });
 

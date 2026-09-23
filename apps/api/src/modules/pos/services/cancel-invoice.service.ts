@@ -1,11 +1,11 @@
-import {
+import { ConflictException,
   Injectable,
   Logger,
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Not } from 'typeorm';
+import { Repository, DataSource, Not, EntityManager } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import { WsEventType } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
@@ -30,6 +30,14 @@ const CANCELLABLE_STATUSES: ReadonlySet<InvoiceStatus> = new Set([
   InvoiceStatus.PARTIAL_DEBT,
 ]);
 
+/**
+ * Mã lỗi cho hai cửa chặn của `cancel()`. Trước đây hai chỗ này ném
+ * `BadRequestException` với câu tiếng Anh, nên giao diện không có gì máy đọc
+ * được để khớp — và spec của T-07-01 lại giả lập một mã KHÔNG hề tồn tại trong
+ * production. Khai ở đây để cả hai phía dùng đúng một chuỗi.
+ */
+export const INVOICE_NOT_CANCELLABLE = 'INVOICE_NOT_CANCELLABLE';
+
 @Injectable()
 export class CancelInvoiceService {
   private readonly logger = new Logger(CancelInvoiceService.name);
@@ -48,10 +56,24 @@ export class CancelInvoiceService {
     private readonly membershipCardService: MembershipCardService,
   ) {}
 
+  /**
+   * Huỷ hoá đơn và đảo trọn gói: kho, điểm tích, điểm đã tiêu, công nợ.
+   *
+   * `manager` (tuỳ chọn) để người gọi KÉO việc huỷ này vào transaction của
+   * mình — cùng lối `createDraftIn` / `applyRedemptionIn`. `SalesOrderService`
+   * .cancel dùng nó để "đơn CANCELLED mà hoá đơn còn sống" không thể tồn tại:
+   * hoá đơn từ chối huỷ ⇒ đơn cũng rollback.
+   *
+   * CẢNH BÁO cho người truyền `manager`: các publisher ở cuối hàm bắn NGAY sau
+   * thân transaction, tức TRƯỚC khi transaction ngoài commit. Vì vậy người gọi
+   * không được làm bất cứ việc gì CÓ THỂ HỎNG sau lời gọi này — hãy gọi nó ở
+   * bước CUỐI. `SalesOrderService.cancel` cập nhật đơn trước rồi mới gọi đây.
+   */
   async cancel(
     id: string,
     dto: CancelInvoiceDto,
     actor: ActorContext,
+    manager?: EntityManager,
   ): Promise<InvoiceEntity> {
     const invoice = await this.invoiceRepo.findOne({
       where: { id, organizationId: actor.organizationId },
@@ -62,17 +84,22 @@ export class CancelInvoiceService {
     }
 
     if (!CANCELLABLE_STATUSES.has(invoice.status)) {
-      throw new BadRequestException(
-        `Only paid/debt/partial-debt invoices can be cancelled. Current status: ${invoice.status}`,
-      );
+      // Mã máy đọc được + câu tiếng Việt: người gọi (nút "Huỷ đơn" ở backoffice)
+      // phải phân biệt được ca này với lỗi khác mà không phải khớp chuỗi tiếng
+      // Anh, và không được để tên enum (`paid`, `debt`) lọt lên màn hình.
+      throw new ConflictException({
+        code: INVOICE_NOT_CANCELLABLE,
+        message: `Hoá đơn ${invoice.code} đang ở trạng thái không huỷ được. Chỉ huỷ được hoá đơn đã thanh toán hoặc còn công nợ.`,
+      });
     }
 
     // A RETURN/EXCHANGE moves money and stock the other way, so voiding one is
     // the mirror of this flow, not this flow — CancelReturnService owns it.
     if (invoice.type !== InvoiceType.SALE) {
-      throw new BadRequestException(
-        `Only sale invoices can be cancelled here. Current type: ${invoice.type}`,
-      );
+      throw new ConflictException({
+        code: INVOICE_NOT_CANCELLABLE,
+        message: `Hoá đơn ${invoice.code} không phải hoá đơn bán, nên không huỷ ở đây. Phiếu trả/đổi có đường huỷ riêng.`,
+      });
     }
 
     await this.assertNoSettledReturns(invoice, actor);
@@ -87,7 +114,7 @@ export class CancelInvoiceService {
       invoice.status === InvoiceStatus.PARTIAL_DEBT;
     const now = new Date();
 
-    const cancelledInvoice = await this.dataSource.transaction(async (manager) => {
+    const body = async (manager: EntityManager): Promise<InvoiceEntity> => {
       invoice.status = InvoiceStatus.CANCELLED;
       invoice.cancelledAt = now;
       invoice.cancelReason = dto.reason;
@@ -139,7 +166,13 @@ export class CancelInvoiceService {
       await this.promotionApplyService.revertPromotions(id, manager);
 
       return saved;
-    });
+    };
+
+    // Có `manager` ⇒ chạy thẳng trong transaction của người gọi, KHÔNG mở
+    // transaction lồng: lồng vào sẽ commit phần huỷ hoá đơn độc lập với đơn.
+    const cancelledInvoice = manager
+      ? await body(manager)
+      : await this.dataSource.transaction(body);
 
     await this.invoiceCancelledPublisher.publish(
       {

@@ -15,6 +15,7 @@ const recordStub = (overrides: Partial<ApiKeyEntity> = {}): ApiKeyEntity =>
     keyHash: hashApiKey('raw-secret'),
     roles: ['role-1'],
     branchIds: undefined,
+    salesChannelId: null,
     ipWhitelist: ['203.0.113.5', '198.51.100.0/28'],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -74,6 +75,7 @@ describe('ApiKeyAuthService', () => {
         organizationId: 'org-1',
         userId: 'shadow-user-1',
         branchIds: ['branch-1', 'branch-2'],
+        salesChannelId: null,
       },
     });
     // Key already carries an explicit branch list — no org-wide lookup needed.
@@ -120,6 +122,52 @@ describe('ApiKeyAuthService', () => {
       'branch-2',
       'branch-3',
     ]);
+  });
+
+  describe('sales channel identity (T-01-06)', () => {
+    it("carries the key's sales channel id on the actor", async () => {
+      repository.findOne.mockResolvedValue(
+        recordStub({
+          branchIds: ['branch-1'],
+          salesChannelId: 'channel-web',
+        }),
+      );
+
+      const result = await service.validate('raw-secret', '203.0.113.5');
+
+      expect(result).toEqual({
+        kind: 'ok',
+        actor: {
+          apiKeyId: 'key-1',
+          organizationId: 'org-1',
+          userId: 'shadow-user-1',
+          branchIds: ['branch-1'],
+          salesChannelId: 'channel-web',
+        },
+      });
+    });
+
+    it('a key bound to no channel still authenticates, with salesChannelId null', async () => {
+      repository.findOne.mockResolvedValue(
+        recordStub({ branchIds: ['branch-1'], salesChannelId: null }),
+      );
+
+      const result = await service.validate('raw-secret', '203.0.113.5');
+
+      expect(result.kind).toBe('ok');
+      expect((result as any).actor.salesChannelId).toBeNull();
+    });
+
+    it('a row written before the column existed maps to null, not undefined', async () => {
+      const legacy = recordStub({ branchIds: ['branch-1'] });
+      delete (legacy as any).salesChannelId;
+      repository.findOne.mockResolvedValue(legacy);
+
+      const result = await service.validate('raw-secret', '203.0.113.5');
+
+      expect(result.kind).toBe('ok');
+      expect((result as any).actor.salesChannelId).toBeNull();
+    });
   });
 
   describe('caching (ADR-02 / A-07)', () => {

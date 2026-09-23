@@ -144,7 +144,14 @@ export class EnqueueOutboxStep implements CheckoutStep {
       const loyaltyPayload: LoyaltyPointsAwardPayload = {
         invoiceId: invoice.id,
         customerId: invoice.customerId,
-        subtotal: totals.amountDue,
+        // The goods part of `amountDue`, with the delivery fee taken back out
+        // (A-24). This MUST stay the exact numerator `compute-totals` floored
+        // `totals.pointsEarned` from: the consumer awards floor(subtotal / rate)
+        // and `persist-invoice` projected `pointsBalanceAfter` from
+        // `pointsEarned`, so any drift between the two prints a receipt balance
+        // the card never reaches. Read off the invoice rather than `totals`
+        // because `CheckoutTotals` carries no fee field.
+        subtotal: totals.amountDue - Number(invoice.shippingFeeAmount ?? 0),
         issuedAt: invoice.issuedAt?.toISOString(),
         branchId,
         organizationId,

@@ -35,7 +35,9 @@ export interface OrderRow {
   deposit: number;
   customerDebt: number;
   remainingReceivable: number;
-  cod: string;
+  /** "Thu hộ" = số shipper phải thu = `amount_due` (A-17). Số, không phải
+   * "Có/Không" — renderer là `money` từ T-05-04. */
+  cod: number;
   packageInfo: string;
   shippingFeePartner: number;
   salesChannel: string;
@@ -43,6 +45,16 @@ export interface OrderRow {
   reconciliationSlip: string;
   reconciliationStatus: string;
   tags: string[];
+  /**
+   * Nhãn chi nhánh đang giữ đơn — CHỈ lưới cấp tổ chức (`/orders/all`) điền.
+   *
+   * Optional chứ không bắt buộc, vì đó là sự thật của dữ liệu: `/orders` đọc
+   * `GET /mobile/sales-orders` đã hard-filter theo `X-Branch-Id`, nên mọi dòng
+   * ở đó thuộc đúng một chi nhánh — chính là chi nhánh đang đăng nhập — và
+   * `toOrderRow` không có gì để điền vào đây. Cột tương ứng cũng nằm ngoài tập
+   * cột mặc định (`orgOnly` trong `_lib/order-columns`).
+   */
+  branchName?: string;
 }
 
 export interface OrderLineRow {
@@ -86,7 +98,7 @@ const ORDER_ROWS: OrderRow[] = [
     deposit: 500_000,
     customerDebt: 300_000,
     remainingReceivable: 0,
-    cod: "",
+    cod: 0,
     packageInfo: PACKAGE_INFO_PLACEHOLDER,
     shippingFeePartner: 0,
     salesChannel: "Tại cửa hàng",
@@ -116,7 +128,7 @@ const ORDER_ROWS: OrderRow[] = [
     deposit: 0,
     customerDebt: 2_000_000,
     remainingReceivable: 0,
-    cod: "",
+    cod: 0,
     packageInfo: PACKAGE_INFO_PLACEHOLDER,
     shippingFeePartner: 0,
     salesChannel: "Tại cửa hàng",
@@ -146,7 +158,7 @@ const ORDER_ROWS: OrderRow[] = [
     deposit: 0,
     customerDebt: 200_000,
     remainingReceivable: 0,
-    cod: "",
+    cod: 0,
     packageInfo: PACKAGE_INFO_PLACEHOLDER,
     shippingFeePartner: 0,
     salesChannel: "Tại cửa hàng",
@@ -176,7 +188,7 @@ const ORDER_ROWS: OrderRow[] = [
     deposit: 500_000,
     customerDebt: 100_000,
     remainingReceivable: 0,
-    cod: "",
+    cod: 0,
     packageInfo: PACKAGE_INFO_PLACEHOLDER,
     shippingFeePartner: 0,
     salesChannel: "Tại cửa hàng",

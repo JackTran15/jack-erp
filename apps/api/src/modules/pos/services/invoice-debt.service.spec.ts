@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { InvoiceDebtService } from './invoice-debt.service';
+import { computeAmountDue } from './invoice-amount.util';
 import { InvoiceDebtEntity, DebtStatus, DebtDocumentType } from '../entities/invoice-debt.entity';
 import { DebtPaymentEntity, DebtPaymentMethod } from '../entities/debt-payment.entity';
 import { CashReceiptEntity } from '../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
@@ -286,6 +287,126 @@ describe('InvoiceDebtService', () => {
         service.createFromInvoice(invoice, undefined, undefined, {
           dueDate: yesterday,
         }),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  // =========================================================================
+  // COD: original_amount = what the shipper actually collects (T-05-02)
+  //
+  // ADR-04 / AC-17. `amountDue` is built by the real `computeAmountDue` here,
+  // not by a literal, so these cases go red the moment the fee stops reaching
+  // the amount — which is the only way the debt could stop carrying it.
+  // `createFromInvoice` does no arithmetic of its own: it stores what it is
+  // handed. Adding the fee a second time in this service would show up as
+  // 910.000 / 1.060.000 below.
+  // =========================================================================
+  describe('createFromInvoice — COD debt equals the fee-inclusive amount due', () => {
+    const openedDebt = () => {
+      const createdEntity = { ...debtStub() };
+      debtRepo.create.mockReturnValue(createdEntity);
+      debtRepo.save.mockResolvedValue(createdEntity);
+      return () => debtRepo.create.mock.calls[0][0] as Partial<InvoiceDebtEntity>;
+    };
+
+    it('opens the debt at the fee-inclusive amount due (1.000.000 − 100.000 − 50.000 + 30.000 = 880.000)', async () => {
+      const amountDue = computeAmountDue({
+        subtotal: 1_000_000,
+        discountAmount: 100_000,
+        pointsDiscountAmount: 50_000,
+        shippingFeeAmount: 30_000,
+      });
+      expect(amountDue).toBe(880_000);
+
+      const debtData = openedDebt();
+      await service.createFromInvoice(invoiceStub({ amountDue }));
+
+      expect(debtData()).toMatchObject({
+        originalAmount: 880_000,
+        remainingAmount: 880_000,
+        paidAmount: 0,
+        status: DebtStatus.OPEN,
+      });
+      // Not the pre-fee 850.000 (fee dropped) and not 910.000 (fee billed twice).
+      expect(debtData().originalAmount).not.toBe(850_000);
+      expect(debtData().originalAmount).not.toBe(910_000);
+    });
+
+    it('demo case: 1.000.000 goods + 30.000 fee, nothing paid → one OPEN debt of 1.030.000', async () => {
+      const amountDue = computeAmountDue({
+        subtotal: 1_000_000,
+        shippingFeeAmount: 30_000,
+      });
+      expect(amountDue).toBe(1_030_000);
+
+      const debtData = openedDebt();
+      await service.createFromInvoice(invoiceStub({ amountDue }));
+
+      expect(debtData()).toMatchObject({
+        originalAmount: 1_030_000,
+        remainingAmount: 1_030_000,
+        status: DebtStatus.OPEN,
+        documentType: DebtDocumentType.CREDIT_INVOICE,
+      });
+    });
+
+    it('a fee-free invoice is numerically identical to before the fee existed (850.000)', async () => {
+      const amountDue = computeAmountDue({
+        subtotal: 1_000_000,
+        discountAmount: 100_000,
+        pointsDiscountAmount: 50_000,
+      });
+      expect(amountDue).toBe(850_000);
+
+      const debtData = openedDebt();
+      await service.createFromInvoice(invoiceStub({ amountDue }));
+
+      expect(debtData()).toMatchObject({
+        originalAmount: 850_000,
+        remainingAmount: 850_000,
+      });
+    });
+
+    it('goods part fully discounted → the debt is exactly the delivery fee (A-22)', async () => {
+      // The clamp inside computeAmountDue wraps the goods part only, so a
+      // discount that eats the whole sale still leaves the fee to collect.
+      const amountDue = computeAmountDue({
+        subtotal: 1_000_000,
+        discountAmount: 1_000_000,
+        shippingFeeAmount: 30_000,
+      });
+      expect(amountDue).toBe(30_000);
+
+      const debtData = openedDebt();
+      await service.createFromInvoice(invoiceStub({ amountDue }));
+
+      expect(debtData()).toMatchObject({
+        originalAmount: 30_000,
+        remainingAmount: 30_000,
+        status: DebtStatus.OPEN,
+      });
+    });
+
+    it('reuses the existing credit-invoice debt type — COD adds no new document type', async () => {
+      const debtData = openedDebt();
+      await service.createFromInvoice(
+        invoiceStub({ amountDue: computeAmountDue({ subtotal: 1_000_000, shippingFeeAmount: 30_000 }) }),
+      );
+
+      expect(debtData().documentType).toBe(DebtDocumentType.CREDIT_INVOICE);
+    });
+
+    it('points the debt at the order customer, never a walk-in (A-01)', async () => {
+      const debtData = openedDebt();
+      await service.createFromInvoice(
+        invoiceStub({ customerId: 'cust-web-0909', amountDue: 1_030_000 }),
+      );
+
+      expect(debtData().customerId).toBe('cust-web-0909');
+      expect(debtData().invoiceId).toBe('inv-1');
+      // A walk-in sale (no customer) cannot open a COD debt at all.
+      await expect(
+        service.createFromInvoice(invoiceStub({ customerId: null as any })),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -625,6 +746,87 @@ describe('InvoiceDebtService', () => {
         actor,
         mockManager,
       );
+    });
+
+    // AC-20 — the shipper hands the COD money in and the debt closes. `save`
+    // echoes its argument here rather than returning a canned row, so the
+    // assertions are about the arithmetic this service performs, not about the
+    // mock's own numbers.
+    describe('COD settlement (T-05-02)', () => {
+      const echoSaves = () =>
+        mockManager.save.mockImplementation((e: unknown) => Promise.resolve(e));
+
+      it('collecting the whole fee-inclusive amount settles the debt: PAID, remaining 0', async () => {
+        const debt = debtStub({
+          originalAmount: 1_030_000,
+          remainingAmount: 1_030_000,
+          paidAmount: 0,
+        });
+        mockManager.findOne.mockResolvedValue(debt);
+        mockManager.create.mockReturnValue({ id: 'pay-1', debtId: 'debt-1' });
+        echoSaves();
+
+        const result = await service.collectPayment(
+          'debt-1',
+          { ...paymentDto, amount: 1_030_000 },
+          actor,
+        );
+
+        expect(result.status).toBe(DebtStatus.PAID);
+        expect(result.remainingAmount).toBe(0);
+        expect(result.paidAmount).toBe(1_030_000);
+        expect(result.settledAt).toBeInstanceOf(Date);
+      });
+
+      it('settles even when the numeric columns come back from TypeORM as strings', async () => {
+        const debt = debtStub({
+          originalAmount: '1030000.00' as unknown as number,
+          remainingAmount: '1030000.00' as unknown as number,
+          paidAmount: '0.00' as unknown as number,
+        });
+        mockManager.findOne.mockResolvedValue(debt);
+        mockManager.create.mockReturnValue({ id: 'pay-1', debtId: 'debt-1' });
+        echoSaves();
+
+        const result = await service.collectPayment(
+          'debt-1',
+          { ...paymentDto, amount: 1_030_000 },
+          actor,
+        );
+
+        expect(result.status).toBe(DebtStatus.PAID);
+        expect(result.remainingAmount).toBe(0);
+      });
+
+      it('paying only the goods part leaves the delivery fee outstanding and the debt OPEN', async () => {
+        const debt = debtStub({
+          originalAmount: 1_030_000,
+          remainingAmount: 1_030_000,
+          paidAmount: 0,
+        });
+        mockManager.findOne.mockResolvedValue(debt);
+        mockManager.create.mockReturnValue({ id: 'pay-1', debtId: 'debt-1' });
+        echoSaves();
+
+        const result = await service.collectPayment(
+          'debt-1',
+          { ...paymentDto, amount: 1_000_000 },
+          actor,
+        );
+
+        expect(result.remainingAmount).toBe(30_000);
+        expect(result.status).toBe(DebtStatus.OPEN);
+      });
+
+      it('refuses a collection above the fee-inclusive balance', async () => {
+        mockManager.findOne.mockResolvedValue(
+          debtStub({ originalAmount: 1_030_000, remainingAmount: 1_030_000 }),
+        );
+
+        await expect(
+          service.collectPayment('debt-1', { ...paymentDto, amount: 1_030_001 }, actor),
+        ).rejects.toThrow(BadRequestException);
+      });
     });
   });
 
