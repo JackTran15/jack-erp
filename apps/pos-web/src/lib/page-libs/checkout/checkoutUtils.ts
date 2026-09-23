@@ -49,13 +49,13 @@ export function lineDiscountAmount(line: CartLine): number {
 }
 
 /**
- * Tiền của một dòng **đúng như BE sẽ tính lại từ payload** đổi/trả:
+ * Tiền của một dòng **như `lineTotal` BE tính từ payload** đổi/trả:
  * `unitPrice × qty − KM dòng`, luôn dương.
  *
  * Khác `lineTotal` bên dưới ở hai điểm cố ý: không đảo dấu dòng trả, và không
- * dùng `refundableUnitPrice` — payload gửi `unitPrice` niêm yết, nên đây phải là
- * bản sao của công thức BE chạy trên chính con số đó. Dùng để quyết định chiều
- * tiền (`net = newSubtotal − returnSubtotal`) trước khi gọi `checkout-return`.
+ * dùng `refundableUnitPrice` — payload gửi `unitPrice` niêm yết. Chỉ còn dùng
+ * cho hiển thị / biên lai: chiều tiền của phiếu đổi lấy từ `netAmount` BE trả
+ * ở `checkout-return/preview` (2026092102 ADR-03), không tính từ số này nữa.
  */
 export function payloadLineSubtotal(line: CartLine): number {
   return line.unitPrice * line.qty - lineDiscountAmount(line);

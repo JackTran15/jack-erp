@@ -31,7 +31,7 @@ export class RefundCashConsumer {
     private readonly categoryResolver: CashVoucherCategoryResolverService,
   ) {}
 
-  @OnDomainEvent(ERP_TOPICS.CASH_REFUND, { groupId: 'erp-api.return.cash-refund' })
+  @OnDomainEvent(ERP_TOPICS.CASH_REFUND, { groupId: 'return.cash-refund' })
   async handle(event: DomainEvent<CashRefundPayload>): Promise<void> {
     const {
       returnInvoiceId,

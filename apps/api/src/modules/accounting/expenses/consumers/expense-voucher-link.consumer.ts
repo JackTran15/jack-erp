@@ -20,7 +20,7 @@ export class ExpenseVoucherLinkConsumer {
   // (it filters by sourceType). Sharing the default group with the other
   // link-back consumers would split events across them and lose link-backs.
   @OnDomainEvent(ERP_TOPICS.CASH_VOUCHER_CREATED, {
-    groupId: 'erp-api.expense-voucher-link',
+    groupId: 'expense-voucher-link',
   })
   async handle(event: DomainEvent<CashVoucherCreatedPayload>): Promise<void> {
     const p = event.payload;

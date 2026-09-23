@@ -1,6 +1,25 @@
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsInt, IsISO8601, IsOptional, Max, Min } from 'class-validator';
 import { SalesOrderStatus } from '../entities/sales-order.entity';
+
+/**
+ * Giá trị lọc "chưa phân chi nhánh" của lưới Admin (`branch_id IS NULL`, A-03).
+ *
+ * Là một TỪ KHOÁ, cố ý không phải chuỗi rỗng: `?branchId=` (rỗng) không phân
+ * biệt được với "không lọc chi nhánh", nên nếu nhận chuỗi rỗng thì một lần gõ
+ * nhầm trên URL sẽ trả về toàn chuỗi thay vì đúng pool.
+ */
+export const UNASSIGNED_BRANCH_FILTER = 'UNASSIGNED';
+
+/**
+ * `branchId` hợp lệ = uuid, hoặc đúng từ khoá {@link UNASSIGNED_BRANCH_FILTER}.
+ *
+ * Một regex thay vì `@IsUUID()` + `@ValidateIf`: hai decorator điều kiện trên
+ * cùng một trường thì thứ tự chạy quyết định thông báo lỗi, còn ở đây mọi giá
+ * trị ngoài tập này — kể cả chuỗi rỗng — đều là 400 với cùng một câu.
+ */
+export const BRANCH_ID_FILTER_PATTERN =
+  /^(UNASSIGNED|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
 
 /** Tập khoá ĐÓNG (`forbidNonWhitelisted`): trang, cỡ trang, trạng thái, khoảng ngày tạo. */
 export class SalesOrderListQueryDto {
@@ -28,4 +47,15 @@ export class SalesOrderListQueryDto {
   @IsOptional()
   @IsISO8601()
   to?: string;
+
+  /**
+   * Hộp thư của thu ngân: đơn CHỜ thu ngân làm gì đó — `SENT` (chờ nhận) HOẶC
+   * `PROCESSED` mà hoá đơn còn NHÁP (đã nhận, chưa thu). Thiếu vế sau thì đơn
+   * rời hộp thư ngay khi *Nhận xử lý*, và rời giỏ trước khi thu là mất lối mở
+   * lại nháp (Loc báo 2026-09-22). Có nó thì [status] bị bỏ qua.
+   */
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  awaitingCashier?: boolean;
 }

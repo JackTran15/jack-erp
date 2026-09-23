@@ -1,5 +1,6 @@
 import { ClampPointsStep } from './clamp-points.step';
 import { POINT_REDEMPTION_VALUE_VND } from '../../../../customer/loyalty.constants';
+import { computeAmountDue } from '../../../services/invoice-amount.util';
 import { CheckoutContext } from '../checkout-step';
 
 function ctx(overrides: Partial<CheckoutContext> = {}): CheckoutContext {
@@ -195,5 +196,108 @@ describe('ClampPointsStep', () => {
     await expect(step.execute(ctx({ invoice: undefined }))).rejects.toThrow(
       'clamp-points ran before load-draft populated the context',
     );
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Delivery fee (T-04-04, AC-25 / A-22)
+  //
+  // The ceiling this step computes deliberately excludes `shippingFeeAmount`:
+  // the fee is money the shipper hands over, so points may not be spent on it.
+  // Folding the fee into `payableByPoints` would look like a harmless
+  // symmetry fix and would quietly let a redemption buy free delivery.
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('delivery fee', () => {
+    const feeInvoice = () => ({
+      id: 'inv-1',
+      customerId: 'cust-1',
+      pointsRedeemed: 1000,
+      pointsDiscountAmount: 1000 * POINT_REDEMPTION_VALUE_VND,
+      discountAmount: 0,
+      depositAmount: 0,
+      shippingFeeAmount: 30_000,
+    });
+
+    it('A-22: the fee does not raise the redemption ceiling', async () => {
+      const invoice: any = feeInvoice();
+      const c = ctx({
+        invoice,
+        items: [line(580_000)],
+        promotion: { promotionDiscount: 116_000, appliedPrograms: [], lineDiscounts: [] },
+      });
+
+      await step.execute(c);
+
+      // 464.000 of goods → 928 points. Counting the 30.000 fee as payable would
+      // give floor(494.000 / 500) = 988, i.e. 60 points of free delivery.
+      expect(invoice.pointsRedeemed).toBe(928);
+      expect(invoice.pointsRedeemed).not.toBe(988);
+    });
+
+    it('AC-25: a maxed-out redemption leaves amountDue at exactly the fee, not 0', async () => {
+      const invoice: any = feeInvoice();
+      const c = ctx({
+        invoice,
+        items: [line(580_000)],
+        promotion: { promotionDiscount: 116_000, appliedPrograms: [], lineDiscounts: [] },
+      });
+
+      await step.execute(c);
+
+      // What compute-totals will do next with the clamped figures.
+      const amountDue = computeAmountDue({
+        subtotal: 580_000,
+        discountAmount: 0 + 116_000,
+        pointsDiscountAmount: invoice.pointsDiscountAmount,
+        depositAmount: 0,
+        shippingFeeAmount: invoice.shippingFeeAmount,
+      });
+
+      expect(invoice.pointsDiscountAmount).toBe(464_000);
+      expect(amountDue).toBe(30_000);
+    });
+
+    it('AC-25: the fee survives even when the discount alone already covers the cart', async () => {
+      const invoice: any = { ...feeInvoice(), pointsDiscountAmount: 500_000 };
+      const c = ctx({
+        invoice,
+        items: [line(100_000)],
+        promotion: { promotionDiscount: 150_000, appliedPrograms: [], lineDiscounts: [] },
+      });
+
+      await step.execute(c);
+
+      expect(invoice.pointsRedeemed).toBe(0);
+      expect(
+        computeAmountDue({
+          subtotal: 100_000,
+          discountAmount: 150_000,
+          pointsDiscountAmount: 0,
+          depositAmount: 0,
+          shippingFeeAmount: invoice.shippingFeeAmount,
+        }),
+      ).toBe(30_000);
+    });
+
+    it('coerces the numeric(18,2) fee TypeORM returns as a string', async () => {
+      const invoice: any = { ...feeInvoice(), shippingFeeAmount: '30000.00' };
+      const c = ctx({
+        invoice,
+        items: [line(580_000)],
+        promotion: { promotionDiscount: 116_000, appliedPrograms: [], lineDiscounts: [] },
+      });
+
+      await step.execute(c);
+
+      expect(invoice.pointsRedeemed).toBe(928);
+      expect(
+        computeAmountDue({
+          subtotal: 580_000,
+          discountAmount: 116_000,
+          pointsDiscountAmount: invoice.pointsDiscountAmount,
+          depositAmount: 0,
+          shippingFeeAmount: invoice.shippingFeeAmount,
+        }),
+      ).toBe(30_000);
+    });
   });
 });

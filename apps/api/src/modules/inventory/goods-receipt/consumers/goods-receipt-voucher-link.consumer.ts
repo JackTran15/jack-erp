@@ -18,7 +18,7 @@ export class GoodsReceiptVoucherLinkConsumer {
 
   // Distinct group so this consumer receives EVERY cash.voucher.created event.
   @OnDomainEvent(ERP_TOPICS.CASH_VOUCHER_CREATED, {
-    groupId: 'erp-api.goods-receipt-voucher-link',
+    groupId: 'goods-receipt-voucher-link',
   })
   async handle(event: DomainEvent<CashVoucherCreatedPayload>): Promise<void> {
     const p = event.payload;

@@ -40,6 +40,8 @@ export interface AppliedProgram {
    * can never have its points blocked by this field's absence of meaning for that type.
    */
   accruePoints?: boolean;
+  /** `PromotionProgram.description` verbatim — the POS modal's "Mô tả" column. */
+  description?: string;
 }
 
 /** auto_apply=false programs that were eligible but not run — the cashier can still pick them. */
@@ -50,6 +52,7 @@ export interface AvailableProgram {
   type: PromotionProgramType;
   autoApply: boolean;
   estimatedDiscount: number;
+  description?: string;
 }
 
 export type SkippedProgramReason =
@@ -67,6 +70,9 @@ export type SkippedProgramReason =
 export interface SkippedProgram {
   programId: string;
   name: string;
+  /** Carried so the POS modal can still label "Hình thức" on a skipped row. */
+  type: PromotionProgramType;
+  description?: string;
   reason: SkippedProgramReason;
   /** programId of the winning program — only set for reason=RESOURCE_TAKEN. */
   takenBy?: string;

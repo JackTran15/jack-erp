@@ -24,6 +24,14 @@ export interface ApiKeyActor {
   userId: string;
   /** Always fully resolved — every branch id an unrestricted key may use. */
   branchIds: string[];
+  /**
+   * The sales channel this key speaks for, or `null` when it belongs to none
+   * (internal keys, non-partner integrations). Like `apiKeyId` this is carried
+   * for *identity*, never for authorization — permissions stay a `user_roles`
+   * lookup on `userId`. The partner order path reads it to resolve the channel
+   * an incoming order belongs to.
+   */
+  salesChannelId: string | null;
 }
 
 /** What `lookup()` resolves — the unit T-03-01 caches as a whole (ADR-02). */
@@ -101,6 +109,10 @@ export class ApiKeyAuthService {
         organizationId: entity.organizationId,
         userId: entity.userId,
         branchIds,
+        // `?? null` rather than passing the column through: a record cached
+        // before this column existed (TTL is seconds, but still) deserializes
+        // with the property missing, and downstream code checks for `null`.
+        salesChannelId: entity.salesChannelId ?? null,
       },
       ipWhitelist: entity.ipWhitelist,
     };

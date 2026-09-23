@@ -86,6 +86,15 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "pos.sales-order.cancel", module: "pos" },
   { key: "pos.sales-order.approve", module: "pos" },
   { key: "pos.sales-order.reject", module: "pos" },
+  // Điều phối đơn web: xem pool chưa phân và phân về một chi nhánh, cấp TỔ CHỨC
+  // (A-08). Deliberately NOT pos.sales-order.approve: that key is the cashier's
+  // "take it to the till", and reusing it would let every branch cashier push
+  // orders into other branches.
+  { key: "pos.sales-order.dispatch", module: "pos" },
+  // Chain-wide order list. Deliberately NOT pos.sales-order.read, which is the
+  // branch-scoped key the consultant mobile app runs on (ADR-07).
+  { key: "pos.sales-order.read-all", module: "pos" },
+  { key: "pos.sales-channel.manage", module: "pos" },
   { key: "pos.return.create", module: "pos" },
   { key: "pos.exchange.create", module: "pos" },
   { key: "pos.session.manage", module: "pos" },
@@ -263,6 +272,11 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   // Deliberately NOT inventory.read: a partner key carrying inventory.read
   // could call /v2/inventory-items/search, which returns purchasePrice.
   { key: "partner.catalog.read", module: "partner-catalog" },
+
+  // Partner order intake (write surface for third parties).
+  // Deliberately NOT partner.catalog.read: a key issued only so the website
+  // can render the catalogue must not be able to place orders.
+  { key: "partner.order.create", module: "sales-order" },
 
   // IAM
   { key: "iam.user.read", module: "iam" },

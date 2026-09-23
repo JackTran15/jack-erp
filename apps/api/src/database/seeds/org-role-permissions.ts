@@ -4,6 +4,7 @@ import {
   reportPermissionsOfDomain,
 } from '@erp/shared-interfaces';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
+import { PARTNER_ORDER_PERMISSION } from '../../modules/sales-order/sales-order.constants';
 
 /** Seeded role display names (unique per organization). */
 export const SEED_ROLE_NAMES = {
@@ -14,14 +15,37 @@ export const SEED_ROLE_NAMES = {
   CASHIER: 'Nhân viên thu ngân',
   WAREHOUSE: 'Nhân viên kho',
   PARTNER: 'Đối tác',
+  PARTNER_ORDER: 'Đối tác đặt hàng',
 } as const;
 
 /**
- * Third-party integration role. Held only by the shadow user behind an API key,
- * never by a person. Exactly one permission: anything more would let a partner
- * key reach an internal endpoint that exposes purchase price (ADR-02).
+ * There are TWO third-party integration roles — read the catalogue, and place an
+ * order — and they are granted independently: a key may hold one, the other, or
+ * both. Both are held only by the shadow user behind an API key, never by a
+ * person.
+ *
+ * Each role carries exactly one permission, for two separate reasons. Within a
+ * role, anything more would let a partner key reach an internal endpoint that
+ * exposes purchase price (ADR-02). Across the roles, reading the catalogue
+ * exposes selling prices, so a key issued only to PLACE orders must not also be
+ * able to read the price list — and revoking order placement must not take the
+ * partner's catalogue page down with it. That split is spelled out at the
+ * declaration site of the permission itself, `sales-order.constants.ts`.
+ *
+ * "Exactly one permission" is a statement about each role, not about how many
+ * partner roles may exist.
  */
 export const PARTNER_PERMISSION_KEYS: string[] = ['partner.catalog.read'];
+
+/**
+ * Partner order-placement role — the write half of the pair described above.
+ * The key is imported rather than retyped: `sales-order.constants.ts` owns that
+ * string because it is a security boundary, and a second literal is the quietest
+ * way to drift from it.
+ */
+export const PARTNER_ORDER_PERMISSION_KEYS: string[] = [
+  PARTNER_ORDER_PERMISSION,
+];
 
 /** Previous single staff role, renamed to SALES — see sync-admin-permissions.seed.ts. */
 export const LEGACY_STAFF_ROLE_NAME = 'Nhân viên';
@@ -57,6 +81,19 @@ const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
   'accounting.bank_payment.delete',
   'accounting.cash_voucher_category.delete',
   'pos.invoice.cancel',
+  // Điều phối đơn web (A-08, ADR-07). Both keys are org-level by construction
+  // and must NOT fall to BRANCH_MANAGER through the `pos.` prefix below:
+  //   - `dispatch` hands an order to ANY branch in the chain, so a branch
+  //     manager holding it could push work into a rival store — or pull the
+  //     whole pool into their own;
+  //   - `read-all` is the order-level twin of the consolidated reports listed
+  //     right after: it shows every store's orders, customers and amounts in
+  //     one grid, which is the same "một cửa hàng không xem được doanh số của
+  //     cửa hàng khác" rule.
+  // Điều phối is done by Admin from the back office, which is General Manager
+  // or User Root — both derive from ALL_PERMISSION_KEYS, so both hold these.
+  'pos.sales-order.dispatch',
+  'pos.sales-order.read-all',
   // "Toàn chuỗi": seeing every store's revenue, profit and debt in one report.
   // This is the rule "một cửa hàng không xem được doanh số / kết quả kinh doanh
   // / lợi nhuận của cửa hàng khác — trừ quản lý hệ thống", so it is listed here

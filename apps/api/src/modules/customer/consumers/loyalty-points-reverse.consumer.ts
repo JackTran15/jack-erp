@@ -22,7 +22,7 @@ export class LoyaltyPointsReverseConsumer {
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.LOYALTY_POINTS_REVERSE, {
-    groupId: 'erp-api.return.loyalty-reverse',
+    groupId: 'return.loyalty-reverse',
   })
   async handle(event: DomainEvent<LoyaltyPointsReversePayload>): Promise<void> {
     const { returnInvoiceId, customerId, subtotalDelta, points, organizationId, actorId } =

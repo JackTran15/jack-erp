@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ConflictException } from '@nestjs/common';
+import { QueryBus } from '@nestjs/cqrs';
 import { DataSource } from 'typeorm';
 import { CheckoutReturnService } from './checkout-return.service';
 import { ReturnEligibilityService } from './return-eligibility.service';
@@ -40,6 +41,8 @@ import { JournalReturnPublisher } from '../../accounting/publishers/journal-retu
 import { LoyaltyPointsPublisher } from '../../customer/publishers/loyalty-points.publisher';
 import { LoyaltyPointsReversePublisher } from '../../customer/publishers/loyalty-points-reverse.publisher';
 import { POINT_EARN_VND_PER_POINT } from '../../customer/loyalty.constants';
+import { ComputeTotalsStep } from '../checkout-saga/application/steps/compute-totals.step';
+import { CheckoutContext } from '../checkout-saga/application/checkout-step';
 
 const actor = {
   userId: 'user-1',
@@ -88,6 +91,13 @@ const returnDraftStub = (overrides: Partial<InvoiceEntity> = {}): InvoiceEntity 
  * Pass overrides here rather than spreading afterwards, so the derivation sees the
  * final `amountDue`. Set `pointsEarned` explicitly to model a sale whose accrual a
  * promotion blocked.
+ *
+ * T-04-06: the delivery fee comes back OUT of the earn base, because the checkout
+ * paths stopped accruing on it (A-24). Every fixture in this file predates the fee
+ * column and leaves it unset, so `amountDue − 0` is the identity and not one
+ * derived number here moves; the subtraction only matters for a fee-bearing
+ * fixture, where the old form would quietly hand the reverse side a cap that the
+ * checkout no longer writes.
  */
 const originalStub = (
   status: InvoiceStatus,
@@ -109,7 +119,10 @@ const originalStub = (
     ...base,
     pointsEarned:
       overrides.pointsEarned ??
-      Math.floor(Number(base.amountDue ?? 0) / POINT_EARN_VND_PER_POINT),
+      Math.floor(
+        (Number(base.amountDue ?? 0) - Number(base.shippingFeeAmount ?? 0)) /
+          POINT_EARN_VND_PER_POINT,
+      ),
   } as InvoiceEntity;
 };
 
@@ -220,6 +233,7 @@ const exchangeDto = (
 
 describe('CheckoutReturnService — debt offset routing', () => {
   let service: CheckoutReturnService;
+  let module: TestingModule;
   let invoiceRepo: { findOne: jest.Mock };
   let itemRepo: { find: jest.Mock };
   let dataSource: { transaction: jest.Mock };
@@ -247,8 +261,21 @@ describe('CheckoutReturnService — debt offset routing', () => {
   let stockReturnInPublisher: { publish: jest.Mock };
   let stockDeductionPublisher: { publish: jest.Mock };
   let tempWarehouseFulfillPublisher: { publish: jest.Mock };
+  // 2026092102 — `EvaluateCartQuery` on the OUT lines. Empty evaluation by
+  // default so every pre-existing case keeps `promotionDiscount = 0`.
+  let queryBus: { execute: jest.Mock };
 
   beforeEach(async () => {
+    queryBus = {
+      execute: jest.fn().mockResolvedValue({
+        subtotal: 0,
+        promotionDiscount: 0,
+        amountAfterPromotion: 0,
+        appliedPrograms: [],
+        availablePrograms: [],
+        skippedPrograms: [],
+      }),
+    };
     debtRow = {
       id: 'debt-1',
       invoiceId: 'orig-1',
@@ -321,7 +348,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
     tempWarehouseFulfillPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
 
     const noop = { publish: jest.fn().mockResolvedValue(undefined) };
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         CheckoutReturnService,
         { provide: getRepositoryToken(InvoiceEntity), useValue: invoiceRepo },
@@ -329,6 +356,7 @@ describe('CheckoutReturnService — debt offset routing', () => {
         { provide: getRepositoryToken(PosSessionEntity), useValue: { findOne: jest.fn() } },
         { provide: getRepositoryToken(InvoiceDebtEntity), useValue: debtRepo },
         { provide: DataSource, useValue: dataSource },
+        { provide: QueryBus, useValue: queryBus },
         { provide: DocumentNumberingService, useValue: { generate: jest.fn().mockResolvedValue('RET-0001') } },
         { provide: WebSocketEmitterService, useValue: { emitToBranch: jest.fn() } },
         { provide: CustomerCreditService, useValue: { issue: jest.fn() } },
@@ -1151,6 +1179,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         invoiceRepo as never,
         itemRepo as never,
         debtRepo as never,
+        // No promotion snapshot on the staged original — `promotions: []`.
+        { getRepository: () => ({ find: async () => [] }) } as never,
       );
       const quoted = (await eligibility.getEligibleLines('orig-1', actor)).find(
         (l) => l.originalInvoiceItemId === 'orig-line-1',
@@ -1171,6 +1201,8 @@ describe('CheckoutReturnService — debt offset routing', () => {
         invoiceRepo as never,
         itemRepo as never,
         debtRepo as never,
+        // No promotion snapshot on the staged original — `promotions: []`.
+        { getRepository: () => ({ find: async () => [] }) } as never,
       );
 
       const lines = await eligibility.getEligibleLines('orig-1', actor);
@@ -1443,6 +1475,161 @@ describe('CheckoutReturnService — debt offset routing', () => {
         expect.anything(),
         actor,
       );
+    });
+  });
+
+  /**
+   * T-04-06 / A-24 — the two sides meeting again on a fee-bearing invoice.
+   *
+   * Nothing in this block changes the return path; `computeReversePoints` and
+   * `computeReverseBase` were always right. What broke was the EARN side: T-04-02
+   * put the delivery fee into `amountDue`, and both checkout paths floored their
+   * earn from `amountDue`, so points started accruing on shipping. The reverse
+   * base never saw the fee — `computeReverseBase` runs on `returnedNet`, and
+   * `RefundableInvoiceHeader` has no fee field — so on the demo invoice the sale
+   * granted 88 points and the fullest possible return could only take back 85.
+   * `Math.min(derived, pointsEarned)` is an UPPER bound, so it cannot recover the
+   * difference: the customer kept 3 points for goods they no longer own, on every
+   * returned delivery, forever.
+   *
+   * `pointsEarned` here is produced by the REAL `ComputeTotalsStep` rather than
+   * typed in, so this asserts the production earn rule against the production
+   * reverse rule. `ComputeTotalsStep` needs no DI, which is why it is the earn
+   * side used; `checkout-invoice.service.spec.ts` separately pins v1 to the same
+   * numbers.
+   */
+  describe('full return of a fee-bearing invoice nets to zero (T-04-06, A-24)', () => {
+    /** The UOW-04 demo sale: 1tr hàng, 100k giảm giá, 50k điểm, 30k phí GH. */
+    const earnOnTheDemoSale = async (): Promise<{
+      pointsEarned: number;
+      amountDue: number;
+    }> => {
+      const saleCtx = {
+        actor,
+        input: {
+          invoiceId: 'orig-1',
+          payments: [{ paymentMethod: InvoicePaymentMethod.CASH, amount: 880_000 }],
+        },
+        correlationId: 'c1',
+        idempotencyKey: 'orig-1',
+        dryRun: false,
+        invoice: {
+          id: 'orig-1',
+          customerId: 'cust-1',
+          discountAmount: 100_000,
+          pointsDiscountAmount: 50_000,
+          depositAmount: 0,
+          shippingFeeAmount: 30_000,
+        },
+        items: [
+          {
+            id: 'orig-line-0',
+            quantity: 1,
+            unitPrice: 1_000_000,
+            lineTotal: 1_000_000,
+            lineDiscount: 0,
+          },
+        ],
+      } as unknown as CheckoutContext;
+
+      await new ComputeTotalsStep().execute(saleCtx);
+      return {
+        pointsEarned: saleCtx.totals!.pointsEarned,
+        amountDue: saleCtx.totals!.amountDue,
+      };
+    };
+
+    /** Hands every line of that sale back. */
+    const setupFullReturnOfTheDemoSale = (pointsEarned: number) =>
+      setupReturn({
+        original: {
+          subtotal: 1_000_000,
+          discountAmount: 100_000,
+          pointsDiscountAmount: 50_000,
+          shippingFeeAmount: 30_000 as unknown as number,
+          amountDue: 880_000,
+          totalPaid: 880_000,
+          pointsEarned,
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 1_000_000,
+            lineTotal: 1_000_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+    it('pointsEarned − pointsReversed = 0 when the whole fee-bearing invoice comes back', async () => {
+      const { pointsEarned, amountDue } = await earnOnTheDemoSale();
+      setupFullReturnOfTheDemoSale(pointsEarned);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const pointsReversed = savedInvoice().pointsReversed as number;
+
+      // The whole point of the ticket. The fee is still collected (amountDue
+      // keeps it) but never earned on, so the reverse base — returnedNet, which
+      // has never included the fee — lands exactly on the earn.
+      expect(pointsEarned - pointsReversed).toBe(0);
+
+      // Pinned absolutely as well, so "both wrong by the same amount" fails.
+      expect(amountDue).toBe(880_000);
+      expect(pointsEarned).toBe(85); // goods 850.000, not the 880.000 payable
+      expect(pointsReversed).toBe(85);
+      expect(loyaltyReversePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotalDelta: 850_000, points: 85 }),
+        actor,
+      );
+    });
+
+    it('records the defect: earning on the fee leaves 3 points behind that the cap cannot take', async () => {
+      // 88 is what `floor(amountDue / rate)` produced before A-24. Everything
+      // else is identical, so this isolates the earn base as the cause — and it
+      // fails the moment someone restores the fee to the earn.
+      setupFullReturnOfTheDemoSale(88);
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      const pointsReversed = savedInvoice().pointsReversed as number;
+
+      // Math.min caps at the derived 85, never lifts to the earned 88.
+      expect(pointsReversed).toBe(85);
+      expect(88 - pointsReversed).toBe(3);
+    });
+
+    it('a fee-less invoice still reverses exactly what it earned', async () => {
+      // The safety net: no fee means `amountDue − 0`, so both sides are the
+      // pre-T-04-02 numbers to the đồng.
+      setupReturn({
+        original: {
+          subtotal: 1_000_000,
+          discountAmount: 100_000,
+          pointsDiscountAmount: 50_000,
+          amountDue: 850_000,
+          totalPaid: 850_000,
+          // pointsEarned omitted on purpose — originalStub derives it.
+        },
+        originalLines: [
+          { quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 },
+        ],
+        returnedLines: [
+          {
+            quantity: 1,
+            unitPrice: 1_000_000,
+            lineTotal: 1_000_000,
+            originalInvoiceItemId: 'orig-line-0',
+          },
+        ],
+      });
+
+      await service.checkout('ret-1', cashDto(), actor);
+
+      expect(savedInvoice().pointsReversed).toBe(85);
     });
   });
 
@@ -2127,6 +2314,209 @@ describe('CheckoutReturnService — debt offset routing', () => {
    * the till, 465.000 still owed. Before this feature the whole 765.000 left the
    * drawer while the 465.000 debt stayed open — 930.000 lost on a 765.000 sale.
    */
+  /**
+   * 2026092102 / T-03-02 — the exchange's "Mua thêm" (OUT) lines go through the
+   * promotion engine (ADR-01) and the money is settled on `newNet`; the returned
+   * (IN) lines never do (AC-14).
+   */
+  describe('promotions on the OUT lines of an exchange (2026092102, ADR-01)', () => {
+    /** Return 685.000 (sold without promotion), buy 2 × 100.000. */
+    const promoExchangeItems = (): InvoiceItemEntity[] => [
+      { ...exchangeItems()[0], id: 'exc-in', unitPrice: 685000, lineTotal: 685000 } as InvoiceItemEntity,
+      { ...exchangeItems()[1], id: 'exc-out', unitPrice: 100000, quantity: 2, lineTotal: 200000 } as InvoiceItemEntity,
+    ];
+
+    const evaluationWith30Percent = () => ({
+      subtotal: 200000,
+      promotionDiscount: 60000,
+      amountAfterPromotion: 140000,
+      appliedPrograms: [
+        {
+          programId: 'prog-30',
+          code: 'KM000001',
+          name: 'Giảm giá hàng hóa 30%',
+          type: 'ITEM_DISCOUNT',
+          priority: 100,
+          discountAmount: 60000,
+          lineDiscounts: [{ lineId: 'exc-out', discountAmount: 60000, unitPriceAfter: 70000 }],
+          gifts: [],
+        },
+      ],
+      availablePrograms: [],
+      skippedPrograms: [],
+    });
+
+    // `persistAppliedPromotions` writes the snapshot through
+    // `manager.getRepository(InvoiceCheckoutPromotionEntity)`.
+    let snapshotRepo: { create: jest.Mock; save: jest.Mock };
+
+    beforeEach(() => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue(promoExchangeItems());
+      snapshotRepo = {
+        create: jest.fn().mockImplementation((data) => ({ id: 'snap-1', ...data })),
+        save: jest.fn().mockImplementation((rows) => Promise.resolve(rows)),
+      };
+      mockManager.getRepository = jest.fn().mockReturnValue(snapshotRepo);
+    });
+
+    it('evaluates only the OUT lines, with the cashier\'s selected/excluded ids and the customer', async () => {
+      await service.checkout(
+        'exc-1',
+        { ...cashDto(), selectedProgramIds: ['sel-1'], excludedProgramIds: ['exc-9'] } as never,
+        actor,
+      );
+
+      expect(queryBus.execute).toHaveBeenCalledTimes(1);
+      const [query] = queryBus.execute.mock.calls[0];
+      expect(query.dto.customerId).toBe('cust-1');
+      expect(query.dto.selectedProgramIds).toEqual(['sel-1']);
+      expect(query.dto.excludedProgramIds).toEqual(['exc-9']);
+      expect(query.dto.lines).toEqual([
+        expect.objectContaining({ lineId: 'exc-out', itemId: 'item-new', quantity: 2, unitPrice: 100000 }),
+      ]);
+      expect(query.actor).toBe(actor);
+    });
+
+    it('settles on newNet: 200.000 − 60.000 − 685.000 ⇒ netAmount −545.000, refundedAmount 545.000 (AC-10 shape)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.netAmount).toBe(-545000);
+      expect(result.refundedAmount).toBe(545000);
+      // Gross stays on the header: `subtotal = Σ lineTotal` is untouched by the engine.
+      expect(result.subtotal).toBe(200000);
+      expect(cashRefundPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amount: 545000 }),
+        actor,
+      );
+    });
+
+    /**
+     * T-03-03 — what the transaction leaves behind: the OUT line's
+     * promotion_discount, one snapshot row keyed on the exchange, the header
+     * discount (A-07), and points + the loyalty award on newNet (A-02).
+     */
+    it('writes promotion_discount on the OUT line and one snapshot row for the exchange (AC-16/AC-18 shape)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      const savedOut = mockManager.save.mock.calls
+        .flatMap(([arg]) => (Array.isArray(arg) ? arg : [arg]))
+        .find((e: InvoiceItemEntity) => e.id === 'exc-out');
+      expect(savedOut).toBeDefined();
+      expect(Number(savedOut.promotionDiscount)).toBe(60000);
+      expect(Number(savedOut.lineTotal)).toBe(200000);
+
+      expect(snapshotRepo.save).toHaveBeenCalledTimes(1);
+      const [rows] = snapshotRepo.save.mock.calls[0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        invoiceId: result.id,
+        programId: 'prog-30',
+        code: 'KM000001',
+        name: 'Giảm giá hàng hóa 30%',
+        type: 'ITEM_DISCOUNT',
+        discountAmount: 60000,
+        lineDiscounts: [{ lineId: 'exc-out', discountAmount: 60000, unitPriceAfter: 70000 }],
+      });
+
+      expect(result.discountAmount).toBe(60000);
+    });
+
+    it('earns points on newNet and publishes the award on the same base (AC-15)', async () => {
+      queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.pointsEarned).toBe(Math.floor(140000 / POINT_EARN_VND_PER_POINT));
+      expect(result.pointsEarned).not.toBe(Math.floor(200000 / POINT_EARN_VND_PER_POINT));
+      expect(loyaltyAwardPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: 'cust-1', subtotal: 140000 }),
+        actor,
+      );
+    });
+
+    it('with no programme applied the header discount stays 0 and nothing is snapshotted', async () => {
+      const result = await service.checkout('exc-1', cashDto(), actor);
+
+      expect(result.discountAmount).toBe(0);
+      expect(snapshotRepo.save).not.toHaveBeenCalled();
+      expect(result.netAmount).toBe(-485000);
+    });
+
+    /**
+     * T-03-06 — `preview()` is the first half of `checkout()` and nothing
+     * else: the seven totals, no transaction, no document number, no event.
+     */
+    describe('preview() — dry-run (AC-28)', () => {
+      it('returns the totals the post would settle on, and writes nothing', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+        const numbering = module.get(DocumentNumberingService) as { generate: jest.Mock };
+
+        const totals = await service.preview('exc-1', { excludedProgramIds: [] }, actor);
+
+        expect(totals).toEqual({
+          returnSubtotal: 685000,
+          newSubtotal: 200000,
+          newPromotionDiscount: 60000,
+          newNet: 140000,
+          returnedNet: 685000,
+          netAmount: -545000,
+          refundedAmount: 545000,
+        });
+        expect(dataSource.transaction).not.toHaveBeenCalled();
+        expect(numbering.generate).not.toHaveBeenCalled();
+        expect(mockManager.save).not.toHaveBeenCalled();
+        expect(snapshotRepo.save).not.toHaveBeenCalled();
+        expect(cashRefundPublisher.publish).not.toHaveBeenCalled();
+        expect(loyaltyAwardPublisher.publish).not.toHaveBeenCalled();
+        expect(stockReturnInPublisher.publish).not.toHaveBeenCalled();
+        expect(stockDeductionPublisher.publish).not.toHaveBeenCalled();
+      });
+
+      it('hands the ids to the engine and is stable across two calls with the same input', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+
+        const first = await service.preview('exc-1', { selectedProgramIds: ['sel-1'] }, actor);
+        const second = await service.preview('exc-1', { selectedProgramIds: ['sel-1'] }, actor);
+
+        expect(second).toEqual(first);
+        expect(queryBus.execute).toHaveBeenCalledTimes(2);
+        for (const [query] of queryBus.execute.mock.calls) {
+          expect(query.dto.selectedProgramIds).toEqual(['sel-1']);
+          expect(query.dto.lines.map((l: { lineId: string }) => l.lineId)).toEqual(['exc-out']);
+        }
+      });
+
+      it('agrees with checkout() on the posted netAmount for the same ids', async () => {
+        queryBus.execute.mockResolvedValue(evaluationWith30Percent());
+        const previewed = await service.preview('exc-1', {}, actor);
+
+        const posted = await service.checkout('exc-1', cashDto(), actor);
+
+        expect(posted.netAmount).toBe(previewed.netAmount);
+        expect(posted.refundedAmount).toBe(previewed.refundedAmount);
+      });
+    });
+
+    it('a pure RETURN (no OUT line) never calls the engine (AC-14)', async () => {
+      invoiceRepo.findOne.mockImplementation(({ where }) =>
+        Promise.resolve(where.id === 'ret-1' ? returnDraftStub() : null),
+      );
+      itemRepo.find.mockResolvedValue([inLineStub()]);
+
+      const result = await service.checkout('ret-1', cashDto(), actor);
+
+      expect(queryBus.execute).not.toHaveBeenCalled();
+      expect(result.refundedAmount).toBe(200);
+    });
+  });
+
   describe('debt-first refund split (QA #8)', () => {
     const DUE = 765_000;
 

@@ -2,6 +2,7 @@ import { StockSummaryDetailService } from "./stock-summary-detail.service";
 import { descriptionSql } from "./stock-ledger-reference.constants";
 import { StringOperator } from "../../../common/filters/filter.dto";
 import { StockLedgerCardDto } from "./dto/stock-ledger-card.dto";
+import { StockSkuBreakdownDto } from "./dto/stock-sku-breakdown.dto";
 
 /**
  * `getLedgerCard` runs 5 raw `dataSource.query()` calls inside one
@@ -100,6 +101,34 @@ describe("StockSummaryDetailService.getLedgerCard", () => {
     const [pageSql] = query.mock.calls[0];
     expect(pageSql).toContain("resolved_description");
     expect(pageSql).not.toContain("COALESCE(m.notes");
+  });
+});
+
+describe("StockSummaryDetailService.getSkuBreakdown", () => {
+  /**
+   * `getSkuBreakdown` issues its main SQL and `loadPendingTransfers`'s query
+   * inside one `Promise.all`, in that order; with a branchId both run.
+   */
+  it("excludes a pair stopped with Ngừng theo dõi from the ledger arm of `cells` (AC-01)", async () => {
+    const query = jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    const service = new StockSummaryDetailService({ query } as never);
+
+    await service.getSkuBreakdown(
+      {
+        groupKey: "11111111-1111-1111-1111-111111111111",
+        storageId: "22222222-2222-2222-2222-222222222222",
+      } as StockSkuBreakdownDto,
+      "org-1",
+      "branch-1",
+    );
+
+    const [sql] = query.mock.calls[0];
+    // The balance arm already keeps only tracked rows; the history arm must
+    // drop a pair whose balance row was explicitly flipped to is_tracked = false.
+    expect(sql).toContain("WHERE sb.organization_id = $1 AND sb.is_tracked = true");
+    expect(sql).toMatch(
+      /FROM stock_ledger_entries sle[\s\S]*NOT EXISTS \(\s*SELECT 1 FROM stock_balances ut[\s\S]*ut\.is_tracked = false/,
+    );
   });
 });
 

@@ -1,0 +1,274 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-promotion-exchange-defects
+slug: 2026092102-pos-promotion-exchange-defects
+profile: none
+created: 2026-09-21T20:43:05
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: 14 assumptions, none blocking-and-pending; 28 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: 5 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-22T09:42:16
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T09:42:39
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T09:47:12
+    by: Akenzy
+    reason: T-01-01 - 13 exact-shape toContainEqual assertions in promotion-resolver.spec.ts and evaluate-cart.handler.spec.ts go red on the new required SkippedProgram.type; the spec files must be in touches and the 'không sửa test cũ' box reworded
+  - gate: G3
+    action: passed
+    at: 2026-09-22T09:47:32
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-22T09:52:29
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T09:52:29
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T09:53:33
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-22T09:58:56
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T09:58:56
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T09:59:09
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T10:01:14
+    by: Akenzy
+    reason: T-02-01 - ReturnEligibilityService gains a DataSource ctor param; checkout-return.service.spec.ts constructs it directly at two spots and must pass a 4th arg for api tsc to stay green — add that spec to T-02-01 touches
+  - gate: G3
+    action: passed
+    at: 2026-09-22T10:01:14
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 15 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:07:26
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:07:26
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:07:35
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:17:48
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:17:48
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:18:07
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:19:36
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:19:36
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:19:56
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:24:26
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:24:26
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:24:52
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:29:42
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:29:42
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:29:55
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:32:31
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:32:31
+    by: Akenzy
+    ticket: T-03-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:32:44
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: scope
+    at: 2026-09-22T10:38:02
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T10:38:02
+    by: Akenzy
+    ticket: T-03-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:38:12
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T10:57:15
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:02:08
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:02:08
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T11:02:16
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:06:01
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:06:01
+    by: Akenzy
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T11:06:09
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:16:20
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:16:20
+    by: Akenzy
+    ticket: T-04-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:20:51
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:20:51
+    by: Akenzy
+    ticket: T-03-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T11:21:05
+    by: Akenzy
+    ticket: T-04-04
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:22:56
+    by: Akenzy
+    ticket: T-04-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:22:56
+    by: Akenzy
+    ticket: T-04-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T11:23:03
+    by: Akenzy
+    ticket: T-03-05
+  - gate: G4
+    action: scope
+    at: 2026-09-22T11:23:42
+    by: Akenzy
+    ticket: T-03-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T11:23:42
+    by: Akenzy
+    ticket: T-03-05

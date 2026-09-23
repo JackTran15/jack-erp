@@ -356,6 +356,10 @@ export class InvoiceOrderListingReport implements ReportDefinition {
           ? salespersonById.get(i.salespersonId) ?? null
           : null,
         storeCode: i.branchId ? storeById.get(i.branchId) ?? null : null,
+        // Read straight off the invoice — it is a snapshot varchar, so unlike
+        // every relation above there is nothing to load and nothing to gate on
+        // a `needs…` flag. NULL (a counter sale) is resolved by the aggregator.
+        salesChannel: i.salesChannel ?? null,
         cash: sign * (pay.cash.get(i.id) ?? 0),
         bankTransfer: sign * (pay.bank.get(i.id) ?? 0),
         voucher: sign * (voucherByInvoice.get(i.id) ?? 0),

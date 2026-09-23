@@ -569,4 +569,157 @@ describe('PromotionApplyService', () => {
       );
     });
   });
+
+  // =========================================================================
+  // delivery fee (T-04-04, AC-25/AC-27)
+  //
+  // Both recompute sites here (`apply`, `remove`) hand the invoice ENTITY to
+  // `computeAmountDue`, so they pick `shippingFeeAmount` up without a line of
+  // production code. Nothing in the call site says so — a reader sees
+  // `computeAmountDue(invoice)` either way — which is why these cases assert a
+  // fee != 0 rather than trusting the read. Every case below is wrong by
+  // exactly 30.000 if the fee stops flowing.
+  // =========================================================================
+  describe('delivery fee (T-04-04, AC-25/AC-27)', () => {
+    it('AC-25: apply recomputes amountDue with the fee on top — 1tr − 100k + 30k = 930k', async () => {
+      const invoice = invoiceStub({
+        subtotal: 1_000_000,
+        discountAmount: 0,
+        depositAmount: 0,
+        shippingFeeAmount: 30_000,
+        amountDue: 1_030_000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+      invoicePromotionRepo.find.mockResolvedValue([]);
+      discountCodeService.validate.mockResolvedValue(
+        discountCodeStub({ discountType: DiscountType.PERCENTAGE, discountValue: 10 }),
+      );
+      mockIpManagerRepo.find.mockResolvedValue([{ discountAmount: 100_000 }]);
+
+      await service.apply(
+        'invoice-1',
+        { type: InvoicePromotionType.DISCOUNT_CODE, code: 'SAVE10' },
+        actor,
+      );
+
+      expect(mockInvManagerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ discountAmount: 100_000, amountDue: 930_000 }),
+      );
+      // The discount lands on the goods only — the fee is untouched (A-22).
+      expect(invoice.shippingFeeAmount).toBe(30_000);
+    });
+
+    it('AC-25: a discount that swallows the goods still leaves the fee payable, not 0', async () => {
+      const invoice = invoiceStub({
+        subtotal: 100_000,
+        discountAmount: 0,
+        depositAmount: 0,
+        shippingFeeAmount: 30_000,
+        amountDue: 130_000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+      invoicePromotionRepo.find.mockResolvedValue([]);
+      // A fixed 150k code is capped at the subtotal, so the goods part is 0.
+      discountCodeService.validate.mockResolvedValue(
+        discountCodeStub({ discountType: DiscountType.FIXED_AMOUNT, discountValue: 150_000 }),
+      );
+      mockIpManagerRepo.find.mockResolvedValue([{ discountAmount: 100_000 }]);
+
+      await service.apply(
+        'invoice-1',
+        { type: InvoicePromotionType.DISCOUNT_CODE, code: 'FREE100K' },
+        actor,
+      );
+
+      // Not 0: the clamp wraps the goods, and the shipper still hands 30k over.
+      expect(mockInvManagerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ amountDue: 30_000 }),
+      );
+    });
+
+    it('AC-25: remove gives the goods back without dropping the fee', async () => {
+      const invoice = invoiceStub({
+        subtotal: 1_000_000,
+        discountAmount: 150_000,
+        depositAmount: 0,
+        shippingFeeAmount: 30_000,
+        amountDue: 880_000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+      // One promotion left after the delete, worth 100k.
+      mockIpManagerRepo.find.mockResolvedValue([{ discountAmount: 100_000 }]);
+
+      await service.remove('invoice-1', 'ip-1', actor);
+
+      expect(mockInvManagerRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ discountAmount: 100_000, amountDue: 930_000 }),
+      );
+      expect(invoice.shippingFeeAmount).toBe(30_000);
+    });
+
+    it('AC-25/AC-27: apply then remove leaves the fee identical before, during and after', async () => {
+      const invoice = invoiceStub({
+        subtotal: 1_000_000,
+        discountAmount: 0,
+        depositAmount: 0,
+        shippingFeeAmount: 30_000,
+        amountDue: 1_030_000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+      invoicePromotionRepo.find.mockResolvedValue([]);
+      discountCodeService.validate.mockResolvedValue(
+        discountCodeStub({ discountType: DiscountType.PERCENTAGE, discountValue: 10 }),
+      );
+      // apply() sees the new row; remove() sees nothing left.
+      mockIpManagerRepo.find
+        .mockResolvedValueOnce([{ discountAmount: 100_000 }])
+        .mockResolvedValueOnce([]);
+
+      const feeBefore = Number(invoice.shippingFeeAmount);
+      expect(feeBefore).toBe(30_000);
+
+      await service.apply(
+        'invoice-1',
+        { type: InvoicePromotionType.DISCOUNT_CODE, code: 'SAVE10' },
+        actor,
+      );
+
+      // Mid round trip: the promotion ate 100k of goods and none of the fee.
+      expect(Number(invoice.shippingFeeAmount)).toBe(feeBefore);
+      expect(invoice.amountDue).toBe(930_000);
+
+      await service.remove('invoice-1', 'ip-1', actor);
+
+      // Back where it started — not 1.000.000, which is what a dropped fee reads as.
+      expect(Number(invoice.shippingFeeAmount)).toBe(feeBefore);
+      expect(invoice.discountAmount).toBe(0);
+      expect(invoice.amountDue).toBe(1_030_000);
+    });
+
+    it('coerces the numeric(18,2) fee TypeORM returns as a string', async () => {
+      const invoice = invoiceStub({
+        subtotal: 1_000_000,
+        discountAmount: 0,
+        depositAmount: 0,
+        shippingFeeAmount: '30000.00' as unknown as number,
+        amountDue: 1_030_000,
+      });
+      invoiceRepo.findOne.mockResolvedValue(invoice);
+      invoicePromotionRepo.find.mockResolvedValue([]);
+      discountCodeService.validate.mockResolvedValue(
+        discountCodeStub({ discountType: DiscountType.PERCENTAGE, discountValue: 10 }),
+      );
+      mockIpManagerRepo.find.mockResolvedValue([{ discountAmount: 100_000 }]);
+
+      await service.apply(
+        'invoice-1',
+        { type: InvoicePromotionType.DISCOUNT_CODE, code: 'SAVE10' },
+        actor,
+      );
+
+      // 930000, not the string '90000030000.00'.
+      expect(invoice.amountDue).toBe(930_000);
+      expect(typeof invoice.amountDue).toBe('number');
+    });
+  });
 });

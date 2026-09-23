@@ -11,7 +11,7 @@ export class JournalReverseConsumer {
 
   constructor(private readonly journalService: JournalService) {}
 
-  @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, { groupId: 'erp-api.invoice.cancelled.journal-reverse' })
+  @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, { groupId: 'invoice.cancelled.journal-reverse' })
   async handle(event: DomainEvent<InvoiceCancelledPayload>): Promise<void> {
     const { invoiceId, reason, branchId, organizationId, actorId } = event.payload;
 

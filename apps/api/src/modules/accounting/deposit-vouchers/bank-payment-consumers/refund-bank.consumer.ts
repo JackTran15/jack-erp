@@ -26,7 +26,7 @@ export class RefundBankConsumer {
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.DEPOSIT_REFUND, {
-    groupId: 'erp-api.return.deposit-refund',
+    groupId: 'return.deposit-refund',
   })
   async handle(event: DomainEvent<DepositRefundPayload>): Promise<void> {
     const {

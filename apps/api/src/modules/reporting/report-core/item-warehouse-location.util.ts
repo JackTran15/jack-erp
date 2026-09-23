@@ -43,9 +43,12 @@ interface ItemShelf {
  * A shelf counts if it is either:
  *   1. the item's preferred shelf (`item_storage_locations`) in that
  *      warehouse, or
- *   2. any shelf there still holding stock (`stock_balances.quantity > 0`).
- * These are a union, not a priority order — an item whose preferred shelf is
- * empty but has real stock elsewhere reports both. Only active storages and
+ *   2. any shelf there whose pair is still tracked
+ *      (`stock_balances.is_tracked = true`), at any quantity — a shelf that
+ *      just sold out is still where the item lives, and "Ngừng theo dõi" is
+ *      the user's way of saying it no longer is.
+ * These are a union, not a priority order — an item with a preferred shelf
+ * and a tracked shelf elsewhere reports both. Only active storages and
  * active locations count, and a pair explicitly set to "Ngừng theo dõi" is
  * skipped. Every matching shelf is joined into three cells: `code` lists the
  * location codes (`"A101, A201"`), `name` lists the location names
@@ -183,7 +186,7 @@ async function resolveWithinStorages(
 
   // The preferred-shelf mapping has no isTracked flag of its own — cross-check
   // its (item, location) pairs against StockBalanceEntity and drop any pair
-  // explicitly marked "Ngừng theo dõi". The stocked-shelf query below already
+  // explicitly marked "Ngừng theo dõi". The tracked-shelf query below already
   // filters `isTracked = true` in SQL, so this only matters for pairs sourced
   // from item_storage_locations.
   //
@@ -208,7 +211,6 @@ async function resolveWithinStorages(
     .innerJoin(LocationEntity, 'loc', 'loc.id = sb.locationId')
     .where('sb.itemId IN (:...itemIds)', { itemIds })
     .andWhere('sb.organizationId = :orgId', { orgId: organizationId })
-    .andWhere('sb.quantity > 0')
     .andWhere('sb.isTracked = true')
     .andWhere('loc.isActive = true')
     .andWhere('loc.storageId IN (:...warehouseIds)', { warehouseIds })

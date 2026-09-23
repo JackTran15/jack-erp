@@ -420,8 +420,10 @@ export function CrudFormDialog({
     : isEdit
       ? "Lưu"
       : "Lưu";
-  // Tree entities carry a tree picker whose dropdown must not be clipped, so
-  // they get a wider modal with an overflow-visible body.
+  // Tree entities carry a tree picker, so they get a wider, taller modal. The
+  // picker's list is portaled (TreeSelectInput), so the body keeps its default
+  // overflow-auto — an overflow-visible body cannot escape AppModal's clipping
+  // wrapper anyway, it only stops the form from scrolling.
   const isTreeEntity = Boolean(CRUD_TREE_ENTITIES[config.entityKey]);
   const defaultWidth = isTreeEntity ? 720 : 560;
   const defaultHeight = isTreeEntity ? 560 : 460;
@@ -440,7 +442,6 @@ export function CrudFormDialog({
       }
       defaultWidth={defaultWidth}
       defaultHeight={defaultHeight}
-      bodyClassName={isTreeEntity ? "overflow-visible" : undefined}
       footer={
         <div className="flex items-center justify-between">
           <button

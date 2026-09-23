@@ -319,6 +319,16 @@ export const API_KEY_ENTITY_CONFIG: CrudEntityConfig = {
       type: 'tags',
       required: true,
     },
+    // `relation`, not `string`: it also makes `normalizeBlankValues` turn the
+    // cleared-form `''` into `null` before it reaches the uuid column.
+    // Not `required` — a key with no sales channel is the normal case.
+    {
+      key: 'salesChannelId',
+      label: 'Kênh bán (để trống = không thuộc kênh nào)',
+      type: 'relation',
+      relationEntity: 'sales-channels',
+      hideInList: true,
+    },
     { key: 'createdAt', label: 'Ngày tạo', type: 'date', readOnly: true },
   ],
   searchableFields: ['name', 'keyPrefix'],

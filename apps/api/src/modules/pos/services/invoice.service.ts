@@ -29,6 +29,31 @@ import {
   ResolvedLineDiscount,
 } from './line-discount.util';
 
+/**
+ * Những trường của hoá đơn nháp mà CHỈ server đặt được — cố ý KHÔNG nằm trên
+ * {@link CreateInvoiceDto}.
+ *
+ * `CreateInvoiceDto` là `@Body()` của `POST /pos/invoices`. Phí giao đi thẳng
+ * vào `amount_due`, rồi `amount_due` thành `invoice_debts.original_amount` —
+ * đúng số tiền shipper thu hộ. Khai nó trên dto ấy là cho bất kỳ client POS nào
+ * tự đặt số tiền phải thu; phí chỉ được CHÉP từ `sales_orders.shipping_fee`
+ * trong `SalesOrderService.approve` (ADR-04).
+ *
+ * Cùng lý do mà `sales_channel` không nằm trên dto ấy: nhãn kênh là SNAPSHOT
+ * server chép sang (ADR-03) — `SalesOrderService.approve` và
+ * `MobileCashierService.createDraft` đều ghi thẳng cột sau lượt tạo.
+ */
+export interface DraftInvoiceServerFields {
+  /**
+   * Phí giao hàng thu khách. Cộng vào `amountDue` SAU mọi khoản giảm và sau khi
+   * phần tiền hàng đã clamp về 0 (A-22) — `computeAmountDue` lo việc đó.
+   *
+   * Vắng mặt = 0 = bán tại quầy: số học cũ rơi ra y nguyên. Nhận cả chuỗi vì
+   * cột numeric của `sales_orders.shipping_fee` về từ TypeORM là CHUỖI.
+   */
+  shippingFeeAmount?: number | string | null;
+}
+
 @Injectable()
 export class InvoiceService {
   private readonly logger = new Logger(InvoiceService.name);
@@ -102,13 +127,25 @@ export class InvoiceService {
    *
    * Trả về entity vừa lưu (chưa nạp `items`); caller cần bản đầy đủ thì gọi
    * [findOneWithItems] sau khi commit.
+   *
+   * `serverFields` là những trường KHÔNG đến từ client — xem
+   * {@link DraftInvoiceServerFields}. Phí giao phải vào ngay lượt INSERT này
+   * chứ không ghi đè sau: `amount_due` được đọc ngay (màn Thu tiền, công nợ
+   * COD), nên một hoá đơn nháp thiếu phí dù chỉ trong một khoảnh khắc là một
+   * con số sai mà ai đó đọc được.
    */
-  async createDraftIn(manager: EntityManager, dto: CreateInvoiceDto, actor: ActorContext): Promise<InvoiceEntity> {
+  async createDraftIn(
+    manager: EntityManager,
+    dto: CreateInvoiceDto,
+    actor: ActorContext,
+    serverFields: DraftInvoiceServerFields = {},
+  ): Promise<InvoiceEntity> {
     const tempCode = `DRAFT-${Date.now()}`;
     {
       const items = dto.items ?? [];
       const lineDiscounts = items.map((i) => this.computeLineDiscount(i));
       const subtotal = lineDiscounts.reduce((sum, d) => sum + d.lineTotal, 0);
+      const shippingFeeAmount = Number(serverFields.shippingFeeAmount ?? 0);
 
       const salespersonProfileId = dto.salespersonId
         ? await this.resolveSalespersonProfileId(
@@ -134,7 +171,11 @@ export class InvoiceService {
         pointsRedeemed: 0,
         pointsDiscountAmount: 0,
         depositAmount: 0,
-        amountDue: subtotal,
+        shippingFeeAmount,
+        // Qua `computeAmountDue` chứ không `subtotal`: phí cộng SAU mọi khoản
+        // giảm, và không có khoản giảm nào ở lượt tạo nháp nên hoá đơn không
+        // phí ra đúng `subtotal` như trước (ADR-04 / A-22).
+        amountDue: computeAmountDue({ subtotal, shippingFeeAmount }),
         staffId: actor.userId,
         salespersonId: salespersonProfileId,
         // Snapshot only — never read by checkout or accounting. See ADR-02 and

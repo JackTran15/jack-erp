@@ -136,6 +136,14 @@ function findTakenByProgram(
 }
 
 /**
+ * Cột "Mô tả" = `promotion_programs.description` nguyên văn; NULL hoặc chuỗi rỗng
+ * → `undefined` để `PromotionRow` in "—" (AC-04).
+ */
+function programDescription(program: { description?: string }): string | undefined {
+  return program.description || undefined;
+}
+
+/**
  * Gom 3 nguồn của `EvaluateCartResponse` (`appliedPrograms`, `availablePrograms`,
  * `skippedPrograms`) thành 1 danh sách hiển thị cho `PromotionSelectionModal`.
  * Hàm thuần — không gọi API, không side effect.
@@ -148,6 +156,7 @@ export function mapEvaluateResponseToPromotionItems(
     name: program.name,
     kind: PromotionKindEnum.CUSTOM,
     kindLabel: PROGRAM_TYPE_LABELS[program.type],
+    description: programDescription(program),
     selected: true,
   }));
 
@@ -156,6 +165,7 @@ export function mapEvaluateResponseToPromotionItems(
     name: program.name,
     kind: PromotionKindEnum.CUSTOM,
     kindLabel: PROGRAM_TYPE_LABELS[program.type],
+    description: programDescription(program),
   }));
 
   // UOW-04/ADR-03/T-04-03 — RESOURCE_TAKEN là nhóm duy nhất tick được (thu ngân
@@ -163,11 +173,14 @@ export function mapEvaluateResponseToPromotionItems(
   // được (thu ngân bỏ tick chính CTKM họ vừa loại, không cần xác nhận). Mọi
   // reason khác (hết hạn, sai chi nhánh, chưa đủ điều kiện...) tick vào cũng
   // không giải quyết được gì nên vẫn disabled.
+  // 2026092102 / T-01-02 — `SkippedProgram` mang `type` từ BE nên nhóm này
+  // in "Hình thức" như hai nhóm trên; một CTKM vừa bị bỏ tick không được mất nhãn.
   const skipped: PromotionItem[] = data.skippedPrograms.map((program) => ({
     id: program.programId,
     name: program.name,
     kind: PromotionKindEnum.CUSTOM,
-    kindLabel: "—",
+    kindLabel: PROGRAM_TYPE_LABELS[program.type],
+    description: programDescription(program),
     disabled: program.reason !== "RESOURCE_TAKEN" && program.reason !== "EXCLUDED_BY_CASHIER",
     reason: skippedReasonLabel(program, data.appliedPrograms),
     reasonCode: program.reason,

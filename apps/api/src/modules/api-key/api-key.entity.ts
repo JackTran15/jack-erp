@@ -63,6 +63,16 @@ export class ApiKeyEntity {
   @Column({ name: 'branch_ids', type: 'text', array: true, nullable: true })
   branchIds?: string[];
 
+  /**
+   * The sales channel this key speaks for (`sales_channels.id`), NULL for every
+   * key that is not a sales channel — internal keys and other integrations.
+   * It is an *identity*, not a permission: what the key may do still comes
+   * solely from the shadow user's `user_roles` (see class doc). The partner
+   * order path is the only caller that requires it to be non-NULL.
+   */
+  @Column({ name: 'sales_channel_id', type: 'uuid', nullable: true })
+  salesChannelId: string | null;
+
   /** IPv4 addresses and/or CIDR ranges allowed to present this key. */
   @Column({ name: 'ip_whitelist', type: 'jsonb', default: () => "'[]'" })
   ipWhitelist: string[];

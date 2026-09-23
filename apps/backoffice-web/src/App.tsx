@@ -8,6 +8,8 @@ import { LoginPage } from "./pages/auth/LoginPage";
 import { TenantSetupPage } from "./pages/setup/TenantSetupPage";
 import { OverviewPage } from "./pages/overview/OverviewPage";
 import { OrdersPage } from "./pages/orders/OrdersPage";
+import { OrdersDispatchPage } from "./pages/orders/OrdersDispatchPage/OrdersDispatchPage";
+import { OrdersAllPage } from "./pages/orders/OrdersAllPage/OrdersAllPage";
 import { CrudListPage } from "./components/crud/CrudListPage";
 import { CrudCreatePage } from "./components/crud/CrudCreatePage";
 import { ProviderGroupListPage } from "./pages/inventory/ProviderGroupListPage";
@@ -97,6 +99,21 @@ export function App() {
               <Route element={<BackofficeLayout />}>
                 <Route path="/" element={<OverviewPage />} />
                 <Route path="/orders" element={<OrdersPage />} />
+                {/*
+                  Màn ĐIỀU PHỐI là route riêng, không phải tab của `/orders`
+                  (A-19): `/orders` là lưới của chi nhánh đang đăng nhập, màn
+                  này đọc cấp tổ chức qua `/admin/sales-orders`.
+                */}
+                <Route
+                  path="/orders/dispatch"
+                  element={<OrdersDispatchPage />}
+                />
+                {/*
+                  Màn TRA CỨU toàn chuỗi, cũng đọc cấp tổ chức. Quyền
+                  `pos.sales-order.read-all` khai ở navConfig và được
+                  `routeAccess` chặn ngay cả khi vào bằng deep link.
+                */}
+                <Route path="/orders/all" element={<OrdersAllPage />} />
                 <Route path="/admin/employees" element={<EmployeesPage />} />
                 <Route
                   path="/admin/provider-groups"

@@ -909,4 +909,334 @@ describe('CheckoutInvoiceService (event-driven)', () => {
       expect(cashFromPaymentPublisher.publish).toHaveBeenCalledTimes(2);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Delivery fee (T-04-04, AC-25 / AC-27)
+  //
+  // This service builds an object literal for `computeAmountDue` rather than
+  // handing it the invoice entity, and `shippingFeeAmount` is optional with a
+  // default of 0 — so a call site that drops the fee still returns a plausible
+  // number and nothing in the code reads as wrong. Only a case with a fee != 0
+  // separates "threaded correctly" from "silently lost".
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('delivery fee', () => {
+    /** The UOW-04 demo invoice: 1tr hàng, 100k giảm giá, 50k điểm, 30k phí GH. */
+    const setupWebOrderInvoice = (overrides: Partial<InvoiceEntity> = {}) => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 1_000_000,
+          discountAmount: 100_000,
+          pointsRedeemed: 100,
+          pointsDiscountAmount: 50_000,
+          shippingFeeAmount: 30_000,
+          amountDue: 880_000,
+          ...overrides,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 }),
+      ]);
+    };
+
+    it('AC-25: amountDue carries the fee — 1tr − 100k − 50k + 30k = 880k', async () => {
+      setupWebOrderInvoice();
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 880_000 }] },
+        actor,
+      );
+
+      expect(result.amountDue).toBe(880_000);
+      expect(result.status).toBe(InvoiceStatus.PAID);
+    });
+
+    it('AC-25: point redemption reduces the goods, never the fee (A-22)', async () => {
+      // 1.000 points are worth 500.000 against 50.000 of goods. The goods part
+      // bottoms out at 0 and the customer still owes the 30.000 fee — points
+      // are not allowed to buy delivery.
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 50_000,
+          pointsRedeemed: 1_000,
+          pointsDiscountAmount: 500_000,
+          shippingFeeAmount: 30_000,
+          amountDue: 30_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 50_000, lineTotal: 50_000 }),
+      ]);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 30_000 }] },
+        actor,
+      );
+
+      expect(result.amountDue).toBe(30_000);
+      expect(membershipCardService.redeemPointsForInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ points: 1_000 }),
+        mockManager,
+        actor,
+      );
+    });
+
+    it('AC-25: a discount bigger than the goods leaves the fee payable, not 0', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 100_000,
+          discountAmount: 500_000,
+          shippingFeeAmount: 30_000,
+          amountDue: 30_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 100_000, lineTotal: 100_000 }),
+      ]);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 30_000 }] },
+        actor,
+      );
+
+      expect(result.amountDue).toBe(30_000);
+      // The sale posting sees the same figure the customer paid.
+      expect(journalSalePublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ amountDue: 30_000, remainder: 0 }),
+        actor,
+      );
+    });
+
+    it('AC-25: an unpaid fee lands in the debt, so a COD balance is not short by 30k', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 100_000,
+          shippingFeeAmount: 30_000,
+          amountDue: 130_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 100_000, lineTotal: 100_000 }),
+      ]);
+
+      const result = await service.checkout('inv-1', { payments: [] }, actor);
+
+      expect(result.amountDue).toBe(130_000);
+      expect(invoiceDebtService.createFromInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ status: InvoiceStatus.DEBT }),
+        130_000,
+        mockManager,
+        { dueDate: undefined, creditDays: undefined },
+      );
+    });
+
+    it('AC-25: rejects a payment covering only the goods, once the fee is on the invoice', async () => {
+      // 130.000 due; paying 100.000 is a partial settlement, not a full one.
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({ subtotal: 100_000, shippingFeeAmount: 30_000, amountDue: 130_000 }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 100_000, lineTotal: 100_000 }),
+      ]);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 100_000 }] },
+        actor,
+      );
+
+      expect(result.status).toBe(InvoiceStatus.PARTIAL_DEBT);
+      expect(invoiceDebtService.createFromInvoice).toHaveBeenCalledWith(
+        expect.anything(),
+        30_000,
+        mockManager,
+        expect.anything(),
+      );
+    });
+
+    it('coerces the numeric(18,2) fee TypeORM returns as a string', async () => {
+      // '30000.00' concatenated instead of added gives '85000030000.00'.
+      setupWebOrderInvoice({
+        shippingFeeAmount: '30000.00' as unknown as number,
+        discountAmount: '100000.00' as unknown as number,
+        pointsDiscountAmount: '50000.00' as unknown as number,
+      });
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 880_000 }] },
+        actor,
+      );
+
+      expect(result.amountDue).toBe(880_000);
+    });
+
+    it('leaves a fee-less counter sale on exactly its old number', async () => {
+      // Every existing invoice has shipping_fee_amount = 0; the default must
+      // reproduce the pre-T-04-02 figure to the đồng.
+      const result = await service.checkout('inv-1', cashPaymentDto(), actor);
+      expect(result.amountDue).toBe(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Loyalty earns on the goods, never on the delivery fee (T-04-06, A-24)
+  //
+  // T-04-02 put the fee inside `amountDue`, and the earn was floored from
+  // `amountDue`, so points quietly started accruing on shipping. The CLAWBACK
+  // base never had the fee: `computeReverseBase` runs on `returnedNet`, and
+  // `RefundableInvoiceHeader` carries no fee field. On the demo invoice that is
+  // an earn on 880.000 against a reverse on 850.000 — a full return leaves the
+  // customer permanently holding the 3 points the fee bought, and
+  // `Math.min(derived, pointsEarned)` is an UPPER bound so it cannot recover
+  // them. A-24 (Akenzy, 2026-09-21): earn on the goods part.
+  //
+  // The two numbers asserted together throughout: what is PERSISTED on the
+  // invoice, and what is PUBLISHED as the async award base. The consumer awards
+  // floor(published / rate) while the receipt prints a balance projected from the
+  // persisted figure, so they have to be the same numerator.
+  // ═══════════════════════════════════════════════════════════════════════════
+  describe('loyalty earns on goods, not on the delivery fee (T-04-06, A-24)', () => {
+    const RATE = 10_000;
+
+    /** The UOW-04 demo invoice: 1tr hàng, 100k giảm giá, 50k điểm, 30k phí GH. */
+    const setupFeeInvoice = (overrides: Partial<InvoiceEntity> = {}) => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 1_000_000,
+          discountAmount: 100_000,
+          pointsRedeemed: 100,
+          pointsDiscountAmount: 50_000,
+          shippingFeeAmount: 30_000,
+          amountDue: 880_000,
+          ...overrides,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 }),
+      ]);
+    };
+
+    const checkoutFeeInvoice = () =>
+      service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 880_000 }] },
+        actor,
+      );
+
+    it('persists the points the 1.000.000 of goods earned, not the 880.000 payable', async () => {
+      setupFeeInvoice();
+
+      const result = await checkoutFeeInvoice();
+
+      // Goods net = 1tr − 100k − 50k = 850.000 → 85 points. The fee is still
+      // collected, so amountDue keeps it.
+      expect(result.amountDue).toBe(880_000);
+      expect(result.pointsEarned).toBe(85);
+      // The exact defect: 880.000/10.000 = 88 was the pre-fix figure, and 100
+      // would be earning on the undiscounted 1.000.000.
+      expect(result.pointsEarned).not.toBe(88);
+    });
+
+    it('publishes the same goods base it persisted, so the consumer awards the same number', async () => {
+      setupFeeInvoice();
+
+      const result = await checkoutFeeInvoice();
+
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotal: 850_000 }),
+        actor,
+      );
+      // The consumer does floor(payload.subtotal / rate); that must land on the
+      // figure written to the invoice, or `pointsBalanceAfter` on the printed
+      // receipt promises a balance the card never reaches.
+      const published = loyaltyPointsPublisher.publish.mock.calls[0][0].subtotal;
+      expect(Math.floor(published / RATE)).toBe(result.pointsEarned);
+    });
+
+    it('projects pointsBalanceAfter off the goods base too', async () => {
+      setupFeeInvoice();
+      membershipCardService.getPointBalanceForUpdate.mockResolvedValue(500);
+
+      const result = await checkoutFeeInvoice();
+
+      expect(result.pointsBalanceAfter).toBe(485); // 500 − 100 redeemed + 85 earned
+    });
+
+    it('earns nothing on an invoice where only the fee is payable', async () => {
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 100_000,
+          discountAmount: 500_000,
+          shippingFeeAmount: 30_000,
+          amountDue: 30_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 100_000, lineTotal: 100_000 }),
+      ]);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 30_000 }] },
+        actor,
+      );
+
+      // The goods part clamped to 0, so there is nothing to earn on — earning 3
+      // points here would be earning purely on delivery.
+      expect(result.amountDue).toBe(30_000);
+      expect(result.pointsEarned).toBe(0);
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotal: 0 }),
+        actor,
+      );
+    });
+
+    it('subtracts the numeric(18,2) fee TypeORM returns as a string', async () => {
+      setupFeeInvoice({
+        shippingFeeAmount: '30000.00' as unknown as number,
+        discountAmount: '100000.00' as unknown as number,
+        pointsDiscountAmount: '50000.00' as unknown as number,
+      });
+
+      const result = await checkoutFeeInvoice();
+
+      expect(result.amountDue).toBe(880_000);
+      expect(result.pointsEarned).toBe(85);
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotal: 850_000 }),
+        actor,
+      );
+    });
+
+    it('leaves a fee-less invoice on exactly the points it earned before the fix', async () => {
+      // shipping_fee_amount = 0 on every invoice that exists today, so
+      // `amountDue − 0` is the identity and no old number may move.
+      invoiceRepo.findOne.mockResolvedValue(
+        invoiceStub({
+          subtotal: 1_000_000,
+          pointsRedeemed: 100,
+          pointsDiscountAmount: 50_000,
+          amountDue: 950_000,
+        }),
+      );
+      itemRepo.find.mockResolvedValue([
+        invoiceItemStub({ quantity: 1, unitPrice: 1_000_000, lineTotal: 1_000_000 }),
+      ]);
+
+      const result = await service.checkout(
+        'inv-1',
+        { payments: [{ paymentMethod: 'cash' as any, amount: 950_000 }] },
+        actor,
+      );
+
+      expect(result.pointsEarned).toBe(95);
+      expect(loyaltyPointsPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({ subtotal: 950_000 }),
+        actor,
+      );
+    });
+  });
 });

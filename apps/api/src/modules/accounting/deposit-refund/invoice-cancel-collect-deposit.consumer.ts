@@ -37,7 +37,7 @@ export class InvoiceCancelCollectDepositConsumer {
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, {
-    groupId: 'erp-api.invoice.cancelled.collect-deposit',
+    groupId: 'invoice.cancelled.collect-deposit',
   })
   async handle(event: DomainEvent<InvoiceCancelledPayload>): Promise<void> {
     const {

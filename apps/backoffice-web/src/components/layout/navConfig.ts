@@ -138,7 +138,22 @@ export const navConfig: NavModule[] = [
     sections: [
       {
         id: "orders-main",
-        children: [{ to: "/orders", label: "Danh sách đơn hàng", end: true }],
+        children: [
+          { to: "/orders", label: "Danh sách đơn hàng", end: true },
+          {
+            to: "/orders/dispatch",
+            label: "Điều phối đơn hàng",
+            permission: "pos.sales-order.dispatch",
+          },
+          {
+            // Lưới toàn chuỗi: chỉ "Quản lý tổng" và "Quản trị hệ thống" giữ
+            // `pos.sales-order.read-all`. Quản lý chi nhánh CỐ TÌNH không có —
+            // cửa hàng này không được đọc đơn của cửa hàng kia.
+            to: "/orders/all",
+            label: "Tất cả đơn hàng",
+            permission: "pos.sales-order.read-all",
+          },
+        ],
       },
     ],
   },

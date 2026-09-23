@@ -4,6 +4,7 @@ import {
   BRANCH_MANAGER_PERMISSION_KEYS,
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
+  PARTNER_ORDER_PERMISSION_KEYS,
   PARTNER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
@@ -353,6 +354,217 @@ describe('partner catalog permission seeds', () => {
   it('still reaches the two full-access roles through ALL_PERMISSION_KEYS', () => {
     expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(PARTNER_KEY);
     expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(PARTNER_KEY);
+  });
+});
+
+const PARTNER_ORDER_KEY = 'partner.order.create';
+
+// Measured on a live API before this block existed: POST /v2/partner/orders
+// answered 403 "Missing required permission: partner.order.create" to EVERY api
+// key, because the permission was seeded but no role granted it. The role split
+// below is deliberate (A-25) — a key issued only to place orders must not also
+// read the catalogue, which exposes the price list.
+describe('partner order permission seeds', () => {
+  const seededKeys = PERMISSION_SEEDS.map((p) => p.key);
+
+  it('registers the partner order permission in the catalogue', () => {
+    expect(seededKeys).toContain(PARTNER_ORDER_KEY);
+  });
+
+  it('names a role of its own, separate from the catalog role', () => {
+    expect(SEED_ROLE_NAMES.PARTNER_ORDER).toBe('Đối tác đặt hàng');
+    expect(SEED_ROLE_NAMES.PARTNER_ORDER).not.toBe(SEED_ROLE_NAMES.PARTNER);
+  });
+
+  it('gives that role exactly one permission', () => {
+    expect(PARTNER_ORDER_PERMISSION_KEYS).toEqual([PARTNER_ORDER_KEY]);
+  });
+
+  // The whole reason for two roles: placing orders must not imply reading
+  // prices, and reading prices must not imply placing orders.
+  it('keeps the two partner roles disjoint', () => {
+    expect(PARTNER_ORDER_PERMISSION_KEYS).not.toContain(PARTNER_KEY);
+    expect(PARTNER_PERMISSION_KEYS).not.toContain(PARTNER_ORDER_KEY);
+    expect(PARTNER_PERMISSION_KEYS).toEqual([PARTNER_KEY]);
+  });
+
+  it('keeps the order key away from every staff role', () => {
+    expect(SALES_PERMISSION_KEYS).not.toContain(PARTNER_ORDER_KEY);
+    expect(CASHIER_PERMISSION_KEYS).not.toContain(PARTNER_ORDER_KEY);
+    expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(PARTNER_ORDER_KEY);
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(PARTNER_ORDER_KEY);
+  });
+});
+
+const DISPATCH_KEY = 'pos.sales-order.dispatch';
+const READ_ALL_KEY = 'pos.sales-order.read-all';
+
+/**
+ * The T-01-03 failure, repeated one feature later would be inexcusable:
+ * `partner.order.create` was seeded, wired into a guard, and granted by no role,
+ * so the endpoint answered 403 to every caller and only a live API call found
+ * it. These two keys are the dispatch feature's entry point; if nothing holds
+ * them, the whole UoW is dead on arrival.
+ *
+ * They reach SYSTEM_ADMIN and GENERAL_MANAGER through ALL_PERMISSION_KEYS — that
+ * is the grant, and it is deliberate that it stops there (A-08: điều phối is an
+ * ORG-level act). The withholding assertions below are AC-13's seed-level half;
+ * the 403 on a live call is the other.
+ */
+describe('web order dispatch permission seeds', () => {
+  const seededKeys = PERMISSION_SEEDS.map((p) => p.key);
+
+  it.each([DISPATCH_KEY, READ_ALL_KEY])('registers %s in the catalogue', (key) => {
+    expect(seededKeys).toContain(key);
+  });
+
+  it.each([DISPATCH_KEY, READ_ALL_KEY])('files %s under the pos module', (key) => {
+    expect(PERMISSION_SEEDS.find((p) => p.key === key)?.module).toBe('pos');
+  });
+
+  it.each([DISPATCH_KEY, READ_ALL_KEY])('grants %s to the two org-wide roles', (key) => {
+    expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(key);
+    expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(key);
+  });
+
+  // The `pos.` prefix in the BRANCH_MANAGER filter would sweep both keys in by
+  // default; ROOT_AND_GENERAL_MANAGER_ONLY_KEYS is what stops it. This is the
+  // test that fails if someone removes them from that set.
+  it.each([DISPATCH_KEY, READ_ALL_KEY])('withholds %s from every branch-level role', (key) => {
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(key);
+    expect(CASHIER_PERMISSION_KEYS).not.toContain(key);
+    expect(SALES_PERMISSION_KEYS).not.toContain(key);
+    expect(WAREHOUSE_PERMISSION_KEYS).not.toContain(key);
+  });
+
+  // A-08: reusing `approve` would let every branch cashier dispatch, and the
+  // cashier keeps `approve` — so the two keys must not travel together.
+  it('keeps dispatch separate from the cashier approve key', () => {
+    expect(CASHIER_PERMISSION_KEYS).toContain('pos.sales-order.approve');
+    expect(CASHIER_PERMISSION_KEYS).not.toContain(DISPATCH_KEY);
+  });
+});
+
+/**
+ * Every permission in the catalogue must be reachable by somebody.
+ *
+ * The literal form of that sentence is worthless here, and the 403 above proves
+ * it: SYSTEM_ADMIN is DERIVED from PERMISSION_SEEDS (it is every key) and
+ * GENERAL_MANAGER is every key bar registration, so "granted by at least one
+ * role" was already true of `partner.order.create` on the day no API key could
+ * use it. The first test below therefore only guards the derivation itself.
+ *
+ * The check with teeth is the second one: a permission must appear in one of
+ * the HAND-WRITTEN role lists — the roles a non-owner can actually be given —
+ * or be named in OWNER_ONLY_KEYS as deliberately withheld. A permission added
+ * to the catalogue and wired into a guard, but into no role, then fails here
+ * instead of failing in production with a 403.
+ */
+describe('permission catalogue coverage', () => {
+  const seededKeys = PERMISSION_SEEDS.map((p) => p.key);
+
+  /** Role lists written by hand, i.e. not derived from PERMISSION_SEEDS. */
+  const CURATED_ROLE_KEYS: ReadonlySet<string> = new Set([
+    ...BRANCH_MANAGER_PERMISSION_KEYS,
+    ...SALES_PERMISSION_KEYS,
+    ...CASHIER_PERMISSION_KEYS,
+    ...WAREHOUSE_PERMISSION_KEYS,
+    ...PARTNER_PERMISSION_KEYS,
+    ...PARTNER_ORDER_PERMISSION_KEYS,
+  ]);
+
+  /**
+   * Withheld from every role below General Manager ON PURPOSE. Each group has a
+   * reason already argued elsewhere in this file or in org-role-permissions.ts;
+   * this list is the place where "no role holds it" is a decision rather than an
+   * oversight. Adding a key here should feel like signing something.
+   */
+  const OWNER_ONLY_KEYS: ReadonlySet<string> = new Set([
+    // Retiring a branch — a branch manager runs a branch, they do not close one.
+    'branch.archive',
+    'branch.delete',
+    // Stock in or out with no counterparty document to reconcile against.
+    'goods_receipt.other-receipt',
+    'inventory.goods-issue.other-issue',
+    'inventory.goods-issue.disposal',
+    // Reversing money that has already been posted.
+    'pos.invoice.cancel',
+    'accounting.cash_receipt.delete',
+    'accounting.cash_payment.delete',
+    'accounting.bank_receipt.delete',
+    'accounting.bank_payment.delete',
+    'accounting.cash_voucher_category.delete',
+    // Điều phối đơn web: handing an order to any branch in the chain, and the
+    // chain-wide order grid. Argued at the declaration site in
+    // org-role-permissions.ts and asserted in "web order dispatch permission
+    // seeds" below.
+    'pos.sales-order.dispatch',
+    'pos.sales-order.read-all',
+    // Every store's revenue/profit/debt in one report.
+    'reporting.dashboard.consolidated.read',
+    'reporting.invoice.consolidated.read',
+    'reporting.profit.consolidated.read',
+    'reporting.debts.consolidated.read',
+    'reporting.cash.consolidated.read',
+    // Back-office promotion catalogue: POS prices a cart with
+    // pos.promotion.evaluate instead.
+    'promotion.read',
+    'promotion.write',
+    'promotion.delete',
+    // Onboarding an organization or a branch.
+    'org.registration.submit',
+    'org.registration.approve',
+    'branch.registration.submit',
+    'branch.registration.approve',
+    // Platform surfaces: the generic CRUD admin and the dead-letter queue.
+    'admin.crud.manage',
+    'events.dead-letter.manage',
+    'crud.entity.read',
+    'crud.entity.create',
+    'crud.entity.update',
+    'crud.entity.delete',
+    // Issuing and revoking API keys — the credentials behind the partner roles.
+    'api-key.read',
+    'api-key.create',
+    'api-key.update',
+    'api-key.delete',
+    // Editing the permission model itself, and seeing/deleting users chain-wide.
+    'iam.user.read.all',
+    'iam.user.delete',
+    'iam.user.branches.write.all',
+    'iam.role.write',
+    'iam.role.delete',
+    'iam.role.permissions.write',
+  ]);
+
+  it('grants every seeded permission to at least one role', () => {
+    const granted = new Set([
+      ...SYSTEM_ADMIN_PERMISSION_KEYS,
+      ...GENERAL_MANAGER_PERMISSION_KEYS,
+      ...CURATED_ROLE_KEYS,
+    ]);
+    expect(seededKeys.filter((key) => !granted.has(key))).toEqual([]);
+  });
+
+  it('leaves no seeded permission out of every hand-written role by accident', () => {
+    const unreachable = seededKeys.filter(
+      (key) => !CURATED_ROLE_KEYS.has(key) && !OWNER_ONLY_KEYS.has(key),
+    );
+    expect(unreachable).toEqual([]);
+  });
+
+  // Keeps the allowlist from rotting: a key granted to a normal role later must
+  // not keep pretending to be owner-only, and a deleted permission must not
+  // linger here.
+  it('keeps OWNER_ONLY_KEYS honest', () => {
+    const grantedAnyway = [...OWNER_ONLY_KEYS].filter((key) =>
+      CURATED_ROLE_KEYS.has(key),
+    );
+    expect(grantedAnyway).toEqual([]);
+    const notSeeded = [...OWNER_ONLY_KEYS].filter(
+      (key) => !seededKeys.includes(key),
+    );
+    expect(notSeeded).toEqual([]);
   });
 });
 

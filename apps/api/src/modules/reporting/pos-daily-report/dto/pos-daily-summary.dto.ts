@@ -29,6 +29,17 @@ export class PosDailySummaryDto {
   @IsUUID()
   branchId?: string;
 
+  @ApiPropertyOptional({
+    description:
+      'Filter invoice-backed figures (revenue, goods, new debt) to ONE POS session (invoice.sessionId). ' +
+      'Used by the mobile shift report: a session belongs to a branch and every cashier sells on it, ' +
+      'so filtering by the opener drops other cashiers\' invoices. Debt payments and vouchers carry ' +
+      'no session link and stay on branch + issuedAt.',
+  })
+  @IsOptional()
+  @IsUUID()
+  sessionId?: string;
+
   @ApiPropertyOptional({ description: 'Filter by cashier (invoice.staffId).' })
   @IsOptional()
   @IsUUID()

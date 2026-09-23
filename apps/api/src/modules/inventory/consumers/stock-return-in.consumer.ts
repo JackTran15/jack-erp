@@ -23,7 +23,7 @@ export class StockReturnInConsumer {
   ) {}
 
   @OnDomainEvent(ERP_TOPICS.STOCK_RETURN_IN, {
-    groupId: 'erp-api.return.stock-return-in',
+    groupId: 'return.stock-return-in',
   })
   async handle(event: DomainEvent<StockReturnInPayload>): Promise<void> {
     const { returnInvoiceId, returnInvoiceCode, branchId, lines, organizationId, actorId } =

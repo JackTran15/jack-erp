@@ -1,3 +1,5 @@
+import type { PromotionProgramType } from "@erp/shared-interfaces";
+
 /**
  * Domain types for the "Đổi trả hàng" page (`/return-goods`). Rows come from
  * `GET /invoices` (hóa đơn đã thanh toán); the per-line returnable list is
@@ -38,6 +40,20 @@ export interface ReturnInvoiceRow {
 }
 
 /**
+ * Một CTKM mà hóa đơn gốc đã phân bổ cho dòng này (snapshot
+ * `invoice_checkout_promotions`), tính cho MỘT đơn vị. Chỉ để hiển thị nhãn
+ * trên dòng trả — tiền đã nằm trong `refundableUnitPrice`.
+ */
+export interface ReturnLinePromotion {
+  programId: string;
+  code: string;
+  name: string;
+  type: PromotionProgramType;
+  /** Số giảm cho 1 đơn vị (2 chữ số thập phân, BE tính). */
+  unitDiscount: number;
+}
+
+/**
  * Một dòng hàng có thể trả, dựng từ `EligibleReturnLine`. `id` =
  * `originalInvoiceItemId` (dùng làm key chọn + truy ngược dòng gốc).
  */
@@ -66,6 +82,8 @@ export interface ReturnableItem {
   refundableUnitPrice: number;
   /** "SL được trả" — max quantity still eligible to return (`maxReturnable`). */
   allowedQty: number;
+  /** CTKM hóa đơn gốc phân bổ cho dòng; `[]` khi không có snapshot. */
+  promotions: ReturnLinePromotion[];
 }
 
 /**
@@ -87,6 +105,8 @@ export interface EligibleReturnLine {
   soldQuantity: number;
   returnedQuantity: number;
   maxReturnable: number;
+  /** Vắng ở BE cũ → coi như `[]`. */
+  promotions?: ReturnLinePromotion[];
 }
 
 /**

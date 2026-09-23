@@ -123,7 +123,7 @@ describe('PromotionResolver', () => {
     const evaluation = resolver.resolve([program], cart);
 
     expect(evaluation.appliedPrograms).toHaveLength(0);
-    expect(evaluation.skippedPrograms).toContainEqual({ programId: program.id, name: program.name, reason: 'STOPPED' });
+    expect(evaluation.skippedPrograms).toContainEqual(expect.objectContaining({ programId: program.id, name: program.name, reason: 'STOPPED' }));
   });
 
   it('AC-04: Mon-Fri restriction skips a cart evaluated on Sunday', () => {
@@ -133,7 +133,7 @@ describe('PromotionResolver', () => {
 
     const evaluation = resolver.resolve([program], cart);
 
-    expect(evaluation.skippedPrograms).toContainEqual({ programId: program.id, name: program.name, reason: 'DAY_OF_WEEK' });
+    expect(evaluation.skippedPrograms).toContainEqual(expect.objectContaining({ programId: program.id, name: program.name, reason: 'DAY_OF_WEEK' }));
   });
 
   describe('AC-05: time-of-day window', () => {
@@ -143,7 +143,7 @@ describe('PromotionResolver', () => {
 
       const evaluation = resolver.resolve([program], cart);
 
-      expect(evaluation.skippedPrograms).toContainEqual({ programId: program.id, name: program.name, reason: 'TIME_OF_DAY' });
+      expect(evaluation.skippedPrograms).toContainEqual(expect.objectContaining({ programId: program.id, name: program.name, reason: 'TIME_OF_DAY' }));
     });
 
     it('an overnight 22:00-02:00 window applies at 01:00', () => {
@@ -188,7 +188,7 @@ describe('PromotionResolver', () => {
     const evaluation = resolver.resolve([program], cart);
 
     expect(evaluation.appliedPrograms).toHaveLength(0);
-    expect(evaluation.skippedPrograms).toContainEqual({ programId: program.id, name: program.name, reason: 'CONDITION_NOT_MET' });
+    expect(evaluation.skippedPrograms).toContainEqual(expect.objectContaining({ programId: program.id, name: program.name, reason: 'CONDITION_NOT_MET' }));
   });
 
   it('BR-001: two programs on the same SKU — lower priority (30%) wins, the other is RESOURCE_TAKEN', () => {
@@ -212,12 +212,14 @@ describe('PromotionResolver', () => {
     expect(evaluation.appliedPrograms).toHaveLength(1);
     expect(evaluation.appliedPrograms[0].programId).toBe(winner.id);
     expect(evaluation.appliedPrograms[0].discountAmount).toBe(30_000);
-    expect(evaluation.skippedPrograms).toContainEqual({
-      programId: loser.id,
-      name: loser.name,
-      reason: 'RESOURCE_TAKEN',
-      takenBy: winner.id,
-    });
+    expect(evaluation.skippedPrograms).toContainEqual(
+      expect.objectContaining({
+        programId: loser.id,
+        name: loser.name,
+        reason: 'RESOURCE_TAKEN',
+        takenBy: winner.id,
+      }),
+    );
   });
 
   it('BR-002: ITEM_DISCOUNT runs first; a NON_PROMO_ONLY INVOICE_DISCOUNT only discounts what is left', () => {
@@ -295,12 +297,14 @@ describe('PromotionResolver', () => {
 
     expect(evaluation.appliedPrograms).toHaveLength(1);
     expect(evaluation.appliedPrograms[0].programId).toBe(winner.id);
-    expect(evaluation.skippedPrograms).toContainEqual({
-      programId: loser.id,
-      name: loser.name,
-      reason: 'RESOURCE_TAKEN',
-      takenBy: winner.id,
-    });
+    expect(evaluation.skippedPrograms).toContainEqual(
+      expect.objectContaining({
+        programId: loser.id,
+        name: loser.name,
+        reason: 'RESOURCE_TAKEN',
+        takenBy: winner.id,
+      }),
+    );
   });
 
   it('a GIFT_ITEM and a BUY_M_GET_N program contend for the single gift slot', () => {
@@ -336,12 +340,14 @@ describe('PromotionResolver', () => {
 
     expect(evaluation.appliedPrograms).toHaveLength(1);
     expect(evaluation.appliedPrograms[0].programId).toBe(winner.id);
-    expect(evaluation.skippedPrograms).toContainEqual({
-      programId: loser.id,
-      name: loser.name,
-      reason: 'RESOURCE_TAKEN',
-      takenBy: winner.id,
-    });
+    expect(evaluation.skippedPrograms).toContainEqual(
+      expect.objectContaining({
+        programId: loser.id,
+        name: loser.name,
+        reason: 'RESOURCE_TAKEN',
+        takenBy: winner.id,
+      }),
+    );
   });
 
   describe('auto_apply', () => {
@@ -405,12 +411,14 @@ describe('PromotionResolver', () => {
       const evaluation = resolver.resolve([priorityLoser, priorityWinner], cart);
 
       expect(evaluation.appliedPrograms[0].programId).toBe(priorityWinner.id);
-      expect(evaluation.skippedPrograms).toContainEqual({
-        programId: priorityLoser.id,
-        name: priorityLoser.name,
-        reason: 'RESOURCE_TAKEN',
-        takenBy: priorityWinner.id,
-      });
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({
+          programId: priorityLoser.id,
+          name: priorityLoser.name,
+          reason: 'RESOURCE_TAKEN',
+          takenBy: priorityWinner.id,
+        }),
+      );
     });
 
     it('selecting the worse-priority program makes it win', () => {
@@ -422,12 +430,14 @@ describe('PromotionResolver', () => {
       expect(evaluation.appliedPrograms).toHaveLength(1);
       expect(evaluation.appliedPrograms[0].programId).toBe(priorityLoser.id);
       expect(evaluation.appliedPrograms[0].discountAmount).toBe(50_000);
-      expect(evaluation.skippedPrograms).toContainEqual({
-        programId: priorityWinner.id,
-        name: priorityWinner.name,
-        reason: 'RESOURCE_TAKEN',
-        takenBy: priorityLoser.id,
-      });
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({
+          programId: priorityWinner.id,
+          name: priorityWinner.name,
+          reason: 'RESOURCE_TAKEN',
+          takenBy: priorityLoser.id,
+        }),
+      );
     });
 
     it('selecting the program that already wins on priority changes nothing', () => {
@@ -614,11 +624,13 @@ describe('PromotionResolver', () => {
 
       expect(evaluation.appliedPrograms).toHaveLength(1);
       expect(evaluation.appliedPrograms[0].programId).toBe(otherProgram.id);
-      expect(evaluation.skippedPrograms).toContainEqual({
-        programId: excludedProgram.id,
-        name: excludedProgram.name,
-        reason: 'EXCLUDED_BY_CASHIER',
-      });
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({
+          programId: excludedProgram.id,
+          name: excludedProgram.name,
+          reason: 'EXCLUDED_BY_CASHIER',
+        }),
+      );
     });
 
     it('empty excludedProgramIds ⇒ unchanged behavior', () => {
@@ -656,11 +668,13 @@ describe('PromotionResolver', () => {
 
       expect(evaluation.appliedPrograms).toHaveLength(1);
       expect(evaluation.appliedPrograms[0].programId).toBe(priorityLoser.id);
-      expect(evaluation.skippedPrograms).toContainEqual({
-        programId: priorityWinner.id,
-        name: priorityWinner.name,
-        reason: 'EXCLUDED_BY_CASHIER',
-      });
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({
+          programId: priorityWinner.id,
+          name: priorityWinner.name,
+          reason: 'EXCLUDED_BY_CASHIER',
+        }),
+      );
       // Not RESOURCE_TAKEN — priorityWinner never entered the contest at all.
       expect(evaluation.skippedPrograms).not.toContainEqual(
         expect.objectContaining({ programId: priorityWinner.id, reason: 'RESOURCE_TAKEN' }),
@@ -691,11 +705,13 @@ describe('PromotionResolver', () => {
 
       expect(evaluation.appliedPrograms).toHaveLength(1);
       expect(evaluation.appliedPrograms[0].programId).toBe(priorityLoser.id);
-      expect(evaluation.skippedPrograms).toContainEqual({
-        programId: priorityWinner.id,
-        name: priorityWinner.name,
-        reason: 'EXCLUDED_BY_CASHIER',
-      });
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({
+          programId: priorityWinner.id,
+          name: priorityWinner.name,
+          reason: 'EXCLUDED_BY_CASHIER',
+        }),
+      );
     });
 
     it('an unknown id in excludedProgramIds is ignored, not thrown, and does not change the result', () => {

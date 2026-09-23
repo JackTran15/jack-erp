@@ -23,6 +23,7 @@ import {
   BRANCH_MANAGER_PERMISSION_KEYS,
   CASHIER_PERMISSION_KEYS,
   GENERAL_MANAGER_PERMISSION_KEYS,
+  PARTNER_ORDER_PERMISSION_KEYS,
   PARTNER_PERMISSION_KEYS,
   SALES_PERMISSION_KEYS,
   SEED_ROLE_NAMES,
@@ -46,6 +47,7 @@ const IDS = {
   roleCashier: '40000000-0000-4000-8000-000000000006',
   roleWarehouse: '40000000-0000-4000-8000-000000000007',
   rolePartner: '40000000-0000-4000-8000-000000000008',
+  rolePartnerOrder: '40000000-0000-4000-8000-000000000009',
   /** Legacy second admin role from earlier seeds — removed after merge. */
   legacyAdminRole: '40000000-0000-4000-8000-000000000002',
   storageMain: '50000000-0000-4000-8000-000000000001',
@@ -460,6 +462,21 @@ async function seedInventoryData() {
       false,
     );
     await assignPermissionsToRole(IDS.rolePartner, PARTNER_PERMISSION_KEYS);
+
+    // Separate from the role above on purpose: a key issued to place orders must
+    // not also be able to read the catalogue, which exposes the price list. A key
+    // may hold either role or both.
+    await upsertSeedRole(
+      IDS.rolePartnerOrder,
+      IDS.organization,
+      SEED_ROLE_NAMES.PARTNER_ORDER,
+      'Đối tác đặt hàng — chỉ tạo đơn qua API key, không đọc bảng giá',
+      false,
+    );
+    await assignPermissionsToRole(
+      IDS.rolePartnerOrder,
+      PARTNER_ORDER_PERMISSION_KEYS,
+    );
 
     await AppDataSource.query(
       `

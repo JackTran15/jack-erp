@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { QueryBus } from '@nestjs/cqrs';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import {
@@ -13,6 +14,12 @@ import {
   SessionStatus,
   WsEventType,
 } from '@erp/shared-interfaces';
+import type { EvaluateCartResponse } from '@erp/shared-interfaces';
+import { EvaluateCartQuery } from '../../promotion/application/queries/evaluate-cart.query';
+import {
+  EvaluateCartDto,
+  EvaluateCartLineInputDto,
+} from '../../promotion/application/dto/evaluate-cart.dto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
 import { WebSocketEmitterService } from '../../websocket/websocket-emitter.service';
@@ -59,15 +66,27 @@ import {
   refundableFactor,
   refundableUnitValues,
 } from './refundable-value.util';
+import { persistAppliedPromotions } from '../checkout-saga/infrastructure/applied-promotion-writer';
 
 interface ComputedTotals {
   /** Gross value of the returned lines. A gate and a display value, not a base. */
   returnSubtotal: number;
+  /** Gross value of the "Mua thêm" (OUT) lines — Σ lineTotal, into `invoice.subtotal`. */
   newSubtotal: number;
+  /** What the promotion engine took off the OUT lines (2026092102 ADR-01). */
+  newPromotionDiscount: number;
+  /** `newSubtotal − newPromotionDiscount`: what the customer owes for the OUT lines. */
+  newNet: number;
   /** What the customer actually paid for the returned lines — the money base. */
   returnedNet: number;
   netAmount: number;
   refundedAmount: number;
+}
+
+/** Ids the cashier ticked / un-ticked for the OUT lines — subset of `CheckoutReturnDto`. */
+interface ProgramSelection {
+  selectedProgramIds?: string[];
+  excludedProgramIds?: string[];
 }
 
 const RETURN_INVOICE_TYPES = new Set<InvoiceType>([
@@ -100,6 +119,7 @@ export class CheckoutReturnService {
     @InjectRepository(InvoiceDebtEntity)
     private readonly debtRepo: Repository<InvoiceDebtEntity>,
     private readonly dataSource: DataSource,
+    private readonly queryBus: QueryBus,
     private readonly numbering: DocumentNumberingService,
     private readonly wsEmitter: WebSocketEmitterService,
     private readonly customerCredit: CustomerCreditService,
@@ -119,11 +139,25 @@ export class CheckoutReturnService {
     private readonly membershipCardService: MembershipCardService,
   ) {}
 
-  async checkout(
+  /**
+   * Everything `checkout()` needs to know before it decides anything: the
+   * draft, its lines, the original invoice, the engine's verdict on the OUT
+   * lines and the totals. Shared with `preview()` so the dry-run and the post
+   * cannot disagree by construction.
+   */
+  private async prepare(
     id: string,
-    dto: CheckoutReturnDto,
+    ids: ProgramSelection,
     actor: ActorContext,
-  ): Promise<InvoiceEntity> {
+  ): Promise<{
+    invoice: InvoiceEntity;
+    items: InvoiceItemEntity[];
+    outItems: InvoiceItemEntity[];
+    originalInvoice: InvoiceEntity | null;
+    originalItems: InvoiceItemEntity[];
+    evaluation: EvaluateCartResponse | null;
+    totals: ComputedTotals;
+  }> {
     const invoice = await this.invoiceRepo.findOne({
       where: { id, organizationId: actor.organizationId },
     });
@@ -178,7 +212,59 @@ export class CheckoutReturnService {
       }
     }
 
-    const totals = this.computeTotals(items, originalInvoice, originalItems);
+    // Promotions on the "Mua thêm" (OUT) lines — same engine, same preflight
+    // posture as the sale saga's evaluate-promotion step (ADR-01): read outside
+    // the transaction, before any number depends on it. IN lines never go
+    // through the engine; they keep the original invoice's allocation.
+    const outItems = items.filter((it) => it.direction === ItemDirection.OUT);
+    const evaluation = outItems.length
+      ? await this.evaluateNewLines(invoice, outItems, ids, actor)
+      : null;
+
+    const totals = this.computeTotals(
+      items,
+      originalInvoice,
+      originalItems,
+      evaluation?.promotionDiscount ?? 0,
+    );
+    if (totals.newPromotionDiscount > 0 && evaluation) {
+      this.logger.log(
+        `Exchange ${id}: ${evaluation.appliedPrograms.length} programme(s) [${evaluation.appliedPrograms
+          .map((p) => p.code)
+          .join(', ')}] discount=${totals.newPromotionDiscount} newNet=${totals.newNet}`,
+      );
+    }
+
+    return { invoice, items, outItems, originalInvoice, originalItems, evaluation, totals };
+  }
+
+  /**
+   * Dry-run of `checkout()`: the first half of it — load, validate, original
+   * invoice, engine on the OUT lines, `computeTotals` — and nothing after.
+   * Writes nothing, mints no number, emits no event; the same draft and the
+   * same ids give the same numbers until a programme changes state between two
+   * calls (the same read-outside-transaction posture the post itself has).
+   *
+   * This is the ONLY number the POS uses to decide the money direction and the
+   * payment ceiling of an exchange (2026092102 ADR-03/05) — hence a method on
+   * this service rather than a re-computation anywhere else.
+   */
+  async preview(
+    id: string,
+    ids: ProgramSelection,
+    actor: ActorContext,
+  ): Promise<ComputedTotals> {
+    const { totals } = await this.prepare(id, ids, actor);
+    return totals;
+  }
+
+  async checkout(
+    id: string,
+    dto: CheckoutReturnDto,
+    actor: ActorContext,
+  ): Promise<InvoiceEntity> {
+    const { invoice, items, outItems, originalInvoice, originalItems, evaluation, totals } =
+      await this.prepare(id, dto, actor);
 
     // `refundMethod` no longer decides the fate of the whole refund — it names the
     // fund that pays out whatever is left AFTER the original invoice's debt has
@@ -338,12 +424,18 @@ export class CheckoutReturnService {
       invoice.refundedAmount = totals.refundedAmount;
       invoice.offsetAmount = offsetAmount;
       invoice.netAmount = totals.netAmount;
+      // Header discount = what the engine took off the OUT lines (A-07) — the
+      // same meaning a sale's header carries; the cashier's manual line
+      // discounts are already inside `lineTotal`. 0 when no programme applied,
+      // as create-exchange-invoice wrote it.
+      invoice.discountAmount = totals.newPromotionDiscount;
       // Loyalty earn is on the newly purchased (OUT) goods — a "Mua thêm" line is
       // a real sale and earns on its own value, independent of what was returned
       // (the return is reversed separately in fanOutEvents). RETURN/refund has no
-      // OUT lines, so newSubtotal = 0 and this earns nothing.
+      // OUT lines, so newNet = 0 and this earns nothing. `newNet`, not the gross
+      // `newSubtotal`: a sale earns on `amountDue`, after its promotion (A-02).
       invoice.pointsEarned = Math.floor(
-        totals.newSubtotal / POINT_EARN_VND_PER_POINT,
+        totals.newNet / POINT_EARN_VND_PER_POINT,
       );
       // Snapshot the points clawed back on the returned goods so receipts can show
       // "Điểm trừ" without querying point_history. Same base as the reverse event.
@@ -373,6 +465,18 @@ export class CheckoutReturnService {
             );
       if (dto.note) invoice.note = dto.note;
       const savedInvoice = await manager.save(invoice);
+
+      // What the engine decided for the OUT lines: per-line promotion_discount +
+      // the invoice_checkout_promotions snapshot, through the writer shared with
+      // the sale saga (ADR-02). Only `outItems` are handed over, so an allocation
+      // can never land on a returned line. `gifts[]` the engine may have offered
+      // are deliberately not turned into lines on an exchange (A-06).
+      await persistAppliedPromotions(manager, {
+        actor,
+        invoiceId: savedInvoice.id,
+        items: outItems,
+        appliedPrograms: evaluation?.appliedPrograms ?? [],
+      });
 
       // Atomic returned_quantity guard on each original SALE line referenced.
       const inLines = items.filter((it) => it.direction === ItemDirection.IN);
@@ -556,6 +660,36 @@ export class CheckoutReturnService {
   // ─── helpers ─────────────────────────────────────────────────────────────
 
   /**
+   * Dispatches `EvaluateCartQuery` on the OUT lines of an exchange, built the
+   * way `evaluate-promotion.step.ts` builds it for a sale: `lineId` is
+   * `invoice_items.id` so the engine's allocation maps back to the exact row,
+   * `manualLineDiscount` is the money the cashier already took off the line,
+   * and the cashier's selected/excluded ids come from the request. Only
+   * `promotion/application` is imported — the query and its DTO, no domain.
+   */
+  private async evaluateNewLines(
+    invoice: InvoiceEntity,
+    outItems: InvoiceItemEntity[],
+    ids: ProgramSelection,
+    actor: ActorContext,
+  ): Promise<EvaluateCartResponse> {
+    const dto = new EvaluateCartDto();
+    dto.customerId = invoice.customerId ?? undefined;
+    dto.selectedProgramIds = ids.selectedProgramIds;
+    dto.excludedProgramIds = ids.excludedProgramIds;
+    dto.lines = outItems.map((item) => {
+      const line = new EvaluateCartLineInputDto();
+      line.lineId = item.id;
+      line.itemId = item.itemId;
+      line.quantity = Number(item.quantity);
+      line.unitPrice = Number(item.unitPrice);
+      line.manualLineDiscount = Number(item.lineDiscount) || undefined;
+      return line;
+    });
+    return this.queryBus.execute(new EvaluateCartQuery(dto, actor));
+  }
+
+  /**
    * `returnSubtotal` stays GROSS, but only as a gate (`> 0`) and as the value
    * shown on `invoice.subtotal`. It is NOT a money base and no longer a loyalty
    * base either: `computeReverseBase` moved onto `returnedNet` so that money and
@@ -592,6 +726,7 @@ export class CheckoutReturnService {
     items: InvoiceItemEntity[],
     originalInvoice: InvoiceEntity | null = null,
     originalItems: InvoiceItemEntity[] = [],
+    newPromotionDiscount = 0,
   ): ComputedTotals {
     const round = (v: number) => Math.round(v * 100) / 100;
 
@@ -604,6 +739,10 @@ export class CheckoutReturnService {
     }
     returnSubtotal = round(returnSubtotal);
     newSubtotal = round(newSubtotal);
+    newPromotionDiscount = round(newPromotionDiscount);
+    // The OUT side of the money is net of the engine's discount, mirroring how a
+    // sale's `amountDue` is; `newSubtotal` itself stays gross for `invoice.subtotal`.
+    const newNet = round(newSubtotal - newPromotionDiscount);
 
     const returnedNet = this.computeReturnedNet(
       items,
@@ -612,9 +751,17 @@ export class CheckoutReturnService {
       returnSubtotal,
     );
 
-    const netAmount = round(newSubtotal - returnedNet);
-    const refundedAmount = round(Math.max(returnedNet - newSubtotal, 0));
-    return { returnSubtotal, newSubtotal, returnedNet, netAmount, refundedAmount };
+    const netAmount = round(newNet - returnedNet);
+    const refundedAmount = round(Math.max(returnedNet - newNet, 0));
+    return {
+      returnSubtotal,
+      newSubtotal,
+      newPromotionDiscount,
+      newNet,
+      returnedNet,
+      netAmount,
+      refundedAmount,
+    };
   }
 
   /**
@@ -1188,13 +1335,15 @@ export class CheckoutReturnService {
     // leaving the balance unchanged. Netting them into a single netAmount would
     // swallow the earn whenever net <= 0.
     if (invoice.customerId) {
-      // AWARD on the newly purchased (OUT) goods.
-      if (totals.newSubtotal > 0) {
+      // AWARD on the newly purchased (OUT) goods — on `newNet`, the same base
+      // `pointsEarned` was snapshotted from above, so the consumer's figure and
+      // the receipt's agree.
+      if (totals.newNet > 0) {
         await this.loyaltyPointsPublisher.publish(
           {
             invoiceId: invoice.id,
             customerId: invoice.customerId,
-            subtotal: totals.newSubtotal,
+            subtotal: totals.newNet,
             issuedAt: invoice.issuedAt,
             branchId,
           },

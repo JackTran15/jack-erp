@@ -56,7 +56,7 @@ export class StockReturnConsumer {
     private readonly itemCostSnapshotService: ItemCostSnapshotService,
   ) {}
 
-  @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, { groupId: 'erp-api.invoice.cancelled.stock-return' })
+  @OnDomainEvent(ERP_TOPICS.INVOICE_CANCELLED, { groupId: 'invoice.cancelled.stock-return' })
   async handle(event: DomainEvent<InvoiceCancelledPayload>): Promise<void> {
     const { invoiceId, branchId, items, organizationId, actorId } = event.payload;
 
