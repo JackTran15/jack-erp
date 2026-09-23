@@ -10,6 +10,7 @@ import {
   StockMovementType,
 } from '@erp/shared-interfaces';
 import { GoodsIssueService } from './goods-issue.service';
+import { EventPublisher } from '../../events/event-publisher.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 import { IssueReasonEntity } from '../issue-reason/issue-reason.entity';
@@ -25,6 +26,7 @@ describe('GoodsIssueService', () => {
   let branchRepo: Record<string, jest.Mock>;
   let dataSource: Record<string, any>;
   let ledgerService: Record<string, jest.Mock>;
+  let eventPublisher: { publish: jest.Mock };
   let transferOrderService: Record<string, jest.Mock>;
   let rbacService: Record<string, jest.Mock>;
 
@@ -73,6 +75,7 @@ describe('GoodsIssueService', () => {
       manager,
       _manager: manager,
     };
+    eventPublisher = { publish: jest.fn().mockResolvedValue(undefined) };
     ledgerService = {
       getInstantAverageCost: jest.fn(),
       recordBatchMovements: jest.fn().mockResolvedValue([{ id: 'ledger-1' }]),
@@ -93,6 +96,7 @@ describe('GoodsIssueService', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         GoodsIssueService,
+        { provide: EventPublisher, useValue: eventPublisher },
         { provide: getRepositoryToken(GoodsIssueEntity), useValue: giRepo },
         {
           provide: getRepositoryToken(IssueReasonEntity),
@@ -300,6 +304,53 @@ describe('GoodsIssueService', () => {
       );
 
       expect(giRepo.save).toHaveBeenCalled();
+    });
+  });
+
+  describe('post — GOODS_ISSUE_POSTED (notification feed)', () => {
+    const issue = () => ({
+      id: 'gi-9',
+      organizationId: actor.organizationId,
+      branchId: actor.branchId,
+      documentNumber: 'XK000009',
+      status: GoodsIssueStatus.DRAFT,
+      purpose: 'OTHER',
+      reason: 'Hàng hỏng',
+      lines: [
+        { id: 'line-1', itemId: 'item-1', locationId: 'loc-A', quantity: 2, unitPrice: '1000' },
+        { id: 'line-2', itemId: 'item-2', locationId: 'loc-A', quantity: 3, unitPrice: '500' },
+      ],
+    });
+
+    it('publishes one document-level event after commit, total from the posted prices', async () => {
+      giRepo.findOne.mockResolvedValue(issue());
+
+      await service.post('gi-9', actor);
+
+      expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+      const [topic, event, key] = eventPublisher.publish.mock.calls[0];
+      expect(topic).toBe('erp.inventory.goods_issue.posted');
+      expect(key).toBe('gi-9');
+      expect(event).toMatchObject({
+        eventType: 'GOODS_ISSUE_POSTED',
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        payload: {
+          issueId: 'gi-9',
+          documentNumber: 'XK000009',
+          purpose: 'OTHER',
+          totalAmount: 3500,
+          lineCount: 2,
+          postedBy: actor.userId,
+        },
+      });
+    });
+
+    it('a failed publish does not turn a committed post into an error', async () => {
+      giRepo.findOne.mockResolvedValue(issue());
+      eventPublisher.publish.mockRejectedValueOnce(new Error('kafka down'));
+
+      await expect(service.post('gi-9', actor)).resolves.toBeDefined();
     });
   });
 

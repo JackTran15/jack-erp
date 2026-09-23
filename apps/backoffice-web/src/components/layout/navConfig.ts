@@ -30,6 +30,7 @@ import type { ComponentType } from "react";
 import { satisfiesPermission } from "../../lib/permissions";
 import { REPORT_CATEGORY_METADATA } from "../../constants/reports/report-category.constant";
 import { STORE_TYPE } from "../../constants/store.constant";
+import { NOTIFICATION_TEST_TOOL_ENABLED } from "../../store/page-stores/notification-test/notification-test.constant";
 import { INVENTORY_NAV_ITEMS } from "../document/inventoryNavigation";
 
 export interface NavChild {
@@ -566,6 +567,12 @@ export const navConfig: NavModule[] = [
             permission: "api-key.read",
           },
           { to: "/settings/appearance", label: "Giao diện" },
+          // Công cụ TẠM để dò thông báo đẩy. Không khai `permission` — cửa của nó
+          // là mã mở khoá ở trang, và backend còn một công tắc riêng.
+          // Tắt: đổi NOTIFICATION_TEST_TOOL_ENABLED thành false rồi deploy lại.
+          ...(NOTIFICATION_TEST_TOOL_ENABLED
+            ? [{ to: "/settings/notification-test", label: "Development" }]
+            : []),
         ],
       },
     ],
