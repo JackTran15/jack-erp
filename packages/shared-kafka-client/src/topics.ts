@@ -35,6 +35,8 @@ export const ERP_TOPICS = {
   DEPOSIT_REFUND: 'erp.deposit.refund',
   JOURNAL_POST_RETURN: 'erp.journal.post.return',
   GOODS_RECEIPT_POSTED: 'erp.inventory.goods_receipt.posted',
+  /** A goods issue (phiếu xuất kho) was posted — document-level, one message per voucher. */
+  GOODS_ISSUE_POSTED: 'erp.inventory.goods_issue.posted',
   DEBT_OVERDUE: 'erp.debt.overdue',
   // Alert: a POS deposit auto-post landed on a doc_date whose period is locked (BR-LOCK-02).
   DEPOSIT_LOCKED_PERIOD_BLOCKED: 'erp.deposit.locked_period.blocked',

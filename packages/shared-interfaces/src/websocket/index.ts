@@ -12,6 +12,8 @@ export enum WsEventType {
   POS_INVOICE_CANCELLED = 'POS_INVOICE_CANCELLED',
   REPORT_JOB_COMPLETED = 'REPORT_JOB_COMPLETED',
   RECONCILIATION_COMPLETED = 'RECONCILIATION_COMPLETED',
+  /** A new in-app notification exists for the user (room `user:<id>`); refresh the badge. */
+  NOTIFICATION_CREATED = 'NOTIFICATION_CREATED',
 }
 
 export interface WsEvent<T = unknown> {

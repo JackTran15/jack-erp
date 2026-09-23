@@ -24,6 +24,7 @@ import { GoodsReceiptEntity } from '../inventory/goods-receipt/goods-receipt.ent
 import { InventoryLocationModule } from '../inventory/location/inventory-location.module';
 import { ProviderEntity } from '../inventory/location/provider.entity';
 import { SupplierGroupEntity } from '../inventory/location/supplier-group.entity';
+import { NotificationModule } from '../notification/notification.module';
 import { MobileActivityController } from './controllers/mobile-activity.controller';
 import { MobileAuthController } from './controllers/mobile-auth.controller';
 import { MobileBranchController } from './controllers/mobile-branch.controller';
@@ -44,6 +45,7 @@ import { MobileCashierController } from './controllers/mobile-cashier.controller
 import { MobileInvoiceController } from './controllers/mobile-invoice.controller';
 import { MobileItemController } from './controllers/mobile-item.controller';
 import { MobileManagerInvoiceController } from './controllers/mobile-manager-invoice.controller';
+import { MobileNotificationController } from './controllers/mobile-notification.controller';
 import { MobileProductController } from './controllers/mobile-product.controller';
 import { MobileProductRevenueController } from './controllers/mobile-product-revenue.controller';
 import { MobilePromotionController } from './controllers/mobile-promotion.controller';
@@ -163,6 +165,8 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     // sẵn. Import để uỷ quyền, không để viết lại.
     GoodsReceiptModule,
     GoodsIssueModule,
+    // Inbox / settings / device registry of the notification core.
+    NotificationModule,
     // `InventoryItemCrudService` (ghi hàng hoá, kèm ma trận biến thể / đơn vị
     // quy đổi / mã vạch / tồn đầu kỳ), `UnitOfMeasureCrudService` (đơn vị tính)
     // `ItemCategoryCrudService` (nhóm hàng) và `ProviderGroupCrudService`
@@ -205,6 +209,7 @@ import { MobileSupplierGroupService } from './services/mobile-supplier-group.ser
     MobileCustomerController,
     MobileCustomerGroupController,
     MobileManagerInvoiceController,
+    MobileNotificationController,
     MobileInventoryController,
     MobileRevenueReportController,
     MobileOverviewReportController,

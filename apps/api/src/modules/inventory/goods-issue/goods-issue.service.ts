@@ -11,6 +11,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Not, Repository } from 'typeorm';
 import {
   DocCounterpartyKind,
+  DomainEventType,
+  GoodsIssuePostedPayload,
   GoodsIssuePurpose,
   GoodsIssueReferenceType,
   GoodsIssueStatus,
@@ -20,6 +22,8 @@ import {
   PaginationQuery,
   VoucherPrintPayload,
 } from '@erp/shared-interfaces';
+import { ERP_TOPICS } from '@erp/shared-kafka-client';
+import { randomUUID } from 'crypto';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { StockLedgerService, RecordMovementParams } from '../ledger/stock-ledger.service';
 import { DocumentNumberingService } from '../../document-numbering/document-numbering.service';
@@ -34,6 +38,7 @@ import {
 import { mapGoodsIssueToVoucherPayload } from './goods-issue-print.mapper';
 import { TransferOrderService } from '../transfer-order/transfer-order.service';
 import { RbacService } from '../../rbac/rbac.service';
+import { EventPublisher } from '../../events/event-publisher.service';
 import { GoodsIssueEntity } from './goods-issue.entity';
 import { GoodsIssueLineEntity } from './goods-issue-line.entity';
 import { assertPurposePermission } from './assert-purpose-permission';
@@ -144,6 +149,7 @@ export class GoodsIssueService {
     @Inject(forwardRef(() => TransferOrderService))
     private readonly transferOrderService: TransferOrderService,
     private readonly rbac: RbacService,
+    private readonly eventPublisher: EventPublisher,
   ) {}
 
   async create(dto: CreateGoodsIssueDto, actor: ActorContext): Promise<GoodsIssueEntity> {
@@ -361,9 +367,63 @@ export class GoodsIssueService {
       return savedEntries;
     });
     await this.ledgerService.publishMovementEvents(entries);
+    await this.publishPosted({ gi, documentNumber, branchId, priceByLine, actor });
 
     this.logger.log(`Goods issue ${id} posted as ${documentNumber}`);
     return this.findOrFail(id, actor.organizationId, actor.branchId);
+  }
+
+  /**
+   * Document-level "phiếu xuất kho đã ghi sổ" event — after commit, like
+   * `GoodsReceiptService.post`. Consumed by the notification module (`stock_out`).
+   *
+   * Best-effort: the issue is already committed, so a Kafka hiccup here must not
+   * turn a successful post into a 500. The ledger movement events above remain the
+   * source of truth for stock; this one only feeds notifications.
+   */
+  private async publishPosted({
+    gi,
+    documentNumber,
+    branchId,
+    priceByLine,
+    actor,
+  }: {
+    gi: GoodsIssueEntity;
+    documentNumber: string;
+    branchId: string;
+    priceByLine: number[];
+    actor: ActorContext;
+  }): Promise<void> {
+    const payload: GoodsIssuePostedPayload = {
+      issueId: gi.id,
+      documentNumber,
+      purpose: gi.purpose,
+      reason: gi.reason,
+      targetBranchId: gi.targetBranchId,
+      totalAmount: gi.lines.reduce((sum, line, index) => sum + Number(line.quantity) * priceByLine[index], 0),
+      lineCount: gi.lines.length,
+      postedAt: new Date().toISOString(),
+      postedBy: actor.userId,
+    };
+    try {
+      await this.eventPublisher.publish(
+        ERP_TOPICS.GOODS_ISSUE_POSTED,
+        {
+          eventId: randomUUID(),
+          eventType: DomainEventType.GOODS_ISSUE_POSTED,
+          timestamp: new Date().toISOString(),
+          organizationId: gi.organizationId,
+          branchId,
+          correlationId: gi.id,
+          payload,
+        },
+        gi.id,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `GOODS_ISSUE_POSTED publish failed for ${gi.id}: ${err instanceof Error ? err.message : err}`,
+      );
+    }
   }
 
   // ─── Update (DRAFT or POSTED) ─────────────────────────────────────────────

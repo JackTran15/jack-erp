@@ -17,6 +17,7 @@ export enum DomainEventType {
   SALES_MANAGER_UNASSIGNED = 'SALES_MANAGER_UNASSIGNED',
   TEMP_WAREHOUSE_TRANSFER_REQUESTED = 'TEMP_WAREHOUSE_TRANSFER_REQUESTED',
   GOODS_RECEIPT_POSTED = 'GOODS_RECEIPT_POSTED',
+  GOODS_ISSUE_POSTED = 'GOODS_ISSUE_POSTED',
   CASH_VOUCHER_NEEDED = 'CASH_VOUCHER_NEEDED',
   CASH_VOUCHER_CREATED = 'CASH_VOUCHER_CREATED',
   RETURN_POSTED = 'RETURN_POSTED',
@@ -28,6 +29,22 @@ export enum DomainEventType {
   DEBT_OVERDUE = 'DEBT_OVERDUE',
   TEMP_WAREHOUSE_INVOICE_FULFILL_REQUESTED = 'TEMP_WAREHOUSE_INVOICE_FULFILL_REQUESTED',
   DEPOSIT_LOCKED_PERIOD_BLOCKED = 'DEPOSIT_LOCKED_PERIOD_BLOCKED',
+}
+
+/**
+ * Emitted after a goods issue (phiếu xuất kho) is posted and committed.
+ * Document-level — unlike `STOCK_MOVEMENT_POSTED`, which fires once per ledger line.
+ */
+export interface GoodsIssuePostedPayload {
+  issueId: string;
+  documentNumber: string;
+  purpose: string;
+  reason?: string;
+  targetBranchId?: string;
+  totalAmount: number;
+  lineCount: number;
+  postedAt: string;
+  postedBy: string;
 }
 
 /** Emitted when a credit invoice debt passes its due date and is marked overdue. */
