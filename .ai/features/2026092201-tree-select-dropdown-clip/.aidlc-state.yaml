@@ -1,0 +1,80 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: tree-select-dropdown-clip
+slug: 2026092201-tree-select-dropdown-clip
+profile: none
+created: 2026-09-22T13:09:54
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-22T13:24:09
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-22T13:24:09
+    by: Akenzy
+    evidence: 8 assumptions, none blocking-and-pending; 8 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-22T13:24:09
+    by: Akenzy
+    evidence: 2 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-22T13:24:09
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 2 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T13:24:18
+    by: Claude
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-22T15:07:25
+    by: Akenzy
+    reason: Bằng chứng AC-02 lộ lỗi thứ hai - API applySorting sắp createdAt không có tiebreaker nên picker phân trang bỏ/lặp dòng (thiếu CHI_CCDC); Akenzy chọn thêm T-01-03 vào plan này 22/09/2026
+  - gate: G3
+    action: passed
+    at: 2026-09-22T15:08:44
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 3 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-22T15:10:21
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T15:10:21
+    by: Claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T15:10:51
+    by: Claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket blocked
+    at: 2026-09-22T15:13:14
+    by: Claude
+    reason: Ô cuối chờ Akenzy - 07-verification.md không chạy được vì local-backoffice ghim  -3000 đang phục vụ checkout erp2; code và 3 ô còn lại đã xong (capture-evidence.py xanh AC-05, AC-06)
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-22T15:13:15
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-22T15:18:16
+    by: Claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-22T15:18:16
+    by: Claude
+    ticket: T-01-03
