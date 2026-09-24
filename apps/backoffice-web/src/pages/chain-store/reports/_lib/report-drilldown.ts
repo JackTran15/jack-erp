@@ -13,8 +13,10 @@ import {
   CASH_FUND_KIND_LABELS_VI,
   CASH_FUND_ROW_KEYS,
   CASH_FUND_UNCATEGORIZED,
+  REPORT_DOMAIN_PERMISSIONS,
   REPORT_ROW_BRANCH_ID,
   REPORT_ROW_INVOICE_ID,
+  type CashFundDocumentKind,
   type CashFundKind,
 } from "@erp/shared-interfaces";
 import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filters.constant";
@@ -27,11 +29,13 @@ import type {
   InvoiceDetailTarget,
   ReportDrillDown,
   ReportFilterValues,
+  VoucherDetailTarget,
 } from "../../../../store/page-stores/report/report.interface";
 import type { ReportRow } from "../_api/invoice-report.api";
 
 export type DrillDownAction =
   | { kind: "invoiceDetail"; target: InvoiceDetailTarget }
+  | { kind: "voucherDetail"; target: VoucherDetailTarget }
   | { kind: "report"; drillDown: ReportDrillDown };
 
 export interface DrillDownContext {
@@ -41,6 +45,11 @@ export interface DrillDownContext {
   raw: ReportRow[string] | undefined;
   row: ReportRow;
   filters: Partial<ReportFilterValues>;
+  /**
+   * Người dùng có quyền này không. Resolver mở phiếu/hóa đơn dùng nó để trả
+   * `null` khi thiếu quyền, nên ô rơi về text thay vì dẫn tới một 403.
+   */
+  can: (permission: string) => boolean;
 }
 
 /** `null` = this cell is not clickable in this state. */
@@ -70,6 +79,49 @@ const invoiceDetail: DrillDownResolver = ({ raw, row }) => {
     kind: "invoiceDetail",
     target: { code, id: text(row[REPORT_ROW_INVOICE_ID]) },
   };
+};
+
+/**
+ * Số hóa đơn của báo cáo Quỹ tiền (#3, #5) → "Chi tiết hóa đơn". Chỉ dòng gắn
+ * hóa đơn (phiếu INVOICE / REFUND) mang `_invoiceId`; thiếu quyền đọc hóa đơn
+ * thì ô là text (A-03). Hai resolver hóa đơn của báo cáo bán hàng không đi qua
+ * đây — người xem báo cáo bán hàng đã có quyền đó.
+ */
+const cashFundInvoiceDetail: DrillDownResolver = (ctx) => {
+  if (!ctx.can(REPORT_DOMAIN_PERMISSIONS.sales.floor)) return null;
+  if (!text(ctx.row[REPORT_ROW_INVOICE_ID])) return null;
+  return invoiceDetail(ctx);
+};
+
+/**
+ * Tham chiếu của #3: ô là "INVOICE <mã>" / "REFUND <mã>", nên mã lấy từ
+ * `invoiceNumber` của dòng chứ không tách từ chuỗi. Tham chiếu loại khác
+ * (MANUAL, FUND_SWAP, GOODS_RECEIPT…) không có `_invoiceId` ⇒ text.
+ */
+const cashFundInvoiceByReference: DrillDownResolver = (ctx) =>
+  cashFundInvoiceDetail({ ...ctx, raw: ctx.row["invoiceNumber"] });
+
+/** Quyền đọc chi tiết của từng loại phiếu — trùng `@RequirePermission` của GET `:id`. */
+const VOUCHER_READ_PERMISSION: Record<CashFundDocumentKind, string> = {
+  CASH_RECEIPT: "accounting.cash_receipt.read",
+  CASH_PAYMENT: "accounting.cash_payment.read",
+  BANK_RECEIPT: "accounting.bank_receipt.read",
+  BANK_PAYMENT: "accounting.bank_payment.read",
+};
+
+const isVoucherKind = (value: unknown): value is CashFundDocumentKind =>
+  typeof value === "string" && Object.hasOwn(VOUCHER_READ_PERMISSION, value);
+
+/**
+ * Số chứng từ của báo cáo Quỹ tiền → dialog xem phiếu của Sổ quỹ. Chỉ dòng chi
+ * tiết mang `voucherId`; dòng đầu kỳ / tổng / nhóm mục chi tự rơi về text.
+ */
+const voucherDetail: DrillDownResolver = ({ row, can }) => {
+  const id = text(row[CASH_FUND_ROW_KEYS.VOUCHER_ID]);
+  const kind = row[CASH_FUND_ROW_KEYS.VOUCHER_KIND];
+  if (!id || !isVoucherKind(kind)) return null;
+  if (!can(VOUCHER_READ_PERMISSION[kind])) return null;
+  return { kind: "voucherDetail", target: { id, kind } };
 };
 
 /**
@@ -436,7 +488,16 @@ const DRILL_DOWNS: Record<string, Record<string, DrillDownResolver>> = {
     cash: cashInOutListForClosing("cash"),
     deposit: cashInOutListForClosing("deposit"),
   },
+  "cash-in-out-list": {
+    documentNumber: voucherDetail,
+    invoiceNumber: cashFundInvoiceDetail,
+    reference: cashFundInvoiceByReference,
+  },
   "expenses-by-category": { categoryName: expenseListForCategory },
+  "expense-list-by-category": {
+    documentNumber: voucherDetail,
+    invoiceNumber: cashFundInvoiceDetail,
+  },
   "expenses-by-time": { bucket: expenseListForBucket },
 };
 

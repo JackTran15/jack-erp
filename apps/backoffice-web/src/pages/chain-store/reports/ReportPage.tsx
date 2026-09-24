@@ -17,6 +17,7 @@ import { ReportPageTable } from "./ReportPageTable/ReportPageTable";
 import { ReportColumnFilterSync } from "./ReportColumnFilterSync/ReportColumnFilterSync";
 import { ReportTableConfigSync } from "./ReportTableConfigSync/ReportTableConfigSync";
 import { ReportUrlSync } from "./ReportUrlSync/ReportUrlSync";
+import { ReportVoucherDetailDialog } from "./VoucherDetailDialog/ReportVoucherDetailDialog";
 import { STORE_TYPE } from "../../../constants/store.constant";
 
 interface Props {
@@ -92,6 +93,7 @@ export function ReportPage({ category, reportType }: Props) {
           <ReportPageTable />
         </div>
         <InvoiceDetailDialog />
+        <ReportVoucherDetailDialog />
         <ReportDrillDownMount />
       </TableStoreProvider>
     </ReportStoreProvider>

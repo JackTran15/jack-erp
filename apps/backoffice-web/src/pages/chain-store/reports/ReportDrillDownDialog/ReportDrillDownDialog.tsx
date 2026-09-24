@@ -14,6 +14,7 @@ import { ReportExportButtons } from "../ReportPageHeader/ReportPageToolbar/Repor
 import { ReportDrillDownMount } from "./ReportDrillDownMount";
 import { ReportPageTable } from "../ReportPageTable/ReportPageTable";
 import { ReportTableConfigSync } from "../ReportTableConfigSync/ReportTableConfigSync";
+import { ReportVoucherDetailDialog } from "../VoucherDetailDialog/ReportVoucherDetailDialog";
 
 interface Props {
   /** null = đóng. */
@@ -36,9 +37,10 @@ interface BodyProps {
  * - KHÔNG có `ReportPageHeader`. Dialog không cho đổi report type hay đổi filter
  *   — phạm vi của nó do dòng vừa được click quyết định.
  *
- * `InvoiceDetailDialog` được mount lại ở ĐÂY, bên trong provider lồng: cái mount
- * ở `ReportPage` đọc `detailInvoice` của store cha, nên nếu thiếu cái này thì
- * click mã hoá đơn trong dialog sẽ không làm gì cả.
+ * `InvoiceDetailDialog` và `ReportVoucherDetailDialog` được mount lại ở ĐÂY,
+ * bên trong provider lồng: cái mount ở `ReportPage` đọc `detailInvoice` /
+ * `detailVoucher` của store cha, nên nếu thiếu thì click mã hoá đơn hay số
+ * chứng từ trong dialog sẽ không làm gì cả.
  */
 function ReportDrillDownBody({ drillDown, onClose }: BodyProps) {
   return (
@@ -62,6 +64,7 @@ function ReportDrillDownBody({ drillDown, onClose }: BodyProps) {
         </Button>
       </div>
       <InvoiceDetailDialog />
+      <ReportVoucherDetailDialog />
       {/*
         Mount lại chính cái mount của drill-down, bên trong provider lồng: nhờ
         đó một ô trong dialog này mở được dialog kế tiếp (L1 → L2 → L3).

@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { CASH_FUND_ROW_KEYS, ReportRow } from '@erp/shared-interfaces';
+import { CASH_FUND_ROW_KEYS, REPORT_ROW_INVOICE_ID, ReportRow } from '@erp/shared-interfaces';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -35,6 +35,7 @@ interface Raw {
   branch_code: string | null;
   branch_name: string | null;
   invoice_number: string | null;
+  invoice_id: string | null;
 }
 
 function voucher(
@@ -63,6 +64,7 @@ function voucher(
     branch_code: 'CN-A',
     branch_name: 'Chi nhánh A',
     invoice_number: null,
+    invoice_id: null,
     ...extra,
   };
 }
@@ -306,6 +308,29 @@ describe('CashInOutListReport', () => {
       for (const k of kinds) expect(['Phiếu thu', 'Phiếu chi', 'Thu tiền gửi', 'Chi tiền gửi']).toContain(k);
     });
 
+    it('carries the invoice id for invoice-linked rows, REFUND included, and null otherwise (T-02-01)', async () => {
+      const rows = PERIOD_ROWS.map((r) =>
+        r.document_number === 'PT-02'
+          ? { ...r, invoice_id: 'inv-1' }
+          : r.document_number === 'PC-04'
+            ? { ...r, reference: 'REFUND HD0001', invoice_number: 'HD0001', invoice_id: 'inv-1' }
+            : r,
+      );
+      const { rows: out, totals } = await build(rows).buildData(dto(), actor);
+      const byNumber = Object.fromEntries(out.slice(1).map((r) => [r.documentNumber as string, r]));
+      expect(byNumber['PT-02']).toMatchObject({ invoiceNumber: 'HD0001', [REPORT_ROW_INVOICE_ID]: 'inv-1' });
+      expect(byNumber['PC-04']).toMatchObject({
+        reference: 'REFUND HD0001',
+        invoiceNumber: 'HD0001',
+        [REPORT_ROW_INVOICE_ID]: 'inv-1',
+      });
+      expect(byNumber['PC-01'][REPORT_ROW_INVOICE_ID]).toBeNull();
+      expect(out[0][REPORT_ROW_INVOICE_ID]).toBeUndefined();
+      // The key is hidden: money is untouched and it is not a catalogue column.
+      expect(totals).toMatchObject({ amountIn: 2670000, amountOut: 400000 });
+      expect((await build().buildColumns()).map((c) => c.col)).not.toContain(REPORT_ROW_INVOICE_ID);
+    });
+
     it('returns no footer for an empty period', async () => {
       const { rows, totals, total } = await build([], []).buildData(dto(), actor);
       expect(rows).toHaveLength(1);
@@ -340,7 +365,8 @@ describe('CashInOutListReport', () => {
       expect(page).toContain('LEFT JOIN branches b ON b.id::text = v.branch_id');
       expect(page).toContain('LEFT JOIN users su ON su.id::text = v.staff_id');
       expect(page).toContain('LEFT JOIN deposit_accounts da ON da.id = v.deposit_account_id');
-      expect(page).toContain("'INVOICE', 'INVOICE_DEBT', 'INVOICE_KEPT_CHANGE', 'RETURN_CANCEL'");
+      expect(page).toContain("'INVOICE', 'INVOICE_DEBT', 'INVOICE_KEPT_CHANGE', 'RETURN_CANCEL', 'REFUND'");
+      expect(page).toContain('inv.id AS invoice_id');
       expect(page).toContain("v.partner_type = 'EMPLOYEE' AND ep.user_id = v.partner_id");
       expect(page).toContain('COALESCE(v.partner_name, v.party_name) AS partner_name');
     });

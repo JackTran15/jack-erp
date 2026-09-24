@@ -1,0 +1,178 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: cash-report-voucher-detail
+slug: 2026092401-cash-report-voucher-detail
+profile: none
+created: 2026-09-24T14:12:00
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-24T14:17:23
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-24T14:17:23
+    by: Akenzy
+    evidence: 9 assumptions, none blocking-and-pending; 11 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T14:17:23
+    by: Akenzy
+    evidence: 3 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T14:17:23
+    by: Akenzy
+    evidence: graph valid - 2 UoW, 7 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T14:24:39
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T14:39:58
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T14:39:58
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T14:41:38
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T14:44:56
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T14:44:56
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-24T15:04:33
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-24T15:04:34
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T16:28:56
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T16:28:56
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T16:28:56
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-24T16:33:32
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T16:33:32
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T16:58:42
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T16:58:42
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T16:58:43
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T16:58:43
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-24T16:59:17
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-24T16:59:17
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-24T16:59:17
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T16:59:37
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T16:59:37
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T17:02:25
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-24T17:02:26
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T17:02:34
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-24T17:02:45
+    by: claude
+    reason: Flagged files are the uncommitted diffs of this feature's already-accepted tickets (T-01-02 dialog + mounts, T-02-02 e2e specs, T-02-03 report-drilldown.ts); nothing is committed yet so the working-tree diff includes them. This verify ticket changed only its own verify-*.py.
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T17:02:45
+    by: claude
+    reason: Flagged files are the uncommitted diffs of this feature's already-accepted tickets (T-01-02 dialog + mounts, T-02-02 e2e specs, T-02-03 report-drilldown.ts); nothing is committed yet so the working-tree diff includes them. This verify ticket changed only its own verify-*.py.
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-24T17:02:45
+    by: claude
+    reason: Flagged files are the uncommitted diffs of this feature's already-accepted tickets (T-01-02 dialog + mounts, T-02-02 e2e specs, T-02-03 report-drilldown.ts); nothing is committed yet so the working-tree diff includes them. This verify ticket changed only its own verify-*.py.
+    ticket: T-02-04
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T17:02:45
+    by: claude
+    reason: Flagged files are the uncommitted diffs of this feature's already-accepted tickets (T-01-02 dialog + mounts, T-02-02 e2e specs, T-02-03 report-drilldown.ts); nothing is committed yet so the working-tree diff includes them. This verify ticket changed only its own verify-*.py.
+    ticket: T-02-04

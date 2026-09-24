@@ -10,6 +10,7 @@ import {
   CashFundKind,
   ColumnFilter,
   InvoiceReportResult,
+  REPORT_ROW_INVOICE_ID,
   ReportColumnDataType,
   ReportColumnHeader,
   ReportFilterOption,
@@ -56,8 +57,17 @@ const PAYMENT_METHOD_OPTIONS: ReportFilterOption[] = (
   Object.keys(CASH_FUND_KIND_LABELS_VI) as CashFundKind[]
 ).map((kind) => ({ value: kind, label: CASH_FUND_KIND_LABELS_VI[kind] }));
 
-/** Reference types whose `reference_id` is an `invoices.id` (A-20). */
-const INVOICE_REFERENCE_TYPES = ['INVOICE', 'INVOICE_DEBT', 'INVOICE_KEPT_CHANGE', 'RETURN_CANCEL'];
+/**
+ * Reference types whose `reference_id` is an `invoices.id` (A-20). `REFUND` is the
+ * refund payment of a returned / cancelled invoice — its reference is the invoice too.
+ */
+const INVOICE_REFERENCE_TYPES = [
+  'INVOICE',
+  'INVOICE_DEBT',
+  'INVOICE_KEPT_CHANGE',
+  'RETURN_CANCEL',
+  'REFUND',
+];
 
 // The screen order. `document_number` before `id` so two vouchers on one day
 // read in numbering order; `id` last so the order is total and paging is stable.
@@ -110,6 +120,8 @@ interface RawRow {
   branch_code: string | null;
   branch_name: string | null;
   invoice_number: string | null;
+  /** `invoices.id` behind `invoice_number` — the drill-down's unambiguous key. */
+  invoice_id: string | null;
   /** Only selected by the export page query. */
   cursor_at?: string;
 }
@@ -380,6 +392,7 @@ export class CashInOutListReport implements ReportDefinition {
         CASE WHEN v.direction = 'in' THEN v.total_amount ELSE -v.total_amount END AS signed,
         CASE WHEN inv.code IS NOT NULL THEN v.reference_type || ' ' || inv.code ELSE v.reference_type END AS reference,
         inv.code AS invoice_number,
+        inv.id AS invoice_id,
         CASE WHEN da.id IS NULL THEN NULL ELSE da.name || ' · ' || da.account_no END AS deposit_account,
         NULLIF(btrim(COALESCE(su.first_name, '') || ' ' || COALESCE(su.last_name, '')), '') AS staff_name,
         COALESCE(c.code, sp.code, ep.code) AS partner_code,
@@ -535,6 +548,7 @@ export class CashInOutListReport implements ReportDefinition {
       branchCode: r.branch_code ?? null,
       branchName: r.branch_name ?? null,
       invoiceNumber: r.invoice_number ?? null,
+      [REPORT_ROW_INVOICE_ID]: r.invoice_id ?? null,
       [CASH_FUND_ROW_KEYS.ROW_KIND]: 'detail',
       [CASH_FUND_ROW_KEYS.VOUCHER_ID]: r.id,
       [CASH_FUND_ROW_KEYS.VOUCHER_KIND]: r.kind,
