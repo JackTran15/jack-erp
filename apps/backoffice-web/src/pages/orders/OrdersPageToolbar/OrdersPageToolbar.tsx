@@ -1,12 +1,30 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppModal, PageToolbar, Textarea, cn, type ToolbarItem } from "@erp/ui";
-import { AlertTriangle, ArrowLeftRight, Ban, Plus, RefreshCw, Undo2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Ban,
+  CheckCheck,
+  History,
+  Plus,
+  RefreshCw,
+  Undo2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { erpApi, requireErpData } from "../../../lib/erp-api";
 import { HttpError } from "../../../lib/http";
 import { ADMIN_SALES_ORDERS_KEY } from "../../../hooks/orders/use-admin-sales-orders";
-import { useBranchSalesOrders } from "../../../hooks/orders/use-branch-sales-orders";
+import type { StockCheckOrder } from "../../../hooks/orders/use-admin-sales-orders";
+import {
+  useBranchConfirmSalesOrders,
+  useBranchSalesOrders,
+  useBranchStockCheck,
+} from "../../../hooks/orders/use-branch-sales-orders";
+import {
+  ConfirmOrdersDialog,
+  type ConfirmOrderFailure,
+} from "../ConfirmOrdersDialog/ConfirmOrdersDialog";
 // Hộp huỷ đơn sống ở panel chi tiết vì panel là thứ DUY NHẤT cả ba màn cùng
 // dựng (T-07-02). Toolbar mượn lại chính nó cho lối huỷ theo MẺ của `/orders`
 // — một cài đặt, không phải hai.
@@ -20,6 +38,7 @@ import {
   useOrdersStore,
 } from "../../../store/page-stores/orders/orders.store";
 import { formatOrderMoney } from "../_lib/order-format";
+import { OrderHistoryModal } from "../OrderHistoryModal/OrderHistoryModal";
 import { OrdersReconcileDialog } from "./OrdersReconcileDialog/OrdersReconcileDialog";
 
 /** Tiền tố khoá cache của lưới đơn chi nhánh — xem `useBranchSalesOrders`. */
@@ -324,10 +343,19 @@ export function OrdersPageToolbar() {
   const pageSize = useOrdersStore((s) => s.pageSize);
   const reloadNonce = useOrdersStore((s) => s.reloadNonce);
   const checkedOrderIds = useOrdersStore((s) => s.checkedOrderIds);
+  const focusedOrderId = useOrdersStore((s) => s.focusedOrderId);
   const { reload, setCheckedOrderIds } = useOrdersActions();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [reconcileOpen, setReconcileOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmChecks, setConfirmChecks] = useState<StockCheckOrder[]>([]);
+  const [confirmedIds, setConfirmedIds] = useState<string[]>([]);
+  const [confirmFailures, setConfirmFailures] = useState<ConfirmOrderFailure[]>([]);
+  const stockCheck = useBranchStockCheck();
+  const confirmOrders = useBranchConfirmSalesOrders();
+  const confirmPending = stockCheck.isPending || confirmOrders.isPending;
 
   // Cùng tham số ⇒ CÙNG `queryKey` với `OrdersPage`, nên đây là một lượt đọc
   // cache, không phải một lượt gọi API thứ hai. Toolbar không nhận prop nào từ
@@ -342,14 +370,103 @@ export function OrdersPageToolbar() {
     reloadNonce,
   });
 
-  const selected: ReturnCandidate[] = (ordersQuery.data?.rows ?? [])
-    .filter((row) => checkedOrderIds.includes(row.id))
-    .map((row) => ({
+  // "Lịch sử" áp cho dòng đang XEM (focus), không phải các dòng tick (A-52).
+  const focusedRow =
+    (ordersQuery.data?.rows ?? []).find((row) => row.id === focusedOrderId) ??
+    null;
+
+  const checkedRows = (ordersQuery.data?.rows ?? []).filter((row) =>
+    checkedOrderIds.includes(row.id),
+  );
+  const selected: ReturnCandidate[] = checkedRows.map((row) => ({
       id: row.id,
       recipient: row.recipientName,
       amount: row.totalAmount,
       statusLabel: row.paymentStatus,
-    }));
+  }));
+
+  // Chỉ đơn web chưa duyệt mới gửi đi (ADR-12): đơn tư vấn viên không có bước
+  // duyệt (AC-48), đơn đã duyệt thì duyệt lại là no-op. Dòng khác trong mẻ tick
+  // bị bỏ qua chứ không chặn nút — tick lẫn là chuyện thường trên lưới hỗn hợp.
+  const confirmableIds = checkedRows
+    .filter((row) => row.needsConfirmation === true && !row.confirmedAt)
+    .map((row) => row.id);
+  const canConfirm = confirmableIds.length > 0 && !confirmPending;
+
+  const confirmTooltip = (): string => {
+    if (checkedRows.length === 0) return "Chọn ít nhất một đơn chờ duyệt";
+    if (confirmableIds.length === 0) {
+      return "Các đơn đang chọn không có đơn nào chờ duyệt";
+    }
+    const skipped = checkedRows.length - confirmableIds.length;
+    return skipped > 0
+      ? `Duyệt ${confirmableIds.length} đơn chờ duyệt (bỏ qua ${skipped} đơn không cần duyệt)`
+      : `Duyệt ${confirmableIds.length} đơn đã chọn`;
+  };
+
+  /**
+   * Duyệt từng id, gom kết quả. Đơn duyệt được thì bỏ tick; đơn hỏng GIỮ tick
+   * để người dùng thấy ngay đơn nào còn phải xử lý (AC-33).
+   */
+  const runConfirm = async (orderIds: string[]) => {
+    const result = await confirmOrders.mutateAsync(orderIds);
+    setConfirmedIds(result.confirmed);
+    setConfirmFailures(result.failed);
+    setCheckedOrderIds(
+      useOrdersStore
+        .getState()
+        .checkedOrderIds.filter((id) => !result.confirmed.includes(id)),
+    );
+
+    if (result.failed.length === 0) {
+      toast.success(`Đã duyệt ${result.confirmed.length} đơn.`);
+      setConfirmOpen(false);
+      return;
+    }
+    toast.error(
+      `Duyệt được ${result.confirmed.length}/${orderIds.length} đơn. ` +
+        `${result.failed.length} đơn không duyệt được.`,
+    );
+    // Lỗi phải nằm cạnh mã đơn — kể cả khi lượt này là duyệt thẳng không qua dialog.
+    setConfirmOpen(true);
+  };
+
+  /**
+   * Luồng "Duyệt đơn" (AC-30, AC-31): đối chiếu tồn TẠI chi nhánh này → đủ hết
+   * thì duyệt ngay; có đơn thiếu thì mở dialog để người dùng "Huỷ" hoặc "Vẫn
+   * duyệt" (AC-32).
+   */
+  const handleConfirmClick = async () => {
+    if (!canConfirm) return;
+    setConfirmedIds([]);
+    setConfirmFailures([]);
+
+    let checks: StockCheckOrder[];
+    try {
+      checks = await stockCheck.mutateAsync(confirmableIds);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Không đối chiếu được tồn kho.",
+      );
+      return;
+    }
+
+    // Server bỏ qua im lặng đơn không còn thuộc chi nhánh này (lưới đã cũ).
+    const dropped = confirmableIds.length - checks.length;
+    if (dropped > 0) {
+      toast.warning(
+        `${dropped} đơn đã chọn không còn thuộc chi nhánh này — bấm "Nạp" để tải lại.`,
+      );
+    }
+    if (checks.length === 0) return;
+
+    setConfirmChecks(checks);
+    if (checks.every((order) => order.sufficient)) {
+      await runConfirm(checks.map((order) => order.orderId));
+      return;
+    }
+    setConfirmOpen(true);
+  };
 
   // Chỉ đơn đang "Chờ xử lý" mới trả về được. Vô hiệu nút là TIỆN ÍCH: API vẫn
   // chặn bằng `ORDER_HAS_INVOICE` / `ORDER_NOT_DISPATCHABLE`, và phải vậy — lưới
@@ -412,6 +529,14 @@ export function OrdersPageToolbar() {
     },
     { id: "sep-1", type: "separator" },
     {
+      id: "confirm-orders",
+      label: "Duyệt đơn",
+      icon: CheckCheck,
+      onClick: () => void handleConfirmClick(),
+      disabled: !canConfirm,
+      tooltip: confirmTooltip(),
+    },
+    {
       id: "reconcile",
       label: "Đối soát",
       icon: ArrowLeftRight,
@@ -435,6 +560,14 @@ export function OrdersPageToolbar() {
       disabled: !canCancel,
       tooltip: cancelTooltip(),
     },
+    {
+      id: "history",
+      label: "Lịch sử",
+      icon: History,
+      onClick: () => setHistoryOpen(true),
+      disabled: !focusedRow,
+      tooltip: "Chọn một đơn để xem lịch sử",
+    },
     { id: "sep-2", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: reload },
   ];
@@ -456,6 +589,15 @@ export function OrdersPageToolbar() {
           )
         }
       />
+      <ConfirmOrdersDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        checks={confirmChecks}
+        confirmed={confirmedIds}
+        failures={confirmFailures}
+        pending={confirmOrders.isPending}
+        onConfirm={() => runConfirm(confirmChecks.map((order) => order.orderId))}
+      />
       <OrdersCancelDialog
         open={cancelOpen}
         onOpenChange={setCancelOpen}
@@ -465,6 +607,12 @@ export function OrdersPageToolbar() {
             checkedOrderIds.filter((id) => !cancelledIds.includes(id)),
           )
         }
+      />
+      <OrderHistoryModal
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        orderId={focusedRow?.id ?? null}
+        scope="branch"
       />
     </>
   );

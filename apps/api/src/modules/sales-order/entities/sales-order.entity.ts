@@ -174,6 +174,25 @@ export class SalesOrderEntity extends BaseEntity {
   @Column({ name: 'cancelled_at', type: 'timestamptz', nullable: true })
   cancelledAt: Date | null;
 
+  /**
+   * Nhãn "thiếu hàng" CHỐT lúc nhận đơn (ADR-10): true khi có ít nhất một dòng
+   * `quantity > chain_stock_at_intake`. Không tính lại lúc đọc; đơn cũ / mobile = false.
+   */
+  @Column({ name: 'stock_short', type: 'boolean', default: false })
+  stockShort: boolean;
+
+  /**
+   * "Đã duyệt" là CỘT, không phải giá trị `status` (ADR-08): duyệt không đổi
+   * luồng `DRAFT → SENT → …`, chỉ đánh dấu đơn đã được xác nhận. NULL = chưa duyệt.
+   * Mỗi lần duyệt cũng ghi một dòng `CONFIRM` vào `sales_order_dispatch_events`.
+   */
+  @Column({ name: 'confirmed_at', type: 'timestamptz', nullable: true })
+  confirmedAt: Date | null;
+
+  /** `users.id` của người duyệt; NULL khi chưa duyệt. */
+  @Column({ name: 'confirmed_by', type: 'uuid', nullable: true })
+  confirmedBy: string | null;
+
   @OneToMany(() => SalesOrderLineEntity, (line) => line.salesOrder, { cascade: ['insert'] })
   lines: SalesOrderLineEntity[];
 }

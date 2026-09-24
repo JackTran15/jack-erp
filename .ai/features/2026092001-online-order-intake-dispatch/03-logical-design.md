@@ -1,6 +1,6 @@
 ---
 feature: online-order-intake-dispatch
-adrs: 7
+adrs: 14
 ---
 
 # Logical design — Nhận đơn web qua API key, Admin phân thủ công về chi nhánh
@@ -135,6 +135,135 @@ SalesOrderService.cancel(id, reason):
 | `/orders/all` *(mới)* | Admin | toàn chuỗi + cột Chi nhánh | `pos.sales-order.read-all` |
 | `/orders` *(có sẵn)* | chi nhánh | `branch_id = actor.branchId` | `pos.sales-order.read` |
 
+### 7. Duyệt đơn ở chi nhánh (đợt 2 — US-09, đổi chỗ lần 2)
+
+Akenzy 2026-09-24: "điều phối thì không có duyệt đơn, duyệt đơn phải bên đơn hàng".
+Luồng mới:
+
+```
+pool ──dispatch (không cần duyệt)──▶ chi nhánh: Chờ duyệt ──confirm──▶ Đã duyệt ──approve() (thu ngân)──▶ PROCESSED
+  ▲                                        │
+  └──────── returnToPool (xoá duyệt) ──────┘
+```
+
+Tên trong code vẫn là **`confirm`** (không trùng `approve()` của thu ngân). Cột giữ
+nguyên như ADR-08: `confirmed_at`, `confirmed_by`; `status` giữ `SENT`.
+
+```
+POST /mobile/sales-orders/:id/confirm          BranchScopeGuard, quyền pos.sales-order.approve (A-46)
+POST /mobile/sales-orders/stock-check          { orderIds[] } — tồn TẠI actor.branchId (A-44)
+```
+
+- `confirm()`: `status = SENT AND branch_id = actor.branchId AND salesperson_id IS NULL`
+  (đơn web — A-43), khác đi là 409 `ORDER_NOT_CONFIRMABLE` (đơn chi nhánh khác: 403
+  `ORDER_NOT_HELD_BY_BRANCH`, như `returnToPool`). Duyệt lại là no-op.
+- `approve()` (thu ngân): đơn web có `confirmed_at IS NULL` → 409 `ORDER_NOT_CONFIRMED`,
+  trước khi đụng `PosSessionService` hay tạo nháp (A-42). Đơn tư vấn viên bỏ qua kiểm.
+- `dispatch()`: **bỏ** guard `ORDER_NOT_CONFIRMED` (A-41).
+- `returnToPool()`: **xoá** `confirmed_at/by` (A-45); lịch sử giữ dòng `CONFIRM` cũ.
+- Đường Admin `POST /admin/sales-orders/:id/confirm` **bị gỡ** — duyệt không còn là
+  việc cấp tổ chức.
+- Lịch sử: dòng `CONFIRM` từ nay mang `to_branch_id = branch đang giữ đơn`? — **Không**:
+  CHECK hiện tại đòi CONFIRM có from/to NULL; giữ nguyên, người duyệt và thời điểm đủ
+  để truy vết (chi nhánh suy từ `DISPATCH` ngay trước).
+
+UI: nút "Duyệt đơn" + `ConfirmOrdersDialog` chuyển từ `/orders/dispatch` sang `/orders`
+(lưới chi nhánh), cột trạng thái hiện "Chờ duyệt / Đã duyệt" **chỉ cho đơn web**.
+POS: đơn web chưa duyệt vẫn hiện, mang nhãn "Chờ duyệt"; xử lý thì báo lỗi (A-47).
+
+### 8. Đối chiếu tồn: một phép tính, ba chỗ dùng (US-09, US-10, US-11)
+
+```
+StockAvailabilityService.forItems(orgId, itemIds, branchId?)
+  → Map<itemId, available>       SUM(stock_balances.quantity)
+                                 WHERE organization_id = :org AND item_id = ANY(:ids)
+                                   [AND branch_id = :branch]
+```
+
+Không lọc `is_tracked`, số âm cộng nguyên (A-34). Không trừ đơn đang chờ (A-33).
+Dùng index có sẵn `IDX_stock_balances_org_branch_item`.
+
+| Chỗ dùng | Phạm vi | Khi nào |
+|---|---|---|
+| Nhận đơn đối tác (US-10) | toàn chuỗi | trong transaction `createFromPartner`, ghi snapshot |
+| Cảnh báo duyệt (US-09) | chi nhánh đang giữ đơn (A-44) | đọc sống trước khi confirm, qua `POST /mobile/sales-orders/stock-check` |
+| Validate (US-11) | chi nhánh đã chọn **của từng đơn** | đọc sống, không ghi gì |
+
+Hai chỗ đọc sống đi qua MỘT endpoint:
+
+```
+POST /admin/sales-orders/stock-check
+  { orders: [{ orderId, branchId? }] }       branchId vắng = toàn chuỗi
+→ { orders: [{ orderId, branchId, sufficient, shortLineCount,
+               lines: [{ itemCode, itemName, required, available, shortBy }] }] }
+```
+
+POST vì body là danh sách (một trang lưới tới 100 đơn), không phải vì nó ghi —
+nó không ghi gì, và nằm ngoài `IdempotencyInterceptor` là vô hại. Server trả
+đơn **đã xếp** đủ → thiếu (`shortLineCount` tăng dần, rồi theo mã đơn), dòng đủ
+trước dòng thiếu (A-39) — thứ tự là nghiệp vụ, không để hai dialog tự xếp mỗi
+nơi một kiểu.
+
+Snapshot lúc nhận đơn (A-35):
+
+```
+sales_orders.stock_short             boolean NOT NULL DEFAULT false
+sales_order_lines.chain_stock_at_intake  numeric NULL   -- NULL = đơn không qua kiểm (mobile, đơn cũ)
+```
+
+`stock_short = true` khi có ít nhất một dòng `quantity > chain_stock_at_intake`.
+Gộp các dòng trùng `itemCode` trước khi so. Response đối tác không đổi (A-36).
+
+### 9. Điều phối: tick đơn → dialog chọn chi nhánh từng đơn (US-11, lần 3)
+
+Akenzy 2026-09-24 (lần 3): không muốn cột chọn chi nhánh nằm sẵn trên lưới. Luồng:
+
+```
+Lưới Điều phối (chỉ ô tick) ──tick n đơn──▶ [Điều phối (n)] ──▶ DispatchOrdersDialog
+   | Mã đơn | Người nhận | Chi nhánh [▾ điền cả DS] |      footer: [Validate] [Lưu]
+```
+
+- Không đổi API ghi: mỗi dòng dialog gọi `POST /admin/sales-orders/:id/dispatch
+  { branchId }` với chi nhánh của chính dòng đó (ADR-11 giữ nguyên).
+- State `Record<orderId, branchId>` là state của **dialog**, sinh ra khi mở, mất khi
+  đóng. Danh sách đơn chụp lại lúc mở (như `DispatchBranchDialog` cũ) — invalidate sau
+  Lưu làm đơn rời lưới, nhưng dialog vẫn phải cầm được dòng để báo kết quả.
+- Ô đầu cột điền cho mọi dòng trong dialog (A-48); sửa riêng từng dòng được.
+- Validate mở `ValidateDispatchDialog` (có sẵn) với các dòng đã chọn chi nhánh.
+- Lưu: dòng chưa chọn bỏ qua; thành công → dòng hiện "Đã phân về …"; lỗi → dòng giữ
+  chi nhánh + lỗi tại dòng, dialog giữ mở (AC-45). Tất cả thành công → đóng + toast.
+- `BranchPickerColumn.tsx` và prop `extraColumn` của `OrdersPageTable` bị gỡ — lưới
+  Điều phối trở về DOM của lưới `/orders`.
+- Nhãn "Thiếu hàng" giữ trên lưới (đọc `stock_short`, AC-39).
+
+### 10. Lịch sử đơn — ghép lúc đọc, không ghi thêm (US-12)
+
+```
+GET /admin/sales-orders/:id/history     quyền dispatch HOẶC read-all, mọi đơn trong tổ chức
+GET /mobile/sales-orders/:id/history    BranchScopeGuard, quyền read; chỉ đơn branch_id = actor.branchId
+→ { orderId, orderCode, currentStatus, entries: [
+     { at, kind, actorName, branchName?, fromBranchName?, reason?, invoiceCode?, statusAfter } ] }
+kind ∈ RECEIVED | DISPATCHED | CONFIRMED | RETURNED | PROCESSED | REJECTED | CANCELLED
+```
+
+`SalesOrderHistoryService.timeline(orderId, actor)`:
+
+| Mốc | Nguồn | Lặp? |
+|---|---|---|
+| RECEIVED | `created_at`, `created_by` (đơn web: tên kênh `sales_channel`, A-54) | 1 |
+| DISPATCHED / RETURNED / CONFIRMED | `sales_order_dispatch_events` theo `created_at` | nhiều |
+| PROCESSED | `approved_at`, `approved_by`, `invoice_id` → mã hoá đơn | 1 |
+| REJECTED / CANCELLED | `rejected_at/by/reason`, `cancelled_at/by/reason` | 1 |
+
+Xếp theo `at`; mốc cùng thời điểm xếp theo thứ tự vòng đời. `statusAfter` tính khi đi
+qua dòng thời gian (Chờ phân → Chờ duyệt → Đã duyệt → Chờ phân … → Đã xử lý / Đã huỷ /
+Từ chối). Chi nhánh của CONFIRMED = `to_branch_id` của DISPATCHED gần nhất trước nó.
+Tên người: một câu `users` cho mọi id; tên chi nhánh: một câu `branches`.
+
+UI: `OrderHistoryModal` dùng chung; nút "Lịch sử" (lucide `History`) trên toolbar của
+`/orders/dispatch`, `/orders/all` (màn này chưa có toolbar — thêm), `/orders`; áp cho
+dòng đang chọn (`focusedOrderId`), khoá khi chưa chọn (A-52).
+
 ## Alternatives rejected
 
 | Option | Why not |
@@ -147,6 +276,12 @@ SalesOrderService.cancel(id, reason):
 | Chi nhánh "Kênh online" ảo làm phạm vi tính CTKM | Đẻ một branch không có kho, phải loại trừ khỏi mọi báo cáo tồn và doanh thu theo chi nhánh; và CTKM đã bị loại khỏi đợt này |
 | Phí GH lưu trên đơn, không lên hoá đơn | Akenzy bác 2026-09-20 (A-16). Đánh đổi đã ghi ở ADR-04 |
 | FK `sales_orders.ship_ward_code → geo_wards.code` | `geo_wards` mang `merged_from` cho đợt sáp nhập 2026; FK cứng vỡ ở đợt sáp nhập sau, và tên phường trên chứng từ cũ tự đổi theo dataset mới |
+| Duyệt = giá trị enum mới `APPROVED` trong `sales_order_status_enum` | Đơn đã phân rồi vẫn phải là `APPROVED` ⇒ `approve()` của thu ngân (`status !== SENT`), lưới chi nhánh, filter `sent` của app mobile và `transition()` đều phải học trạng thái mới; AC-10 ("status vẫn SENT") đổi nghĩa. Xem ADR-08 |
+| Nhãn thiếu hàng tính sống lúc đọc lưới | Mỗi dòng lưới một subquery `SUM(stock_balances)`; nhãn nhảy theo tồn khiến người điều phối không biết đơn "lúc vào" có thiếu không. Màn duyệt/Validate đã đọc sống cho việc quyết định (A-35) |
+| Cột chọn chi nhánh inline trên lưới Điều phối | Đã làm (T-10-01) rồi Akenzy bác 2026-09-24 (lần 3): người điều phối muốn chọn đơn trước, rồi mới quyết chi nhánh cho đúng các đơn đó (A-48) |
+| Ghi thêm sự kiện PROCESS / CANCEL / REJECT vào `sales_order_dispatch_events` cho lịch sử | Ba mốc đó xảy ra đúng một lần và đơn đã lưu người + giờ + lý do; ghi thêm là trùng dữ liệu, cần migration enum + CHECK, và đơn cũ vẫn không có — ghép lúc đọc cho đủ cả đơn cũ (ADR-14) |
+| Endpoint batch `POST /admin/sales-orders/dispatch { items[] }` | Một transaction cho cả mẻ ⇒ một đơn hỏng kéo cả mẻ, hoặc phải tự chế partial-success. Vòng lặp per-id đã có, đã có báo lỗi từng dòng, và mỗi call có idempotency key riêng |
+| Trừ SL các đơn đang chờ khỏi tồn | Akenzy bác 2026-09-24 (A-33); reservation ngoài phạm vi (intent) |
 | Thêm trạng thái giao hàng (Chờ giao → Đang giao → Chờ thu COD) | Akenzy chốt: đơn hỏng thì huỷ, huỷ tự rollback. Vòng đời giao hàng ngoài phạm vi |
 
 ## Contracts
@@ -179,7 +314,11 @@ GET  /admin/sales-orders                      → toàn chuỗi    (read-all)
 POST /admin/sales-orders/:id/dispatch  { branchId }
 POST /admin/sales-orders/:id/return    { reason }
 POST /admin/sales-orders/:id/cancel    { reason }
+POST /admin/sales-orders/stock-check  { orders[] }        (đợt 2, dispatch)
 ```
+
+Đợt 2 thêm vào view của đơn: `stockShort` (Admin), `confirmedAt` (chi nhánh + Admin); vào view dòng:
+`chainStockAtIntake`. Filter pool thêm `confirmed=true|false` (tuỳ chọn).
 
 ### Chi nhánh — không đổi surface
 
@@ -198,6 +337,8 @@ POST /admin/sales-orders/:id/cancel    { reason }
 | `ORDER_ALREADY_DISPATCHED` | 409 | `dispatch` trên đơn đã có `branch_id` | Admin |
 | `ORDER_HAS_INVOICE` | 409 | `return`/`dispatch` lại trên đơn đã phát hành hoá đơn | Admin, chi nhánh |
 | `ORDER_NOT_DISPATCHED` | 409 | `return` trên đơn KHÔNG có chi nhánh nào giữ (đang ở pool, hoặc thua cuộc đua đồng thời) — khác `ORDER_NOT_DISPATCHABLE`, vốn là `status ≠ SENT` | Admin, chi nhánh |
+| `ORDER_NOT_CONFIRMED` | 409 | *(đợt 2)* thu ngân `approve()` đơn web chưa duyệt (A-42) | chi nhánh |
+| `ORDER_NOT_CONFIRMABLE` | 409 | *(đợt 2)* `confirm` trên đơn không phải `SENT`, không có chi nhánh, hoặc là đơn tư vấn viên (A-43) | chi nhánh |
 | `ORDER_NOT_HELD_BY_BRANCH` | 403 | chi nhánh thao tác trên đơn không thuộc mình | chi nhánh |
 | `NO_OPEN_SESSION` | 409 | *(đã có)* `approve()` khi chi nhánh chưa mở ca | chi nhánh |
 | `INVOICE_NOT_CANCELLABLE` | 409 | *(đã có)* huỷ hoá đơn ngoài `CANCELLABLE_STATUSES`, hoặc đã có trả hàng tất toán | Admin |
@@ -294,4 +435,91 @@ tư vấn viên đang dựa vào đúng ràng buộc đó.
 **Consequences:** Hai controller đọc cùng một bảng với hai phạm vi — việc sửa
 hình dạng dữ liệu phải sửa hai nơi. Đổi lại: không có cách nào một lỗi phân
 quyền ở đường Admin làm rò đơn sang app tư vấn viên.
+**Status:** accepted
+
+### ADR-08 — "Đã duyệt" là cột `confirmed_at`, không phải trạng thái enum mới
+**Context:** Akenzy chọn "trạng thái mới APPROVED" (2026-09-24). Nhưng đơn sau
+khi duyệt còn đi tiếp: phân về chi nhánh, rồi thu ngân `approve()` ra hoá đơn.
+`approve()` guard `status !== SENT` (`sales-order.service.ts:1041`), bảng
+`transition()` (`:200`), lưới chi nhánh và app mobile đều lọc theo `SENT`. Một
+giá trị enum `APPROVED` sẽ phải chảy qua tất cả chỗ đó, hoặc bị đổi ngược về
+`SENT` lúc phân — tức là mất dấu "đã duyệt" đúng lúc cần nó.
+**Decision:** Akenzy chốt 2026-09-24: `sales_orders.confirmed_at` +
+`confirmed_by`. `status` không đổi. UI hiển thị "Chờ duyệt" / "Đã duyệt" từ
+`confirmed_at` — với người dùng, đó vẫn là một trạng thái.
+**Consequences:** Không đụng app mobile, luồng thu ngân, `transition()` hay enum
+trạng thái; AC-10 giữ nguyên. Cái giá: "trạng thái" hiển thị là dẫn xuất từ hai
+cột (`status` + `confirmed_at`), và ai lọc báo cáo theo `status` sẽ không thấy
+"Đã duyệt" ở đó.
+**Status:** accepted
+
+### ADR-09 — Một dịch vụ đối chiếu tồn, một endpoint đọc cho cả duyệt và Validate
+**Context:** Ba chỗ cần cùng một câu hỏi "món này còn bao nhiêu" — nhận đơn
+(toàn chuỗi), duyệt (toàn chuỗi), Validate (theo chi nhánh). Hai dialog còn cần
+cùng một thứ tự đủ → thiếu.
+**Decision:** `StockAvailabilityService` trong `sales-order/` đọc thẳng
+`stock_balances`; `POST /admin/sales-orders/stock-check` nhận `branchId` tuỳ
+chọn theo từng đơn và trả kết quả đã xếp.
+**Consequences:** Hai dialog chỉ vẽ, không tính. Một chỗ sai là sai cả ba —
+đó là chủ đích: ba con số lệch nhau còn tệ hơn.
+**Status:** accepted
+
+### ADR-10 — Nhãn thiếu hàng là snapshot ghi lúc nhận đơn
+**Context:** Task 2 nói "gán một nhãn" lúc tạo đơn. A-35.
+**Decision:** `createFromPartner` tính tồn toàn chuỗi trong cùng transaction,
+ghi `sales_order_lines.chain_stock_at_intake` và `sales_orders.stock_short`.
+Không job nào cập nhật lại.
+**Consequences:** Nhãn có thể "cũ" sau khi nhập hàng (AC-38) — màn duyệt đọc
+sống nên quyết định vẫn đúng. Đơn cũ và đơn mobile: `stock_short = false`,
+`chain_stock_at_intake = NULL`, không backfill.
+**Status:** accepted
+
+### ADR-11 — Chọn chi nhánh từng đơn không thêm API ghi
+**Context:** Frontend đã phân từng đơn một, mỗi đơn một request
+(`use-admin-sales-orders.ts:209`).
+**Decision:** Giữ `POST /admin/sales-orders/:id/dispatch`. `useDispatchSalesOrders`
+nhận `Array<{ orderId, branchId }>` thay vì `{ orderIds, branchId }`. Bỏ
+`DispatchBranchDialog`.
+**Consequences:** Không migration, không e2e backend mới cho phần ghi của US-11.
+Mẻ 100 đơn = 100 request tuần tự — chấp nhận được với lưu lượng điều phối tay.
+**Status:** accepted
+
+### ADR-12 — Duyệt đơn là việc của chi nhánh, trên controller chi nhánh
+**Context:** Akenzy 2026-09-24 (lần 2) chuyển duyệt khỏi màn Điều phối: đơn phân về
+chi nhánh trước, chi nhánh duyệt, thu ngân chỉ xử lý đơn đã duyệt (A-41, A-42).
+ADR-07 ghi `/mobile/sales-orders` "không sửa một dòng" — lý do là **không nới phạm
+vi** của controller đó sang cấp tổ chức.
+**Decision:** Thêm `POST /mobile/sales-orders/:id/confirm` và
+`POST /mobile/sales-orders/stock-check` vào controller chi nhánh, giữ nguyên
+`BranchScopeGuard`, quyền `pos.sales-order.approve` (A-46). Gỡ
+`POST /admin/sales-orders/:id/confirm`. Admin `stock-check` giữ cho Validate.
+Guard `ORDER_NOT_CONFIRMED` dời từ `dispatch()` sang `approve()`.
+**Consequences:** ADR-07 được nới đúng một nghĩa: thêm route **cùng phạm vi chi
+nhánh**, không thêm đường nhìn xuyên chi nhánh. `approve()` — đường tạo hoá đơn đã
+chạy production — có thêm một điều kiện chặn; chỉ áp cho đơn web
+(`salesperson_id IS NULL`), đơn tư vấn viên không đổi. Toàn bộ e2e đã sửa fixture ở
+T-09-04 ("duyệt trước khi phân") phải đổi lại thành "phân, rồi duyệt ở chi nhánh".
+**Status:** accepted
+
+### ADR-13 — Chọn chi nhánh từng đơn trong dialog, không trên lưới
+**Context:** T-10-01 đặt ô chọn chi nhánh vào cột đầu của lưới Điều phối (ghép chung
+cột tick vì `BaseDataTable` không nhận header là component). Akenzy 2026-09-24 (lần 3):
+"tick đơn xong rồi select từng item, bấm Điều phối mới phân chi nhánh".
+**Decision:** Lưới chỉ có ô tick. Nút "Điều phối (n)" mở `DispatchOrdersDialog` với
+đúng các đơn đã tick: một ô chọn mỗi dòng + một ô đầu cột điền cả danh sách, footer
+[Validate] [Lưu]. Gỡ `BranchPickerColumn` và prop `extraColumn` khỏi `OrdersPageTable`.
+**Consequences:** Hết vấn đề "cột chọn ghép vào cột tick" của T-10-01; lưới Điều phối
+dùng lại nguyên lưới `/orders`. Đổi lại: muốn phân khác nhau cho nhiều đơn phải mở
+dialog — nhưng đó đúng là thứ tự thao tác người điều phối yêu cầu. API không đổi.
+**Status:** accepted
+
+### ADR-14 — Lịch sử đơn ghép lúc đọc từ sự kiện điều phối + cột của đơn
+**Context:** US-12 cần đủ vòng đời. Bảng sự kiện chỉ có DISPATCH / RETURN / CONFIRM; các
+mốc xử lý, huỷ, từ chối đang nằm ở cột `*_at/*_by/*_reason` của `sales_orders`.
+**Decision:** Không ghi thêm. `SalesOrderHistoryService` ghép hai nguồn lúc đọc, qua hai
+route: Admin (`/admin/sales-orders/:id/history`) và chi nhánh
+(`/mobile/sales-orders/:id/history`, chỉ đơn chi nhánh đang giữ — A-53).
+**Consequences:** Không migration, đơn cũ có lịch sử ngay. Nếu sau này một mốc "một lần"
+thành lặp được (vd mở lại đơn đã huỷ) thì phải chuyển mốc đó sang bảng sự kiện. Controller
+chi nhánh thêm một route đọc — cùng phạm vi, như ADR-12.
 **Status:** accepted

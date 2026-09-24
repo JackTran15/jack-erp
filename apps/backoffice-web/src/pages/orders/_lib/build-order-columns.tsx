@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { AlertTriangle } from "lucide-react";
 import { Badge } from "@erp/ui";
+import { StatusBadge } from "../../../components/status/StatusBadge";
 import type { TableColumn } from "../../../components/table/BaseDataTable";
 import type { OrdersColumnPrefs } from "../../../store/page-stores/orders/orders.interface";
 import type { OrderRow } from "../_mock/orders.mock";
@@ -16,6 +18,25 @@ const ALIGN_CLASS: Record<NonNullable<OrderColumnDef["align"]>, string> = {
   center: "text-center",
 };
 
+/**
+ * Cờ `stockShort` chỉ có trên dòng dựng từ `GET /admin/sales-orders`
+ * (`SalesOrderRow`); dòng của lưới chi nhánh không mang nó nên không bao giờ
+ * có nhãn.
+ */
+function isStockShort(row: OrderRow): boolean {
+  return "stockShort" in row && row.stockShort === true;
+}
+
+/**
+ * Nhãn duyệt chỉ có nghĩa với đơn CẦN chi nhánh duyệt (A-41): chỉ dòng mang
+ * `needsConfirmation === true` mới có nhãn. Dòng pool của màn Điều phối không
+ * mang cờ này — đơn trong pool chưa ai duyệt được — nên không bao giờ có nhãn.
+ */
+function confirmationOf(row: OrderRow): "pending" | "confirmed" | null {
+  if (!("needsConfirmation" in row) || row.needsConfirmation !== true) return null;
+  return "confirmedAt" in row && row.confirmedAt ? "confirmed" : "pending";
+}
+
 function renderCell(column: OrderColumnDef, row: OrderRow): ReactNode {
   const value = row[column.key];
 
@@ -24,8 +45,34 @@ function renderCell(column: OrderColumnDef, row: OrderRow): ReactNode {
       return formatOrderDate(String(value ?? ""));
     case "money":
       return formatOrderMoney(typeof value === "number" ? value : 0);
-    case "statusLink":
-      return value ? <span className="text-info">{String(value)}</span> : null;
+    case "statusLink": {
+      const status = value ? (
+        <span className="text-info">{String(value)}</span>
+      ) : null;
+      const confirmation = confirmationOf(row);
+      const stockShort = isStockShort(row);
+      if (!stockShort && !confirmation) return status;
+      // Nhãn nằm NGAY TRÊN LƯỚI (AC-39), cạnh trạng thái đơn; `flex-wrap` để
+      // cột hẹp đẩy nhãn xuống dòng thay vì cắt mất nó.
+      return (
+        <div className="flex flex-wrap items-center gap-1">
+          {status}
+          {confirmation ? (
+            <StatusBadge
+              variant={confirmation === "confirmed" ? "success" : "neutral"}
+            >
+              {confirmation === "confirmed" ? "Đã duyệt" : "Chờ duyệt"}
+            </StatusBadge>
+          ) : null}
+          {stockShort ? (
+            <StatusBadge variant="warning" className="gap-1">
+              <AlertTriangle className="h-3 w-3" aria-hidden />
+              Thiếu hàng
+            </StatusBadge>
+          ) : null}
+        </div>
+      );
+    }
     case "invoiceLink":
       return value ? (
         <span className="text-primary-blue hover:underline">{String(value)}</span>

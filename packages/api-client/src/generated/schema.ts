@@ -8191,6 +8191,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Danh sách thông báo của người đang đăng nhập (mới nhất trước) */
+        get: operations["MobileNotificationController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Số thông báo chưa đọc (badge) */
+        get: operations["MobileNotificationController_unreadCount"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu tất cả đã đọc */
+        post: operations["MobileNotificationController_readAll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/notifications/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Thiết lập thông báo + các loại app này bật được */
+        get: operations["MobileNotificationController_getSettings"];
+        /** Lưu thiết lập thông báo */
+        put: operations["MobileNotificationController_saveSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/notifications/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Đăng ký / cập nhật FCM token của thiết bị (upsert theo installationId + app) */
+        put: operations["MobileNotificationController_registerDevice"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/notifications/devices/{installationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Huỷ đăng ký thiết bị (gọi lúc đăng xuất, trước /mobile/auth/logout) */
+        delete: operations["MobileNotificationController_unregisterDevice"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Đánh dấu một thông báo đã đọc */
+        post: operations["MobileNotificationController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/inventory/categories": {
         parameters: {
             query?: never;
@@ -8780,8 +8900,35 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Thu tiền hoá đơn nháp — phát hành số hoá đơn, ghi sổ quỹ / công nợ. */
+        /**
+         * Thu tiền hoá đơn nháp qua checkout saga v2 (T-03-02) — phát hành số hoá
+         *     đơn, ghi sổ quỹ / công nợ / kho / điểm, cùng đường với POS web.
+         *
+         *     `x-idempotency-key` đọc như `collectDebt`, nhưng vắng thì rơi về
+         *     `invoiceId` (không phải `randomUUID()`): khoá của saga phải ổn định qua
+         *     các lần gửi lại, nếu không một lượt thu mất phản hồi sẽ thu hai lần.
+         *
+         *     Trả: `{ invoiceId, invoiceCode, status, amountDue, totalPaid, remainder, salesOrderId }`
+         *     — giữ nguyên hình dạng thời v1 mà app đang đọc.
+         */
         post: operations["MobileCashierController_checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/cashier/drafts/{invoiceId}/checkout/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Xem trước số phải thu của hoá đơn nháp theo checkout saga */
+        post: operations["MobileCashierController_previewCheckout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -9367,6 +9514,26 @@ export interface paths {
         patch: operations["SalesOrderController_update"];
         trace?: never;
     };
+    "/mobile/sales-orders/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lịch sử xử lý — chỉ đơn chi nhánh đang thao tác giữ (A-53); đơn chi nhánh
+         *     khác → 403 `ORDER_NOT_HELD_BY_BRANCH`.
+         */
+        get: operations["SalesOrderController_historyOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/sales-orders/{id}/points": {
         parameters: {
             query?: never;
@@ -9388,6 +9555,48 @@ export interface paths {
          *     số dư không còn đủ.
          */
         patch: operations["SalesOrderController_setPoints"];
+        trace?: never;
+    };
+    "/mobile/sales-orders/stock-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đối chiếu tồn cho dialog duyệt ở chi nhánh (ADR-12, A-44): tồn TẠI chi nhánh
+         *     đang thao tác, và chỉ nhận đơn chi nhánh này đang giữ — đơn chi nhánh khác
+         *     bị bỏ qua im lặng, không lộ. Không ghi gì; POST vì body là danh sách.
+         */
+        post: operations["SalesOrderController_stockCheck"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/{id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Duyệt một đơn web chi nhánh đang giữ (ADR-12). Quyền dùng lại `approve`
+         *     (A-46); đơn chi nhánh khác → 403 `ORDER_NOT_HELD_BY_BRANCH` (AC-35).
+         *     Batch = client lặp từng id.
+         */
+        post: operations["SalesOrderController_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/mobile/sales-orders/{id}/approve": {
@@ -9458,6 +9667,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/sales-orders/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dòng thời gian xử lý của một đơn */
+        get: operations["AdminSalesOrderController_historyOf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/sales-orders/{id}/dispatch": {
         parameters: {
             query?: never;
@@ -9492,6 +9718,26 @@ export interface paths {
          * @description Đặt `branch_id = NULL` và ghi một dòng `RETURN` kèm lý do; trạng thái GIỮ NGUYÊN `SENT` — đơn vẫn chờ xử lý, chỉ là chưa ai giữ (A-05). `reason` bắt buộc.
          */
         post: operations["AdminSalesOrderController_returnToPool"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sales-orders/stock-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đối chiếu đủ/thiếu tồn cho nhiều đơn
+         * @description `branchId` vắng = tồn toàn chuỗi, có = tồn tại chi nhánh đó. Đơn trả về đã xếp đủ → thiếu (`shortLineCount` tăng dần, rồi mã đơn); trong đơn dòng đủ trước dòng thiếu. Đơn ngoài tổ chức bị bỏ qua, không báo lỗi. Tối đa 100 đơn.
+         */
+        post: operations["AdminSalesOrderController_stockCheck"];
         delete?: never;
         options?: never;
         head?: never;
@@ -15902,6 +16148,11 @@ export interface components {
             branchId?: string;
             /**
              * Format: uuid
+             * @description Filter invoice-backed figures (revenue, goods, new debt) to ONE POS session (invoice.sessionId). Used by the mobile shift report: a session belongs to a branch and every cashier sells on it, so filtering by the opener drops other cashiers' invoices. Debt payments and vouchers carry no session link and stay on branch + issuedAt.
+             */
+            sessionId?: string;
+            /**
+             * Format: uuid
              * @description Filter by cashier (invoice.staffId).
              */
             cashierId?: string;
@@ -15949,6 +16200,11 @@ export interface components {
              * @description Target branch id (defaults to actor branch).
              */
             branchId?: string;
+            /**
+             * Format: uuid
+             * @description Filter invoice-backed figures (revenue, goods, new debt) to ONE POS session (invoice.sessionId). Used by the mobile shift report: a session belongs to a branch and every cashier sells on it, so filtering by the opener drops other cashiers' invoices. Debt payments and vouchers carry no session link and stay on branch + issuedAt.
+             */
+            sessionId?: string;
             /**
              * Format: uuid
              * @description Filter by cashier (invoice.staffId).
@@ -17686,6 +17942,80 @@ export interface components {
             loyalty: components["schemas"]["MobileManagerInvoiceLoyaltyDto"] | null;
             lines: components["schemas"]["MobileManagerInvoiceLineDto"][];
         };
+        NotificationTargetDto: {
+            /** @enum {string} */
+            type: "invoice" | "stock_document" | "store" | "overview" | "inventory_store" | "product" | "notifications";
+            id?: string;
+            slug?: string;
+            branchId?: string;
+        };
+        NotificationItemDto: {
+            id: string;
+            /** @example invoice */
+            type: string;
+            createdAt: string;
+            isRead: boolean;
+            branchId?: string | null;
+            /**
+             * @description Raw template variables — clients format and render text
+             * @example {
+             *       "actor": "Nguyễn Văn A",
+             *       "code": "2609220001",
+             *       "amount": 1250000,
+             *       "store": "Cửa hàng Q1"
+             *     }
+             */
+            data: Record<string, never>;
+            target?: components["schemas"]["NotificationTargetDto"] | null;
+        };
+        NotificationPageDto: {
+            data: components["schemas"]["NotificationItemDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        UnreadCountDto: {
+            count: number;
+        };
+        ReadAllResultDto: {
+            updated: number;
+        };
+        NotificationSettingsDto: {
+            scopeBranchId?: string | null;
+            enabledTypes: string[];
+            /** @description Types this app can enable; others are "coming soon" */
+            availableTypes: string[];
+        };
+        SaveNotificationSettingsDto: {
+            /**
+             * Format: uuid
+             * @description null = whole chain
+             */
+            scopeBranchId?: string | null;
+            /**
+             * @example [
+             *       "invoice",
+             *       "invoice_cancel"
+             *     ]
+             */
+            enabledTypes: string[];
+        };
+        RegisterDeviceDto: {
+            /**
+             * Format: uuid
+             * @description UUID the app generates once per install
+             */
+            installationId: string;
+            /** @enum {string} */
+            app: "erp_manager" | "erp_sales";
+            /** @enum {string} */
+            platform: "ios" | "android";
+            fcmToken: string;
+            /** @enum {string} */
+            locale: "vi" | "en";
+            appVersion?: string;
+            environment?: string;
+        };
         MobileInventoryCategoryResponseDto: {
             /** Format: uuid */
             id: string;
@@ -18073,6 +18403,8 @@ export interface components {
             collected: components["schemas"]["MobileStoreCollectedDto"];
             /** @description Hoá đơn còn nợ của cửa hàng — KHÔNG theo kỳ, là trạng thái hiện tại */
             pendingUnpaidCount: number;
+            /** @description Đơn hàng tư vấn gửi lên đang CHỜ XỬ LÝ (`sales_orders.status = SENT`) — cũng không theo kỳ, cùng lý do `pendingUnpaidCount` */
+            pendingOrderCount: number;
             newCustomers: components["schemas"]["MobileStoreNewCustomersDto"];
             inventory: components["schemas"]["MobileStoreInventoryDto"];
         };
@@ -18167,7 +18499,10 @@ export interface components {
             unit: string;
             quantity: number;
             unitPrice: number;
-            /** @description Giảm dòng theo TIỀN (giảm tay + khuyến mại đã chốt) — cùng nghĩa với `lineDiscount` của POS. */
+            /**
+             * @description Giảm dòng theo TIỀN — CHỈ giảm tay. Khuyến mại do checkout saga tính lại lúc
+             *     thu (ADR-50); gộp KM vào đây thì saga trừ KM hai lần (A-87).
+             */
             lineDiscount?: number;
             lineDiscountReason?: string;
             note?: string;
@@ -18208,6 +18543,16 @@ export interface components {
             payments: components["schemas"]["MobilePaymentLineDto"][];
             salesChannel?: string;
             dueDate?: string;
+            /** @description Tiền thừa khách không lấy — không nằm trong `payments`, saga ghi thu nhập khác. */
+            keptChangeAmount?: number;
+            /** @description CTKM thu ngân bật thêm / ưu tiên — saga tự tính số tiền, không nhận từ app. */
+            selectedProgramIds?: string[];
+            /** @description CTKM thu ngân gỡ khỏi hoá đơn này; thắng `selectedProgramIds` khi trùng. */
+            excludedProgramIds?: string[];
+        };
+        MobileCheckoutPreviewDto: {
+            selectedProgramIds?: string[];
+            excludedProgramIds?: string[];
         };
         MobileDebtAllocationDto: {
             /** Format: uuid */
@@ -18238,6 +18583,11 @@ export interface components {
             quantity: number;
             unitPrice: number;
             lineDiscount?: number;
+            /**
+             * @description Lý do giảm giá TAY của dòng — `invoice_items.line_discount_reason`, cùng chỗ POS web ghi. App bắt buộc nhập khi có
+             *     `lineDiscount` (như `LineDiscountDialog` của web); thiếu trường này thì lý do rơi mất khi lưu phiếu.
+             */
+            lineDiscountReason?: string;
             /** @description Ghi chú của RIÊNG dòng này — `invoice_items.note`, cùng chỗ mà dòng giỏ bán ghi vào. */
             note?: string;
         };
@@ -18649,6 +18999,8 @@ export interface components {
             name: string;
             /** @description URL công khai ảnh đầu tiên của MẪU MÃ, `null` khi chưa có ảnh. Mọi biến thể dùng chung ảnh này nên nó không lặp lại ở từng phần tử `variants`. */
             thumbnailUrl?: string | null;
+            /** @description MỌI ảnh của mẫu mã theo thứ tự hiển thị — ảnh đầu trùng `thumbnailUrl`. Màn chi tiết của app bán hàng bày chúng thành carousel full-width như app quản lý. Rỗng khi chưa có ảnh HOẶC kho lưu trữ chưa cấu hình. `thumbnailUrl` giữ lại cho client cũ. */
+            images: components["schemas"]["MobileProductImageDto"][];
             attributes: components["schemas"]["MobileSalesModelAttributeDto"][];
             /** @description Chỉ các biến thể CÒN BÁN ĐƯỢC (`isActive` và `isPosVisible`) — cùng tập đã dựng nên dòng mẫu mã ở danh sách, nên hai màn không lệch nhau. */
             variants: components["schemas"]["MobileSalesVariantDto"][];
@@ -19064,6 +19416,35 @@ export interface components {
         OverviewSubjectListResponseDto: {
             rows: components["schemas"]["OverviewSubjectRowDto"][];
         };
+        /** @enum {string} */
+        SalesOrderHistoryKind: "RECEIVED" | "DISPATCHED" | "CONFIRMED" | "RETURNED" | "PROCESSED" | "REJECTED" | "CANCELLED";
+        SalesOrderHistoryEntryResponseDto: {
+            /**
+             * Format: date-time
+             * @description ISO 8601 (UTC)
+             */
+            at: string;
+            kind: components["schemas"]["SalesOrderHistoryKind"];
+            /** @description Tên người làm; với "Nhận đơn" của đơn web là tên kênh. `null` khi không tra được. */
+            actorName: string | null;
+            /** @description Chi nhánh liên quan tới mốc này */
+            branchName?: string;
+            /** @description Chỉ có ở "Phân đơn" khi phân lại từ chi nhánh khác */
+            fromBranchName?: string;
+            reason?: string;
+            /** @description Chỉ có ở "Thu ngân xử lý" */
+            invoiceCode?: string;
+            /** @description Trạng thái hiển thị sau mốc này (tiếng Việt) */
+            statusAfter: string;
+        };
+        SalesOrderHistoryResponseDto: {
+            /** Format: uuid */
+            orderId: string;
+            orderCode: string;
+            /** @enum {string} */
+            currentStatus: "DRAFT" | "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+            entries: components["schemas"]["SalesOrderHistoryEntryResponseDto"][];
+        };
         SalesOrderLineDto: {
             /** Format: uuid */
             itemId: string;
@@ -19100,11 +19481,49 @@ export interface components {
              */
             isDraft?: boolean;
             note?: string;
+            /**
+             * @description CTKM tư vấn bật thêm (ADR-52). Cùng validator với `CheckoutV2Dto` của saga,
+             *     vì đây chính là thứ sẽ được gửi sang saga lúc thu. Vắng = `[]`: `PATCH` thay
+             *     TRỌN đơn, như `pointsRedeemed`.
+             */
+            selectedProgramIds?: string[];
+            /** @description CTKM tư vấn gỡ khỏi đơn — thắng `selectedProgramIds` khi trùng (luật của engine). */
+            excludedProgramIds?: string[];
             lines: components["schemas"]["SalesOrderLineDto"][];
         };
         SalesOrderPointsDto: {
             /** @description `0` = bỏ dự kiến dùng điểm. */
             points: number;
+        };
+        BranchStockCheckRequestDto: {
+            orderIds: string[];
+        };
+        StockCheckLineResponseDto: {
+            /** Format: uuid */
+            itemId: string;
+            itemCode: string;
+            itemName: string;
+            /** @description Tổng SL cần của món trong đơn (dòng trùng món đã gộp) */
+            required: number;
+            /** @description Tồn thực tế trong phạm vi đối chiếu; có thể âm */
+            available: number;
+            /** @description `max(0, required - available)`; 0 = đủ */
+            shortBy: number;
+        };
+        StockCheckOrderResponseDto: {
+            /** Format: uuid */
+            orderId: string;
+            orderCode: string;
+            /** @description `null` = tồn toàn chuỗi */
+            branchId: string | null;
+            sufficient: boolean;
+            shortLineCount: number;
+            /** @description Dòng đủ trước dòng thiếu */
+            lines: components["schemas"]["StockCheckLineResponseDto"][];
+        };
+        StockCheckResponseDto: {
+            /** @description Đã xếp: `shortLineCount` tăng dần, rồi mã đơn (A-39). Đơn ngoài tổ chức bị bỏ qua. */
+            orders: components["schemas"]["StockCheckOrderResponseDto"][];
         };
         RejectSalesOrderDto: {
             /** @description Cùng ngưỡng 5 ký tự với `CancelInvoiceDto.reason`. */
@@ -19113,13 +19532,140 @@ export interface components {
         CancelSalesOrderDto: {
             reason?: string;
         };
+        AdminSalesOrderLineResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            itemId: string;
+            code: string;
+            name: string;
+            unit: string;
+            quantity: number;
+            unitPrice: number;
+            manualDiscount: number;
+            manualDiscountReason: string | null;
+            promotionDiscount: number;
+            promotionName: string | null;
+            note: string | null;
+            lineTotal: number;
+            thumbnailUrl: string | null;
+            /** @description Tồn toàn chuỗi của mặt hàng CHỤP lúc nhận đơn (ADR-10); `null` với đơn không qua đường đối tác hoặc đơn cũ. */
+            chainStockAtIntake: number | null;
+        };
+        OrgSalesOrderResponseDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** @enum {string} */
+            status: "DRAFT" | "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+            /** Format: date-time */
+            createdAt: string;
+            salespersonId: string | null;
+            salespersonName: string | null;
+            salesChannel: string;
+            customerId: string | null;
+            customerName: string | null;
+            customerPhone: string | null;
+            subtotal: number;
+            discount: number;
+            amountDue: number;
+            shippingFee: number;
+            recipientName: string | null;
+            recipientPhone: string | null;
+            shipProvinceName: string | null;
+            shipWardName: string | null;
+            shipAddressLine: string | null;
+            externalOrderId: string | null;
+            salesChannelId: string | null;
+            note: string | null;
+            rejectReason: string | null;
+            cancelReason: string | null;
+            pointsRedeemed: number;
+            selectedProgramIds: string[];
+            excludedProgramIds: string[];
+            invoiceId: string | null;
+            invoiceCode: string | null;
+            invoiceIsDraft: boolean | null;
+            /** @description Nhãn "Thiếu hàng": tồn toàn chuỗi lúc nhận đơn không đủ cho ít nhất một mặt hàng (ADR-10). Snapshot — không tính lại khi tồn đổi (A-35). */
+            stockShort: boolean;
+            /**
+             * Format: date-time
+             * @description Lúc chi nhánh duyệt đơn (ADR-12); `null` = "Chờ duyệt". Trả về pool xoá duyệt.
+             */
+            confirmedAt: string | null;
+            lines: components["schemas"]["AdminSalesOrderLineResponseDto"][];
+            /** @description `null` = đơn còn trong pool */
+            branchId: string | null;
+            branchName: string | null;
+        };
+        AdminSalesOrderListResponseDto: {
+            data: components["schemas"]["OrgSalesOrderResponseDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
         DispatchSalesOrderDto: {
             /** Format: uuid */
             branchId: string;
         };
+        AdminSalesOrderResponseDto: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** @enum {string} */
+            status: "DRAFT" | "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+            /** Format: date-time */
+            createdAt: string;
+            salespersonId: string | null;
+            salespersonName: string | null;
+            salesChannel: string;
+            customerId: string | null;
+            customerName: string | null;
+            customerPhone: string | null;
+            subtotal: number;
+            discount: number;
+            amountDue: number;
+            shippingFee: number;
+            recipientName: string | null;
+            recipientPhone: string | null;
+            shipProvinceName: string | null;
+            shipWardName: string | null;
+            shipAddressLine: string | null;
+            externalOrderId: string | null;
+            salesChannelId: string | null;
+            note: string | null;
+            rejectReason: string | null;
+            cancelReason: string | null;
+            pointsRedeemed: number;
+            selectedProgramIds: string[];
+            excludedProgramIds: string[];
+            invoiceId: string | null;
+            invoiceCode: string | null;
+            invoiceIsDraft: boolean | null;
+            /** @description Nhãn "Thiếu hàng": tồn toàn chuỗi lúc nhận đơn không đủ cho ít nhất một mặt hàng (ADR-10). Snapshot — không tính lại khi tồn đổi (A-35). */
+            stockShort: boolean;
+            /**
+             * Format: date-time
+             * @description Lúc chi nhánh duyệt đơn (ADR-12); `null` = "Chờ duyệt". Trả về pool xoá duyệt.
+             */
+            confirmedAt: string | null;
+            lines: components["schemas"]["AdminSalesOrderLineResponseDto"][];
+        };
         ReturnSalesOrderDto: {
             /** @description Vì sao chi nhánh trả đơn về pool */
             reason: string;
+        };
+        StockCheckOrderRequestDto: {
+            /** Format: uuid */
+            orderId: string;
+            /**
+             * Format: uuid
+             * @description Vắng = tồn toàn chuỗi
+             */
+            branchId?: string;
+        };
+        StockCheckDto: {
+            orders: components["schemas"]["StockCheckOrderRequestDto"][];
         };
         PartnerOrderCustomerDto: {
             /** @description Tên người đặt */
@@ -30220,7 +30766,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -33828,6 +34376,179 @@ export interface operations {
             };
         };
     };
+    MobileNotificationController_list: {
+        parameters: {
+            query?: {
+                app?: "erp_manager" | "erp_sales";
+                page?: number;
+                limit?: number;
+                unreadOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPageDto"];
+                };
+            };
+        };
+    };
+    MobileNotificationController_unreadCount: {
+        parameters: {
+            query?: {
+                app?: "erp_manager" | "erp_sales";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnreadCountDto"];
+                };
+            };
+        };
+    };
+    MobileNotificationController_readAll: {
+        parameters: {
+            query?: {
+                app?: "erp_manager" | "erp_sales";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadAllResultDto"];
+                };
+            };
+        };
+    };
+    MobileNotificationController_getSettings: {
+        parameters: {
+            query?: {
+                app?: "erp_manager" | "erp_sales";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSettingsDto"];
+                };
+            };
+        };
+    };
+    MobileNotificationController_saveSettings: {
+        parameters: {
+            query?: {
+                app?: "erp_manager" | "erp_sales";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveNotificationSettingsDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationSettingsDto"];
+                };
+            };
+        };
+    };
+    MobileNotificationController_registerDevice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterDeviceDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileNotificationController_unregisterDevice: {
+        parameters: {
+            query?: {
+                app?: "erp_manager" | "erp_sales";
+            };
+            header?: never;
+            path: {
+                installationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileNotificationController_markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     MobileInventoryController_listCategories: {
         parameters: {
             query?: never;
@@ -34771,6 +35492,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MobileCheckoutDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MobileCashierController_previewCheckout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invoiceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobileCheckoutPreviewDto"];
             };
         };
         responses: {
@@ -35816,8 +36560,28 @@ export interface operations {
                 page?: number;
                 limit?: number;
                 status?: "DRAFT" | "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+                /**
+                 * @description Chi nhánh cần xem, thay cho chi nhánh đang làm việc của người gọi.
+                 *
+                 *     App quản lý mở đơn của MỘT cửa hàng từ màn chi tiết cửa hàng, mà cửa hàng
+                 *     đó thường không phải cửa hàng đang chọn trên thanh điều hướng — tức không
+                 *     phải `X-Branch-Id`. Vắng khoá này thì rơi về chi nhánh của người gọi, đúng
+                 *     hành vi cũ của lưới POS.
+                 *
+                 *     **KHÔNG nới quyền:** `BranchScopeGuard` đọc `query.branchId` TRƯỚC header
+                 *     (`common/utils/branch-request.util.ts`) và vẫn đòi id đó nằm trong tập chi
+                 *     nhánh được phân công; gửi chi nhánh lạ vẫn là 403.
+                 */
+                branchId?: string;
                 from?: string;
                 to?: string;
+                /**
+                 * @description Hộp thư của thu ngân: đơn CHỜ thu ngân làm gì đó — `SENT` (chờ nhận) HOẶC
+                 *     `PROCESSED` mà hoá đơn còn NHÁP (đã nhận, chưa thu). Thiếu vế sau thì đơn
+                 *     rời hộp thư ngay khi *Nhận xử lý*, và rời giỏ trước khi thu là mất lối mở
+                 *     lại nháp (Loc báo 2026-09-22). Có nó thì [status] bị bỏ qua.
+                 */
+                awaitingCashier?: boolean;
             };
             header?: never;
             path?: never;
@@ -35923,6 +36687,27 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_historyOf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderHistoryResponseDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_setPoints: {
         parameters: {
             query?: never;
@@ -35937,6 +36722,50 @@ export interface operations {
                 "application/json": components["schemas"]["SalesOrderPointsDto"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+        };
+    };
+    SalesOrderController_stockCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BranchStockCheckRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockCheckResponseDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
@@ -36029,6 +36858,8 @@ export interface operations {
                 to?: string;
                 /** @description Chỉ lấy đơn chưa phân chi nhánh */
                 unassigned?: boolean;
+                /** @description Lọc theo trạng thái duyệt: true = Đã duyệt, false = Chờ duyệt */
+                confirmed?: boolean;
                 /** @description uuid chi nhánh, hoặc `UNASSIGNED` cho đơn chưa phân */
                 branchId?: string;
             };
@@ -36042,7 +36873,30 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["AdminSalesOrderListResponseDto"];
+                };
+            };
+        };
+    };
+    AdminSalesOrderController_historyOf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderHistoryResponseDto"];
+                };
             };
         };
     };
@@ -36061,6 +36915,14 @@ export interface operations {
             };
         };
         responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSalesOrderResponseDto"];
+                };
+            };
             /** @description `ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc `ORDER_ALREADY_DISPATCHED` (đơn đã có chi nhánh) */
             409: {
                 headers: {
@@ -36085,6 +36947,14 @@ export interface operations {
             };
         };
         responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminSalesOrderResponseDto"];
+                };
+            };
             /** @description `ORDER_NOT_HELD_BY_BRANCH` — đơn thuộc chi nhánh khác */
             403: {
                 headers: {
@@ -36098,6 +36968,29 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AdminSalesOrderController_stockCheck: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StockCheckDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockCheckResponseDto"];
+                };
             };
         };
     };

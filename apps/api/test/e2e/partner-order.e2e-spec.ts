@@ -38,6 +38,17 @@ const PRODUCT_ID = 'e2000000-0000-4000-8000-000000000001';
 const ITEM_ID = 'e3000000-0000-4000-8000-000000000001';
 const ITEM_CODE = 'PORD-0001';
 
+// T-08-03 (AC-36..AC-38): hai món riêng để tồn của chúng không lẫn với các
+// đơn của những test khác, và một kho + vị trí ở MỖI chi nhánh.
+const SKU500_ID = 'e3000000-0000-4000-8000-000000000500';
+const SKU500_CODE = 'SKU-500';
+const SKU900_ID = 'e3000000-0000-4000-8000-000000000900';
+const SKU900_CODE = 'SKU-900';
+const STORAGE_A_ID = 'e4000000-0000-4000-8000-00000000000a';
+const STORAGE_B_ID = 'e4000000-0000-4000-8000-00000000000b';
+const LOCATION_A_ID = 'e5000000-0000-4000-8000-00000000000a';
+const LOCATION_B_ID = 'e5000000-0000-4000-8000-00000000000b';
+
 const WHITELISTED_IP = '203.0.113.7';
 
 const DATASET_DIR = path.resolve(__dirname, '../../src/database/migrations/data/geo-2026');
@@ -326,5 +337,140 @@ describe('Partner order intake — /v2/partner/orders (E2E)', () => {
       .set('X-Branch-Id', SECOND_BRANCH_ID)
       .expect(200);
     expect(inBranch2.body.data).toEqual([]);
+  });
+
+  /**
+   * Nhãn "Thiếu hàng" lúc nhận đơn (T-08-03): tồn toàn chuỗi, snapshot, không
+   * lộ ra cho đối tác. Tồn gieo thẳng vào `stock_balances`.
+   */
+  describe('snapshot thiếu hàng (AC-36..AC-38)', () => {
+    const stockPayload = (externalOrderId: string, lines: Array<{ itemCode: string; quantity: number }>) => ({
+      ...orderPayload(externalOrderId),
+      lines,
+    });
+
+    const orderRow = async (id: string) => {
+      const [row] = await app.get(DataSource).query('SELECT stock_short FROM sales_orders WHERE id = $1', [id]);
+      return row;
+    };
+    const lineRows = async (id: string) =>
+      (
+        await app
+          .get(DataSource)
+          .query('SELECT item_code, chain_stock_at_intake FROM sales_order_lines WHERE sales_order_id = $1 ORDER BY line_no', [id])
+      ).map((r: { item_code: string; chain_stock_at_intake: string | null }) => [
+        r.item_code,
+        r.chain_stock_at_intake === null ? null : Number(r.chain_stock_at_intake),
+      ]);
+
+    let sufficientBody!: Record<string, any>;
+    let shortOrderId!: string;
+
+    beforeAll(async () => {
+      const ds = app.get(DataSource);
+      for (const [id, code, name, price] of [
+        [SKU500_ID, SKU500_CODE, 'Ghế gỗ', 500000],
+        [SKU900_ID, SKU900_CODE, 'Bàn đá', 900000],
+      ] as const) {
+        await ds.query(
+          `INSERT INTO items
+             (id, organization_id, created_by, code, name, unit, is_active,
+              selling_price, purchase_price, product_id, category_id, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, 'pcs', true, $6, 1, $7::uuid, $8::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [id, SEEDED_ORG_ID, SEEDED_USER_ID, code, name, price, PRODUCT_ID, CATEGORY_ID],
+        );
+      }
+      for (const [storageId, locationId, branchId, code] of [
+        [STORAGE_A_ID, LOCATION_A_ID, seed.branchId, 'CN-A'],
+        [STORAGE_B_ID, LOCATION_B_ID, SECOND_BRANCH_ID, 'CN-B'],
+      ]) {
+        await ds.query(
+          `INSERT INTO storages (id, organization_id, branch_id, name, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [storageId, SEEDED_ORG_ID, branchId, `Kho ${code}`, SEEDED_USER_ID],
+        );
+        await ds.query(
+          `INSERT INTO locations (id, organization_id, branch_id, storage_id, code, name, type, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3, $4::uuid, $5, $5, 'SHELF', $6::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [locationId, SEEDED_ORG_ID, branchId, storageId, `${code}-01`, SEEDED_USER_ID],
+        );
+      }
+      // SKU-500: 1 ở CN-A + 1 ở CN-B (toàn chuỗi = 2). SKU-900: không dòng nào (= 0).
+      for (const [branchId, locationId] of [
+        [seed.branchId, LOCATION_A_ID],
+        [SECOND_BRANCH_ID, LOCATION_B_ID],
+      ]) {
+        await ds.query(
+          `INSERT INTO stock_balances (id, organization_id, branch_id, item_id, location_id, quantity, created_by, created_at, updated_at)
+           VALUES (gen_random_uuid(), $1, $2, $3, $4, 1, $5, NOW(), NOW())`,
+          [SEEDED_ORG_ID, branchId, SKU500_ID, locationId, SEEDED_USER_ID],
+        );
+      }
+    });
+
+    it('AC-36: 1 ở CN-A + 1 ở CN-B, đặt ×2 → không nhãn, dòng ghi tồn chuỗi = 2', async () => {
+      const res = await postOrder(orderKey, stockPayload('AC36-ENOUGH', [{ itemCode: SKU500_CODE, quantity: 2 }])).expect(201);
+      sufficientBody = res.body;
+
+      expect((await orderRow(res.body.id)).stock_short).toBe(false);
+      expect(await lineRows(res.body.id)).toEqual([[SKU500_CODE, 2]]);
+    });
+
+    it('AC-37: thiếu hàng vẫn 201, body cùng hình dạng đơn đủ; DB mang nhãn và tồn từng dòng', async () => {
+      const res = await postOrder(
+        orderKey,
+        stockPayload('AC37-SHORT', [
+          { itemCode: SKU500_CODE, quantity: 3 },
+          { itemCode: SKU900_CODE, quantity: 1 },
+        ]),
+      ).expect(201);
+      shortOrderId = res.body.id;
+
+      // A-36: đối tác không thấy gì khác — cùng bộ khoá ở đơn và ở dòng.
+      expect(Object.keys(res.body).sort()).toEqual(Object.keys(sufficientBody).sort());
+      for (const line of res.body.lines) {
+        expect(Object.keys(line).sort()).toEqual(Object.keys(sufficientBody.lines[0]).sort());
+      }
+
+      expect((await orderRow(shortOrderId)).stock_short).toBe(true);
+      // SKU-500 cần 3 có 2; SKU-900 cần 1 có 0.
+      expect(await lineRows(shortOrderId)).toEqual([
+        [SKU500_CODE, 2],
+        [SKU900_CODE, 0],
+      ]);
+    });
+
+    it('AC-38: nhập thêm 10 SKU-500 và 10 SKU-900 vào CN-A → nhãn và tồn đã ghi giữ nguyên, kể cả khi gửi lại', async () => {
+      const ds = app.get(DataSource);
+      await ds.query(
+        `UPDATE stock_balances SET quantity = quantity + 10 WHERE item_id = $1 AND location_id = $2`,
+        [SKU500_ID, LOCATION_A_ID],
+      );
+      await ds.query(
+        `INSERT INTO stock_balances (id, organization_id, branch_id, item_id, location_id, quantity, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 10, $5, NOW(), NOW())`,
+        [SEEDED_ORG_ID, seed.branchId, SKU900_ID, LOCATION_A_ID, SEEDED_USER_ID],
+      );
+
+      expect((await orderRow(shortOrderId)).stock_short).toBe(true);
+      expect(await lineRows(shortOrderId)).toEqual([
+        [SKU500_CODE, 2],
+        [SKU900_CODE, 0],
+      ]);
+
+      // Gửi lại cùng externalOrderId: trả đơn cũ, KHÔNG tính lại theo tồn mới.
+      const replay = await postOrder(
+        orderKey,
+        stockPayload('AC37-SHORT', [
+          { itemCode: SKU500_CODE, quantity: 3 },
+          { itemCode: SKU900_CODE, quantity: 1 },
+        ]),
+      ).expect(200);
+      expect(replay.body.id).toBe(shortOrderId);
+      expect((await orderRow(shortOrderId)).stock_short).toBe(true);
+    });
   });
 });

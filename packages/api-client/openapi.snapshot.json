@@ -17760,7 +17760,14 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -23774,6 +23781,310 @@
         ]
       }
     },
+    "/mobile/notifications": {
+      "get": {
+        "operationId": "MobileNotificationController_list",
+        "parameters": [
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "erp_manager",
+              "type": "string",
+              "enum": [
+                "erp_manager",
+                "erp_sales"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20,
+              "type": "number"
+            }
+          },
+          {
+            "name": "unreadOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationPageDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Danh sách thông báo của người đang đăng nhập (mới nhất trước)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/notifications/unread-count": {
+      "get": {
+        "operationId": "MobileNotificationController_unreadCount",
+        "parameters": [
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "erp_manager",
+              "type": "string",
+              "enum": [
+                "erp_manager",
+                "erp_sales"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnreadCountDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Số thông báo chưa đọc (badge)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/notifications/read-all": {
+      "post": {
+        "operationId": "MobileNotificationController_readAll",
+        "parameters": [
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "erp_manager",
+              "type": "string",
+              "enum": [
+                "erp_manager",
+                "erp_sales"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadAllResultDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đánh dấu tất cả đã đọc",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/notifications/settings": {
+      "get": {
+        "operationId": "MobileNotificationController_getSettings",
+        "parameters": [
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "erp_manager",
+              "type": "string",
+              "enum": [
+                "erp_manager",
+                "erp_sales"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Thiết lập thông báo + các loại app này bật được",
+        "tags": [
+          "mobile"
+        ]
+      },
+      "put": {
+        "operationId": "MobileNotificationController_saveSettings",
+        "parameters": [
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "erp_manager",
+              "type": "string",
+              "enum": [
+                "erp_manager",
+                "erp_sales"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveNotificationSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationSettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lưu thiết lập thông báo",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/notifications/devices": {
+      "put": {
+        "operationId": "MobileNotificationController_registerDevice",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Đăng ký / cập nhật FCM token của thiết bị (upsert theo installationId + app)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/notifications/devices/{installationId}": {
+      "delete": {
+        "operationId": "MobileNotificationController_unregisterDevice",
+        "parameters": [
+          {
+            "name": "installationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "app",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "erp_manager",
+              "type": "string",
+              "enum": [
+                "erp_manager",
+                "erp_sales"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Huỷ đăng ký thiết bị (gọi lúc đăng xuất, trước /mobile/auth/logout)",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/notifications/{id}/read": {
+      "post": {
+        "operationId": "MobileNotificationController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Đánh dấu một thông báo đã đọc",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/inventory/categories": {
       "get": {
         "operationId": "MobileInventoryController_listCategories",
@@ -25772,7 +26083,41 @@
             "description": ""
           }
         },
-        "summary": "Thu tiền hoá đơn nháp — phát hành số hoá đơn, ghi sổ quỹ / công nợ.",
+        "summary": "Thu tiền hoá đơn nháp qua checkout saga v2 (T-03-02) — phát hành số hoá\nđơn, ghi sổ quỹ / công nợ / kho / điểm, cùng đường với POS web.\n\n`x-idempotency-key` đọc như `collectDebt`, nhưng vắng thì rơi về\n`invoiceId` (không phải `randomUUID()`): khoá của saga phải ổn định qua\ncác lần gửi lại, nếu không một lượt thu mất phản hồi sẽ thu hai lần.\n\nTrả: `{ invoiceId, invoiceCode, status, amountDue, totalPaid, remainder, salesOrderId }`\n— giữ nguyên hình dạng thời v1 mà app đang đọc.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/cashier/drafts/{invoiceId}/checkout/preview": {
+      "post": {
+        "operationId": "MobileCashierController_previewCheckout",
+        "parameters": [
+          {
+            "name": "invoiceId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MobileCheckoutPreviewDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Xem trước số phải thu của hoá đơn nháp theo checkout saga",
         "tags": [
           "mobile"
         ]
@@ -27790,6 +28135,16 @@
             }
           },
           {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Chi nhánh cần xem, thay cho chi nhánh đang làm việc của người gọi.\n\nApp quản lý mở đơn của MỘT cửa hàng từ màn chi tiết cửa hàng, mà cửa hàng\nđó thường không phải cửa hàng đang chọn trên thanh điều hướng — tức không\nphải `X-Branch-Id`. Vắng khoá này thì rơi về chi nhánh của người gọi, đúng\nhành vi cũ của lưới POS.\n\n**KHÔNG nới quyền:** `BranchScopeGuard` đọc `query.branchId` TRƯỚC header\n(`common/utils/branch-request.util.ts`) và vẫn đòi id đó nằm trong tập chi\nnhánh được phân công; gửi chi nhánh lạ vẫn là 403.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
             "name": "from",
             "required": false,
             "in": "query",
@@ -27803,6 +28158,15 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "awaitingCashier",
+            "required": false,
+            "in": "query",
+            "description": "Hộp thư của thu ngân: đơn CHỜ thu ngân làm gì đó — `SENT` (chờ nhận) HOẶC\n`PROCESSED` mà hoá đơn còn NHÁP (đã nhận, chưa thu). Thiếu vế sau thì đơn\nrời hộp thư ngay khi *Nhận xử lý*, và rời giỏ trước khi thu là mất lối mở\nlại nháp (Loc báo 2026-09-22). Có nó thì [status] bị bỏ qua.",
+            "schema": {
+              "type": "boolean"
             }
           }
         ],
@@ -27957,6 +28321,37 @@
         ]
       }
     },
+    "/mobile/sales-orders/{id}/history": {
+      "get": {
+        "operationId": "SalesOrderController_historyOf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderHistoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lịch sử xử lý — chỉ đơn chi nhánh đang thao tác giữ (A-53); đơn chi nhánh\nkhác → 403 `ORDER_NOT_HELD_BY_BRANCH`.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/sales-orders/{id}/points": {
       "patch": {
         "operationId": "SalesOrderController_setPoints",
@@ -27993,6 +28388,69 @@
           }
         },
         "summary": "Sửa số điểm DỰ KIẾN — quyền của CẢ HAI vai.\n\nMảng `@RequirePermission` nghĩa là HOẶC (tiền lệ: `promotion-v2.controller`).\nTư vấn ghi con số lúc lập đơn; thu ngân sửa nó khi *Nhận xử lý* bị chặn vì\nsố dư không còn đủ.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/stock-check": {
+      "post": {
+        "operationId": "SalesOrderController_stockCheck",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BranchStockCheckRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCheckResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đối chiếu tồn cho dialog duyệt ở chi nhánh (ADR-12, A-44): tồn TẠI chi nhánh\nđang thao tác, và chỉ nhận đơn chi nhánh này đang giữ — đơn chi nhánh khác\nbị bỏ qua im lặng, không lộ. Không ghi gì; POST vì body là danh sách.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/{id}/confirm": {
+      "post": {
+        "operationId": "SalesOrderController_confirm",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Duyệt một đơn web chi nhánh đang giữ (ADR-12). Quyền dùng lại `approve`\n(A-46); đơn chi nhánh khác → 403 `ORDER_NOT_HELD_BY_BRANCH` (AC-35).\nBatch = client lặp từng id.",
         "tags": [
           "mobile"
         ]
@@ -28169,6 +28627,15 @@
             }
           },
           {
+            "name": "confirmed",
+            "required": false,
+            "in": "query",
+            "description": "Lọc theo trạng thái duyệt: true = Đã duyệt, false = Chờ duyệt",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "branchId",
             "required": false,
             "in": "query",
@@ -28180,10 +28647,48 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalesOrderListResponseDto"
+                }
+              }
+            }
           }
         },
         "summary": "Đơn toàn chuỗi; `unassigned=true` là pool chưa phân",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/sales-orders/{id}/history": {
+      "get": {
+        "operationId": "AdminSalesOrderController_historyOf",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderHistoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Dòng thời gian xử lý của một đơn",
         "tags": [
           "admin"
         ]
@@ -28214,6 +28719,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalesOrderResponseDto"
+                }
+              }
+            }
+          },
           "409": {
             "description": "`ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc `ORDER_ALREADY_DISPATCHED` (đơn đã có chi nhánh)"
           }
@@ -28249,6 +28764,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalesOrderResponseDto"
+                }
+              }
+            }
+          },
           "403": {
             "description": "`ORDER_NOT_HELD_BY_BRANCH` — đơn thuộc chi nhánh khác"
           },
@@ -28257,6 +28782,39 @@
           }
         },
         "summary": "Trả đơn về pool chưa phân",
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/sales-orders/stock-check": {
+      "post": {
+        "description": "`branchId` vắng = tồn toàn chuỗi, có = tồn tại chi nhánh đó. Đơn trả về đã xếp đủ → thiếu (`shortLineCount` tăng dần, rồi mã đơn); trong đơn dòng đủ trước dòng thiếu. Đơn ngoài tổ chức bị bỏ qua, không báo lỗi. Tối đa 100 đơn.",
+        "operationId": "AdminSalesOrderController_stockCheck",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StockCheckDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockCheckResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đối chiếu đủ/thiếu tồn cho nhiều đơn",
         "tags": [
           "admin"
         ]
@@ -46763,6 +47321,11 @@
             "format": "uuid",
             "description": "Target branch id (defaults to actor branch)."
           },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter invoice-backed figures (revenue, goods, new debt) to ONE POS session (invoice.sessionId). Used by the mobile shift report: a session belongs to a branch and every cashier sells on it, so filtering by the opener drops other cashiers' invoices. Debt payments and vouchers carry no session link and stay on branch + issuedAt."
+          },
           "cashierId": {
             "type": "string",
             "format": "uuid",
@@ -46868,6 +47431,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Target branch id (defaults to actor branch)."
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Filter invoice-backed figures (revenue, goods, new debt) to ONE POS session (invoice.sessionId). Used by the mobile shift report: a session belongs to a branch and every cashier sells on it, so filtering by the opener drops other cashiers' invoices. Debt payments and vouchers carry no session link and stay on branch + issuedAt."
           },
           "cashierId": {
             "type": "string",
@@ -51604,6 +52172,233 @@
           "lines"
         ]
       },
+      "NotificationTargetDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "stock_document",
+              "store",
+              "overview",
+              "inventory_store",
+              "product",
+              "notifications"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "NotificationItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "example": "invoice"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "description": "Raw template variables — clients format and render text",
+            "example": {
+              "actor": "Nguyễn Văn A",
+              "code": "2609220001",
+              "amount": 1250000,
+              "store": "Cửa hàng Q1"
+            }
+          },
+          "target": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NotificationTargetDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "createdAt",
+          "isRead",
+          "data"
+        ]
+      },
+      "NotificationPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "UnreadCountDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count"
+        ]
+      },
+      "ReadAllResultDto": {
+        "type": "object",
+        "properties": {
+          "updated": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "updated"
+        ]
+      },
+      "NotificationSettingsDto": {
+        "type": "object",
+        "properties": {
+          "scopeBranchId": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabledTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "availableTypes": {
+            "description": "Types this app can enable; others are \"coming soon\"",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "enabledTypes",
+          "availableTypes"
+        ]
+      },
+      "SaveNotificationSettingsDto": {
+        "type": "object",
+        "properties": {
+          "scopeBranchId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "null = whole chain"
+          },
+          "enabledTypes": {
+            "maxItems": 50,
+            "example": [
+              "invoice",
+              "invoice_cancel"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        },
+        "required": [
+          "enabledTypes"
+        ]
+      },
+      "RegisterDeviceDto": {
+        "type": "object",
+        "properties": {
+          "installationId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "UUID the app generates once per install"
+          },
+          "app": {
+            "type": "string",
+            "enum": [
+              "erp_manager",
+              "erp_sales"
+            ]
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android"
+            ]
+          },
+          "fcmToken": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "vi",
+              "en"
+            ]
+          },
+          "appVersion": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "environment": {
+            "type": "string",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "installationId",
+          "app",
+          "platform",
+          "fcmToken",
+          "locale"
+        ]
+      },
       "MobileInventoryCategoryResponseDto": {
         "type": "object",
         "properties": {
@@ -52720,6 +53515,10 @@
             "type": "number",
             "description": "Hoá đơn còn nợ của cửa hàng — KHÔNG theo kỳ, là trạng thái hiện tại"
           },
+          "pendingOrderCount": {
+            "type": "number",
+            "description": "Đơn hàng tư vấn gửi lên đang CHỜ XỬ LÝ (`sales_orders.status = SENT`) — cũng không theo kỳ, cùng lý do `pendingUnpaidCount`"
+          },
           "newCustomers": {
             "$ref": "#/components/schemas/MobileStoreNewCustomersDto"
           },
@@ -52733,6 +53532,7 @@
           "revenue",
           "collected",
           "pendingUnpaidCount",
+          "pendingOrderCount",
           "newCustomers",
           "inventory"
         ]
@@ -52993,7 +53793,7 @@
           },
           "lineDiscount": {
             "type": "number",
-            "description": "Giảm dòng theo TIỀN (giảm tay + khuyến mại đã chốt) — cùng nghĩa với `lineDiscount` của POS.",
+            "description": "Giảm dòng theo TIỀN — CHỈ giảm tay. Khuyến mại do checkout saga tính lại lúc\nthu (ADR-50); gộp KM vào đây thì saga trừ KM hai lần (A-87).",
             "minimum": 0
           },
           "lineDiscountReason": {
@@ -53124,11 +53924,51 @@
           },
           "dueDate": {
             "type": "string"
+          },
+          "keptChangeAmount": {
+            "type": "number",
+            "description": "Tiền thừa khách không lấy — không nằm trong `payments`, saga ghi thu nhập khác.",
+            "minimum": 0
+          },
+          "selectedProgramIds": {
+            "description": "CTKM thu ngân bật thêm / ưu tiên — saga tự tính số tiền, không nhận từ app.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "description": "CTKM thu ngân gỡ khỏi hoá đơn này; thắng `selectedProgramIds` khi trùng.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         },
         "required": [
           "payments"
         ]
+      },
+      "MobileCheckoutPreviewDto": {
+        "type": "object",
+        "properties": {
+          "selectedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
       },
       "MobileDebtAllocationDto": {
         "type": "object",
@@ -53227,6 +54067,11 @@
           "lineDiscount": {
             "type": "number",
             "minimum": 0
+          },
+          "lineDiscountReason": {
+            "type": "string",
+            "description": "Lý do giảm giá TAY của dòng — `invoice_items.line_discount_reason`, cùng chỗ POS web ghi. App bắt buộc nhập khi có\n`lineDiscount` (như `LineDiscountDialog` của web); thiếu trường này thì lý do rơi mất khi lưu phiếu.",
+            "maxLength": 255
           },
           "note": {
             "type": "string",
@@ -54217,6 +55062,13 @@
             "nullable": true,
             "description": "URL công khai ảnh đầu tiên của MẪU MÃ, `null` khi chưa có ảnh. Mọi biến thể dùng chung ảnh này nên nó không lặp lại ở từng phần tử `variants`."
           },
+          "images": {
+            "description": "MỌI ảnh của mẫu mã theo thứ tự hiển thị — ảnh đầu trùng `thumbnailUrl`. Màn chi tiết của app bán hàng bày chúng thành carousel full-width như app quản lý. Rỗng khi chưa có ảnh HOẶC kho lưu trữ chưa cấu hình. `thumbnailUrl` giữ lại cho client cũ.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileProductImageDto"
+            }
+          },
           "attributes": {
             "type": "array",
             "items": {
@@ -54235,6 +55087,7 @@
           "id",
           "code",
           "name",
+          "images",
           "attributes",
           "variants"
         ]
@@ -55293,6 +56146,99 @@
           "rows"
         ]
       },
+      "SalesOrderHistoryKind": {
+        "type": "string",
+        "enum": [
+          "RECEIVED",
+          "DISPATCHED",
+          "CONFIRMED",
+          "RETURNED",
+          "PROCESSED",
+          "REJECTED",
+          "CANCELLED"
+        ]
+      },
+      "SalesOrderHistoryEntryResponseDto": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 (UTC)"
+          },
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SalesOrderHistoryKind"
+              }
+            ]
+          },
+          "actorName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Tên người làm; với \"Nhận đơn\" của đơn web là tên kênh. `null` khi không tra được."
+          },
+          "branchName": {
+            "type": "string",
+            "description": "Chi nhánh liên quan tới mốc này"
+          },
+          "fromBranchName": {
+            "type": "string",
+            "description": "Chỉ có ở \"Phân đơn\" khi phân lại từ chi nhánh khác"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "invoiceCode": {
+            "type": "string",
+            "description": "Chỉ có ở \"Thu ngân xử lý\""
+          },
+          "statusAfter": {
+            "type": "string",
+            "description": "Trạng thái hiển thị sau mốc này (tiếng Việt)"
+          }
+        },
+        "required": [
+          "at",
+          "kind",
+          "actorName",
+          "statusAfter"
+        ]
+      },
+      "SalesOrderHistoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderCode": {
+            "type": "string"
+          },
+          "currentStatus": {
+            "enum": [
+              "DRAFT",
+              "SENT",
+              "PROCESSED",
+              "REJECTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderHistoryEntryResponseDto"
+            }
+          }
+        },
+        "required": [
+          "orderId",
+          "orderCode",
+          "currentStatus",
+          "entries"
+        ]
+      },
       "SalesOrderLineDto": {
         "type": "object",
         "properties": {
@@ -55375,6 +56321,22 @@
             "type": "string",
             "maxLength": 1000
           },
+          "selectedProgramIds": {
+            "description": "CTKM tư vấn bật thêm (ADR-52). Cùng validator với `CheckoutV2Dto` của saga,\nvì đây chính là thứ sẽ được gửi sang saga lúc thu. Vắng = `[]`: `PATCH` thay\nTRỌN đơn, như `pointsRedeemed`.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excludedProgramIds": {
+            "description": "CTKM tư vấn gỡ khỏi đơn — thắng `selectedProgramIds` khi trùng (luật của engine).",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           "lines": {
             "type": "array",
             "items": {
@@ -55397,6 +56359,111 @@
         },
         "required": [
           "points"
+        ]
+      },
+      "BranchStockCheckRequestDto": {
+        "type": "object",
+        "properties": {
+          "orderIds": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "orderIds"
+        ]
+      },
+      "StockCheckLineResponseDto": {
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemCode": {
+            "type": "string"
+          },
+          "itemName": {
+            "type": "string"
+          },
+          "required": {
+            "type": "number",
+            "description": "Tổng SL cần của món trong đơn (dòng trùng món đã gộp)"
+          },
+          "available": {
+            "type": "number",
+            "description": "Tồn thực tế trong phạm vi đối chiếu; có thể âm"
+          },
+          "shortBy": {
+            "type": "number",
+            "description": "`max(0, required - available)`; 0 = đủ"
+          }
+        },
+        "required": [
+          "itemId",
+          "itemCode",
+          "itemName",
+          "required",
+          "available",
+          "shortBy"
+        ]
+      },
+      "StockCheckOrderResponseDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "orderCode": {
+            "type": "string"
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` = tồn toàn chuỗi"
+          },
+          "sufficient": {
+            "type": "boolean"
+          },
+          "shortLineCount": {
+            "type": "number"
+          },
+          "lines": {
+            "description": "Dòng đủ trước dòng thiếu",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCheckLineResponseDto"
+            }
+          }
+        },
+        "required": [
+          "orderId",
+          "orderCode",
+          "branchId",
+          "sufficient",
+          "shortLineCount",
+          "lines"
+        ]
+      },
+      "StockCheckResponseDto": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "description": "Đã xếp: `shortLineCount` tăng dần, rồi mã đơn (A-39). Đơn ngoài tổ chức bị bỏ qua.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCheckOrderResponseDto"
+            }
+          }
+        },
+        "required": [
+          "orders"
         ]
       },
       "RejectSalesOrderDto": {
@@ -55422,6 +56489,297 @@
           }
         }
       },
+      "AdminSalesOrderLineResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "itemId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "manualDiscount": {
+            "type": "number"
+          },
+          "manualDiscountReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "promotionDiscount": {
+            "type": "number"
+          },
+          "promotionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "chainStockAtIntake": {
+            "type": "number",
+            "nullable": true,
+            "description": "Tồn toàn chuỗi của mặt hàng CHỤP lúc nhận đơn (ADR-10); `null` với đơn không qua đường đối tác hoặc đơn cũ."
+          }
+        },
+        "required": [
+          "id",
+          "itemId",
+          "code",
+          "name",
+          "unit",
+          "quantity",
+          "unitPrice",
+          "manualDiscount",
+          "manualDiscountReason",
+          "promotionDiscount",
+          "promotionName",
+          "note",
+          "lineTotal",
+          "thumbnailUrl",
+          "chainStockAtIntake"
+        ]
+      },
+      "OrgSalesOrderResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SENT",
+              "PROCESSED",
+              "REJECTED",
+              "CANCELLED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "salespersonId": {
+            "type": "string",
+            "nullable": true
+          },
+          "salespersonName": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesChannel": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number"
+          },
+          "amountDue": {
+            "type": "number"
+          },
+          "shippingFee": {
+            "type": "number"
+          },
+          "recipientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "recipientPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipProvinceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipWardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipAddressLine": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesChannelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejectReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "pointsRedeemed": {
+            "type": "number"
+          },
+          "selectedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "invoiceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceIsDraft": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "stockShort": {
+            "type": "boolean",
+            "description": "Nhãn \"Thiếu hàng\": tồn toàn chuỗi lúc nhận đơn không đủ cho ít nhất một mặt hàng (ADR-10). Snapshot — không tính lại khi tồn đổi (A-35)."
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Lúc chi nhánh duyệt đơn (ADR-12); `null` = \"Chờ duyệt\". Trả về pool xoá duyệt."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSalesOrderLineResponseDto"
+            }
+          },
+          "branchId": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` = đơn còn trong pool"
+          },
+          "branchName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "createdAt",
+          "salespersonId",
+          "salespersonName",
+          "salesChannel",
+          "customerId",
+          "customerName",
+          "customerPhone",
+          "subtotal",
+          "discount",
+          "amountDue",
+          "shippingFee",
+          "recipientName",
+          "recipientPhone",
+          "shipProvinceName",
+          "shipWardName",
+          "shipAddressLine",
+          "externalOrderId",
+          "salesChannelId",
+          "note",
+          "rejectReason",
+          "cancelReason",
+          "pointsRedeemed",
+          "selectedProgramIds",
+          "excludedProgramIds",
+          "invoiceId",
+          "invoiceCode",
+          "invoiceIsDraft",
+          "stockShort",
+          "confirmedAt",
+          "lines",
+          "branchId",
+          "branchName"
+        ]
+      },
+      "AdminSalesOrderListResponseDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrgSalesOrderResponseDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
       "DispatchSalesOrderDto": {
         "type": "object",
         "properties": {
@@ -55432,6 +56790,185 @@
         },
         "required": [
           "branchId"
+        ]
+      },
+      "AdminSalesOrderResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SENT",
+              "PROCESSED",
+              "REJECTED",
+              "CANCELLED"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "salespersonId": {
+            "type": "string",
+            "nullable": true
+          },
+          "salespersonName": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesChannel": {
+            "type": "string"
+          },
+          "customerId": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtotal": {
+            "type": "number"
+          },
+          "discount": {
+            "type": "number"
+          },
+          "amountDue": {
+            "type": "number"
+          },
+          "shippingFee": {
+            "type": "number"
+          },
+          "recipientName": {
+            "type": "string",
+            "nullable": true
+          },
+          "recipientPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipProvinceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipWardName": {
+            "type": "string",
+            "nullable": true
+          },
+          "shipAddressLine": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalOrderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "salesChannelId": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "rejectReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "pointsRedeemed": {
+            "type": "number"
+          },
+          "selectedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "excludedProgramIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "invoiceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "invoiceIsDraft": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "stockShort": {
+            "type": "boolean",
+            "description": "Nhãn \"Thiếu hàng\": tồn toàn chuỗi lúc nhận đơn không đủ cho ít nhất một mặt hàng (ADR-10). Snapshot — không tính lại khi tồn đổi (A-35)."
+          },
+          "confirmedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Lúc chi nhánh duyệt đơn (ADR-12); `null` = \"Chờ duyệt\". Trả về pool xoá duyệt."
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminSalesOrderLineResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "status",
+          "createdAt",
+          "salespersonId",
+          "salespersonName",
+          "salesChannel",
+          "customerId",
+          "customerName",
+          "customerPhone",
+          "subtotal",
+          "discount",
+          "amountDue",
+          "shippingFee",
+          "recipientName",
+          "recipientPhone",
+          "shipProvinceName",
+          "shipWardName",
+          "shipAddressLine",
+          "externalOrderId",
+          "salesChannelId",
+          "note",
+          "rejectReason",
+          "cancelReason",
+          "pointsRedeemed",
+          "selectedProgramIds",
+          "excludedProgramIds",
+          "invoiceId",
+          "invoiceCode",
+          "invoiceIsDraft",
+          "stockShort",
+          "confirmedAt",
+          "lines"
         ]
       },
       "ReturnSalesOrderDto": {
@@ -55445,6 +56982,39 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "StockCheckOrderRequestDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branchId": {
+            "type": "string",
+            "description": "Vắng = tồn toàn chuỗi",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "orderId"
+        ]
+      },
+      "StockCheckDto": {
+        "type": "object",
+        "properties": {
+          "orders": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockCheckOrderRequestDto"
+            }
+          }
+        },
+        "required": [
+          "orders"
         ]
       },
       "PartnerOrderCustomerDto": {

@@ -54,6 +54,14 @@ export class SalesOrderLineEntity {
   @Column({ name: 'line_total', type: 'numeric', precision: 18, scale: 2 })
   lineTotal: string;
 
+  /**
+   * Tồn toàn chuỗi của hàng dòng này, CHỐT lúc nhận đơn (ADR-10) — không tính lại
+   * lúc đọc. NULL = đơn không qua kiểm (mobile, đơn cũ), KHÁC 0. Về dạng chuỗi như
+   * mọi cột `numeric` khác.
+   */
+  @Column({ name: 'chain_stock_at_intake', type: 'numeric', nullable: true })
+  chainStockAtIntake: string | null;
+
   @ManyToOne(() => SalesOrderEntity, (order) => order.lines, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'sales_order_id' })
   salesOrder?: SalesOrderEntity;

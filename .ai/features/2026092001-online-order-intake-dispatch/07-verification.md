@@ -1,11 +1,182 @@
 ---
 feature: 2026092001-online-order-intake-dispatch
-environment: local-pos (pos-web :3001 → API :4188, DB erp_dev_3008)
-date: 2026-09-21
-by: claude (orchestrator)
+environments: [local-backoffice-erp2]
+viewports: [desktop]
 ---
 
 # 07 — Bằng chứng xác minh
+
+## Đợt 2 (2026-09-24) — duyệt đơn · nhãn thiếu hàng · chọn chi nhánh từng đơn
+
+Lưới Điều phối KHÔNG có cột mã đơn, nên bước nhận dòng theo **người nhận** (`Người nhận X`…, duy nhất theo đơn); dialog thì có mã đơn nên assert trong dialog dùng mã `DT…`.
+
+Chạy bằng `verify.py --env local-backoffice-erp2` trên backoffice **:3010** của
+checkout này, trỏ vào API **:4199** → DB **`erp_dev_3008`**, tổ chức Inventory Demo
+Org. KHÔNG chạy qua `local-backoffice` (:3000): trên máy này nó gọi API erp3 nối vào
+`erp_clone_prod`.
+
+**Các bước có ghi và chạy theo thứ tự** — S5 phải trước S6, S9 trước S10. Chạy lại
+cần bộ đơn mới (externalOrderId khác) vì S6 và S10 đổi trạng thái đơn.
+
+### Fixture lần 2 (sau A-41, duyệt chuyển sang chi nhánh)
+
+Sáu đơn mới qua `POST /v2/partner/orders` (key demo cũ): U1 `43-NAU × 5`, U2 `43-NAU × 30`,
+U3 `43-NAU × 2 + 40-DEN × 20` (DT000154–156) — phân về **Main Branch** bằng
+`POST /admin/sales-orders/:id/dispatch` **không duyệt trước** (200, AC-46 ở mức API);
+Main Branch có `43-NAU = 22`, `40-DEN = 8` ⇒ U2 thiếu 8, U3 thiếu 12. V1–V3 `39-DEN × 1`
+(DT000157–159) để lại pool. Phiên runner đăng nhập ở Main Branch.
+
+### Fixture lần 1 (không qua UI, ghi lại ở đây)
+
+Tồn thật, không sửa tay: `GELLI-39-DEN` = 30 Cà Mau + 30 Cần Thơ (toàn chuỗi 60),
+`GELLI-40-NAU` = 60. Mười đơn đặt qua `POST /v2/partner/orders` bằng một API key
+demo (vai trò *Đối tác đặt hàng*, kênh WEB):
+
+| Mã | Vai | Dòng | Nhãn lúc nhận |
+|---|---|---|---|
+| DT000144 | A — đủ nhờ cộng 2 CN | 39-DEN × 45 | không |
+| DT000145 | B — thiếu 2 dòng | 39-DEN × 70, 40-NAU × 61 | Thiếu hàng |
+| DT000146 | X — đủ | 39-DEN × 10 | không |
+| DT000147 | Y — thiếu 1 dòng | 39-DEN × 70 | Thiếu hàng |
+| DT000148 | Z — thiếu 1 dòng | 39-DEN × 10, 40-NAU × 100 | Thiếu hàng |
+| DT000149 | P | 39-DEN × 40 | không |
+| DT000150 | Q | 39-DEN × 5 | không |
+| DT000151 | R | 39-DEN × 1 | không |
+| DT000152 | S — cho AC-45 | 39-DEN × 2 | không |
+| DT000153 | T — cho AC-33 | 39-DEN × 3 | không |
+
+Rồi qua API: duyệt P, Q, R, S (`POST /admin/sales-orders/:id/confirm`); huỷ S và T
+(`POST /mobile/sales-orders/:id/cancel`) để giả lập "người khác vừa huỷ". Kiểm DB
+sau khi nhận đơn: `stock_short` = f,t,f,t,t,f,f,f,f,f; mọi dòng
+`chain_stock_at_intake = 60`; body 201 của đơn thiếu và đơn đủ cùng bộ khoá.
+
+## Steps
+
+| ID | Step | Path | Interaction | Verifies | Assert |
+|---|---|---|---|---|---|
+| S1 | Điều phối: DT000145 (B, thiếu) có nhãn vàng, DT000144 (A, đủ nhờ cộng 2 CN) không | `/orders/dispatch` | `wait tbody tr:has-text("Người nhận A")` | AC-36, AC-37, AC-39 | `count tbody tr:has-text("Người nhận B"):has-text("Thiếu hàng") = 1; count tbody tr:has-text("Người nhận A"):has-text("Thiếu hàng") = 0` |
+| S2 | Tất cả đơn: cùng nhãn cho cùng đơn | `/orders/all` | `wait tbody tr:has-text("Người nhận V1")` | AC-39 | `count tbody tr:has-text("Người nhận B"):has-text("Thiếu hàng") = 1; count tbody tr:has-text("Người nhận A"):has-text("Thiếu hàng") = 0` |
+
+## Not verified here
+
+AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-13, AC-14, AC-15, AC-16, AC-17, AC-18, AC-19, AC-20, AC-21, AC-22, AC-23, AC-24, AC-25, AC-26, AC-27, AC-28, AC-29 thuộc đợt 1 (UOW-01 … UOW-07): bằng chứng tay, SQL và ảnh chụp nằm ở phần
+"Đợt 1" bên dưới, không qua runner.
+
+AC-30, AC-31, AC-33, AC-34, AC-35, AC-40, AC-41, AC-42, AC-43, AC-44, AC-45, AC-46,
+AC-47 — luồng có GHI (duyệt, phân, trả về) không chạy lại được bằng runner trên cùng dữ
+liệu, nên được chứng minh bằng script E2E tạo bộ đơn mới mỗi lần:
+`evidence/2026-09-24-e2e-dialog/run_e2e.py` → **41/41 đạt** (Playwright qua backoffice
+:3010 + API :4199, ảnh 01–09, `report.md`, `results.json`), cộng e2e
+`branch-confirm.e2e-spec.ts` (9/9) cho AC-33, AC-35. AC-32 (Huỷ ở cảnh báo) và AC-48
+(đơn mobile) — e2e `branch-confirm` và lần chạy runner lần 2 (S10) trước khi đổi luồng
+Điều phối; hành vi duyệt ở chi nhánh không đổi từ đó.
+
+AC-38 (nhãn giữ nguyên sau nhập hàng) — e2e `partner-order.e2e-spec.ts` (T-08-03).
+
+AC-49, AC-50, AC-51, AC-52, AC-53, AC-54 (US-12, lịch sử đơn) — dữ liệu phải dựng bằng
+chuỗi thao tác ghi, nên chứng minh bằng `evidence/2026-09-24-e2e-history/run_e2e.py`
+(**22/22**, modal trên ba màn + API) và e2e `sales-order-history.e2e-spec.ts` (T-13-03,
+**7/7**, gồm AC-53 thiếu quyền → 403 và AC-54 đơn tư vấn viên).
+
+## Notes
+
+- S8 đếm 6 = số đơn Đã duyệt còn trong pool lúc đó (X, Y, Z sau S6; P, Q, R, S từ
+  fixture = 7) trừ Q vừa đổi sang Cần Thơ. Nếu con số lệch, đọc ảnh trước khi sửa assert.
+- Thứ tự đủ → thiếu trong dialog (S4: X trước Y, Z; S9: Q trước P) là thứ tự server
+  trả; ảnh là bằng chứng, assert chỉ chặn nội dung.
+- **Chạy lại**: S4–S6 duyệt X, Y, Z. Trước mỗi lần chạy lại toàn bộ, đưa ba đơn demo đó về Chờ duyệt: `UPDATE sales_orders SET confirmed_at=NULL, confirmed_by=NULL` + xoá các dòng `CONFIRM` của chúng trong `sales_order_dispatch_events` (chỉ dữ liệu demo DEMO0924-X/Y/Z trên `erp_dev_3008`). Phiên `.ai/.auth/local-backoffice-erp2.json` phải chụp lại trước mỗi lần chạy (refresh token xoay vòng).
+- AC-33, AC-45: script `evidence/manual/partial-failures.py` (xem mục cùng tên).
+
+## E2E lịch sử đơn — 2026-09-24 (`evidence/2026-09-24-e2e-history/`)
+
+Run `140719`, H1 = DT000170 (đủ vòng), H2 (huỷ), H3 (trả về pool) → **22/22 đạt**. Dựng
+bằng API thật: phân Cà Mau → Cà Mau duyệt (token chi nhánh qua `/auth/switch-branch`) →
+Cà Mau trả về "hết hàng" → phân Main → Main duyệt → thu ngân Main xử lý. API lịch sử: 7
+mốc đúng thứ tự, nhận đơn hiện "Website công ty", trạng thái sau: Chờ phân → Chờ duyệt →
+Đã duyệt → Chờ phân → Chờ duyệt → Đã duyệt → Đã xử lý; Cần Thơ gọi → 403
+`ORDER_NOT_HELD_BY_BRANCH`. Modal "Lịch sử" mở đúng trên Tất cả đơn (nút khoá khi chưa
+chọn dòng), Điều phối (H3: Nhận → Phân Cà Mau → Trả về "sai kho"), Đơn hàng chi nhánh
+Main (H1 đủ 7 mốc), H2 mốc cuối "Huỷ đơn" + "khách đổi ý". Ảnh 01–04.
+
+Ghi chú: mốc "Thu ngân xử lý" hiện mã **hoá đơn nháp** (`DRAFT-…`) cho tới khi thu ngân
+thu tiền và hoá đơn có số chính thức.
+
+## E2E toàn chuỗi, dialog Điều phối — 2026-09-24 (`evidence/2026-09-24-e2e-dialog/`)
+
+Sau A-48 / ADR-13 (UOW-12). Run `134015`, đơn DT000164–DT000169 → **41/41 đạt**. Khác bản
+dưới ở chặng 2–3 và thêm chặng 8: lưới Điều phối không còn ô chọn chi nhánh; tick 4 đơn →
+"Điều phối (4)" → dialog đúng 4 đơn, "Chọn cho tất cả" = Main Branch điền 4 dòng, đổi O3
+→ Cà Mau; Validate trong dialog ("thiếu 8 tại Main Branch", "thiếu 40 tại Cà Mau", đủ
+trước thiếu), đóng báo cáo lựa chọn còn nguyên; Lưu → 4/4, dialog đóng. Chặng 8 (AC-45):
+tick O5, O6, mở dialog, O6 bị huỷ qua API, Lưu → O5 "Đã phân về Cần Thơ", O6 báo "Đơn
+hàng không ở trạng thái chờ phân (CANCELLED)" tại dòng, giữ Cần Thơ, dialog không đóng.
+
+## E2E toàn chuỗi — 2026-09-24 (`evidence/2026-09-24-e2e/`, luồng cột chọn trên lưới — đã thay)
+
+Script `evidence/2026-09-24-e2e/run_e2e.py` (Playwright + API, bộ đơn mới mỗi lần chạy,
+run `132919`, đơn DT000160–DT000163) → **27/27 kiểm tra đạt**. Báo cáo `report.md`, dữ
+liệu `results.json`, ảnh `01…07-*.png` cùng thư mục. Bảy chặng: đối tác đặt đơn (nhãn
+chỉ trên đơn thiếu toàn chuỗi, body 201 không đổi) → Điều phối không có bước duyệt, chọn
+chi nhánh từng đơn, Validate ("thiếu 8 tại Main Branch", "thiếu 40 tại Cà Mau"), Lưu 4/4
+→ thu ngân xử lý đơn chưa duyệt: 409 `ORDER_NOT_CONFIRMED`, không nháp, không có trong
+`awaitingCashier` → chi nhánh Duyệt đơn: cảnh báo "theo tồn tại chi nhánh này", đủ trước
+thiếu, Vẫn duyệt → Đã duyệt → thu ngân xử lý đơn đã duyệt: 200 PROCESSED + hoá đơn nháp →
+chi nhánh duyệt rồi trả về pool: `confirmed_at` NULL, dòng CONFIRM còn, đơn hiện lại ở
+Điều phối không nhãn duyệt. Không thay runner (`evidence/run.json` giữ nguyên).
+
+## Kết quả chạy lần 2 — 2026-09-24 (sau A-41: duyệt ở chi nhánh)
+
+**Runner:** `verify.py --env local-backoffice-erp2 --write` → **pass 11/11** trên API build
+mới (:4199). `evidence_check.py` → PASS. Bộ bước ở trên thay hoàn toàn bộ bước lần 1
+(lần 1 khẳng định "Duyệt đơn" nằm ở Điều phối — sai sau A-41).
+
+- S3: Điều phối không còn "Duyệt đơn" / "Chờ duyệt", 10/10 dòng pool có ô chọn chi nhánh.
+- S5: V1 chưa ai duyệt vẫn Lưu được → DB `branch_id` = Cần Thơ, `confirmed_at` NULL (AC-46).
+- S6/S7: Y → Cà Mau "thiếu 40 tại Cà Mau", V3 → Cần Thơ đủ; Lưu → cả hai rời pool, V2 ở lại.
+- S8–S11 ở `/orders` của Main Branch: U1–U3 "Chờ duyệt" → dialog "Theo tồn tại chi nhánh
+  này, 2/3 đơn thiếu hàng": U1 đủ (cần 5 / tồn 22), U2 "cần 30 / tồn 22 / thiếu 8", U3
+  dòng 40-DEN "cần 20 / tồn 8 / thiếu 12", đúng thứ tự đủ → thiếu. Huỷ không đổi gì; Vẫn
+  duyệt → DB cả ba có `confirmed_at`. (U1–U3 thay vai X, Y, Z của demo UOW-09 cũ.)
+
+**Lỗi tìm thấy (S9.png):** dòng "Khách web E2E" — đơn web đã **Đã xử lý** từ trước khi có
+bước duyệt — vẫn mang nhãn "Chờ duyệt". Nhãn chỉ xét `needsConfirmation` (đơn web), phải
+xét thêm `status = SENT`. **Đã sửa ở T-11-06** (Akenzy reopen G3): `toOrderRow` chỉ đặt `needsConfirmation` khi đơn còn `SENT`; vitest `order-mapper.test.ts` 22/22; kiểm lại trên `/orders` Main Branch: dòng "Khách web E2E" (Đã xử lý) 0 nhãn "Chờ duyệt", U1 vẫn "Đã duyệt" — ảnh `evidence/manual/T-11-06-processed-no-badge.png`.
+
+Đơn Y (DT000147) mang `confirmed_at` từ luồng cũ (duyệt ở Điều phối trước A-41) — dữ liệu
+demo sót lại, không phải hành vi mới.
+
+## Kết quả chạy lần 1 — 2026-09-24 (luồng cũ, duyệt ở Điều phối — đã lỗi thời)
+
+**Runner:** `verify.py --env local-backoffice-erp2 --write` → **pass 11/11**
+(chromium 151, commit 16ab9b9b, cây làm việc chưa commit). `evidence_check.py` → PASS.
+Ảnh: `evidence/local-backoffice-erp2/desktop/S1…S11.png`. Dialog ở S4 và S9 bị chụp
+lúc còn hiệu ứng mờ dần — nội dung đọc được, thứ tự đúng: S4 X (Đủ hàng) → Y → Z
+(Thiếu 1 dòng, vàng "cần 70 / tồn 60 / thiếu 10"); S9 Q (Đủ hàng, Cần Thơ) → P
+("thiếu 10 tại Cà Mau"), R không có mặt.
+
+**DB sau S10 (AC-42, AC-44):** P (DT000149) → Cà Mau dù thiếu 10 tại đó; Q
+(DT000150) → Cần Thơ; R (DT000151) branch NULL. `status` giữ `SENT` (ADR-08). Lịch
+sử: mỗi đơn đúng một dòng `CONFIRM`, hai dòng `DISPATCH` (Cà Mau, Cần Thơ).
+
+**Script `evidence/manual/partial-failures.py` → 2/2 pass:**
+- AC-33 — tick A (đủ) + T (đã huỷ) → Duyệt đơn: A "Đã duyệt"; dialog giữ mở, T báo
+  lỗi ngay cạnh DT000153 và vẫn "Chờ duyệt". Ảnh `AC-33-dialog.png`, `AC-33-grid.png`.
+- AC-45 — R → Cần Thơ, S (đã huỷ) → Cà Mau → Lưu: R rời pool (DB: Cần Thơ); dòng S
+  viền đỏ + icon cảnh báo, ô chi nhánh giữ "Cà Mau"; toast "Đã phân 1/2 đơn —
+  DT000152: Đơn hàng không ở trạng thái chờ phân (CANCELLED)". Ảnh `AC-45-grid.png`,
+  `AC-45-row-error-hover.png`.
+
+**Phát hiện nhỏ (không chặn AC):** lỗi hiện ra là `message` tiếng Việt của server
+("Đơn hàng không ở trạng thái chờ duyệt (CANCELLED)"), không phải câu frontend tự
+map cho `ORDER_NOT_CONFIRMABLE` trong `use-admin-sales-orders.ts:321` — bảng map đó
+đang không được dùng khi server đã có message.
+
+---
+
+# Đợt 1 (2026-09-21) — bằng chứng tay
+
+_Môi trường đợt 1: local-pos (pos-web :3001 → API :4188, DB erp_dev_3008), by claude (orchestrator)._
+
 
 ## T-04-05 — Ba nguồn số, một kết quả (AC-26)
 

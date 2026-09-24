@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { DocumentListShell, PageToolbar, type ToolbarItem } from "@erp/ui";
-import { RefreshCw, Store } from "lucide-react";
+import { History, RefreshCw, Store } from "lucide-react";
 import { useColumnFilters } from "../../../components/table/useColumnFilters";
 import { useAdminSalesOrders } from "../../../hooks/orders/use-admin-sales-orders";
 import {
@@ -8,14 +8,15 @@ import {
   useOrdersStore,
 } from "../../../store/page-stores/orders/orders.store";
 import { ORDER_COLUMN_ORDER } from "../_lib/order-columns";
+import { OrderHistoryModal } from "../OrderHistoryModal/OrderHistoryModal";
 import { OrdersDetailPanel } from "../OrdersDetailPanel/OrdersDetailPanel";
 import { OrdersPageFilterBar } from "../OrdersPageFilterBar/OrdersPageFilterBar";
 import { OrdersPagePagination } from "../OrdersPagePagination/OrdersPagePagination";
 import { OrdersPageTable } from "../OrdersPageTable/OrdersPageTable";
 import {
-  DispatchBranchDialog,
+  DispatchOrdersDialog,
   type DispatchCandidate,
-} from "./DispatchBranchDialog";
+} from "./DispatchOrdersDialog";
 
 /**
  * Màn ĐIỀU PHỐI: pool đơn chưa phân chi nhánh (A-19, AC-09).
@@ -25,13 +26,14 @@ import {
  * vào một trang là cách nhanh nhất để rò đơn của chi nhánh khác.
  *
  * Nguồn dữ liệu là `GET /admin/sales-orders?unassigned=true`; lưới, cột và
- * panel chi tiết dùng lại nguyên của `/orders`. Không có cột "Chi nhánh" ở đây
- * vì mọi dòng đều chưa phân.
+ * panel chi tiết dùng lại nguyên của `/orders`. Admin tick đơn trên lưới rồi bấm
+ * "Điều phối (n)": chọn chi nhánh TỪNG đơn, Validate và Lưu đều nằm trong
+ * `DispatchOrdersDialog` (A-48, ADR-13). Màn này chỉ phân, không duyệt: duyệt là
+ * việc của chi nhánh nhận đơn (A-41).
  *
  * Trạng thái UI (cột, trang, dòng đã tick) dùng chung `useOrdersStore` với
- * `/orders`: `OrdersPageTable` đọc thẳng store đó và nó nằm ngoài `touches:`
- * của ticket này. Hai màn không bao giờ mount cùng lúc, nên chỉ cần dọn phần
- * mang sang được — xem hai `useEffect` bên dưới.
+ * `/orders`: `OrdersPageTable` đọc thẳng store đó. Hai màn không bao giờ mount
+ * cùng lúc, nên chỉ cần dọn phần mang sang được — xem hai `useEffect` bên dưới.
  */
 export function OrdersDispatchPage() {
   const applied = useOrdersStore((s) => s.applied);
@@ -44,6 +46,9 @@ export function OrdersDispatchPage() {
     useOrdersActions();
 
   const [dispatchOpen, setDispatchOpen] = useState(false);
+  /** Các đơn đã tick, chụp lúc bấm "Điều phối" — dialog không co theo lưới tải lại. */
+  const [dispatchOrders, setDispatchOrders] = useState<DispatchCandidate[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Vào màn là về trang 1: số trang mang sang từ `/orders` trỏ vào một tập kết
   // quả khác hẳn, và trang 4 của một pool 3 đơn là một lưới rỗng khó hiểu.
@@ -52,7 +57,7 @@ export function OrdersDispatchPage() {
   }, [setPage]);
 
   // Tick dòng là chuyện của TRANG đang xem: id tick ở trang khác thì lưới không
-  // còn cầm mã đơn để báo lỗi đúng dòng đó. Đổi trang (và cả lúc vào màn) là bỏ tick.
+  // còn cầm mã đơn để gọi tên nó trong dialog. Đổi trang (và cả lúc vào màn) là bỏ tick.
   useEffect(() => {
     setCheckedOrderIds([]);
     setFocusedOrderId(null);
@@ -89,18 +94,32 @@ export function OrdersDispatchPage() {
       code: codeById[row.id] ?? "",
       recipient: row.recipientName,
     }));
+  const noSelection = selectedOrders.length === 0;
+
+  const openDispatch = () => {
+    if (noSelection) return;
+    setDispatchOrders(selectedOrders);
+    setDispatchOpen(true);
+  };
 
   const toolbarItems: ToolbarItem[] = [
     {
       id: "dispatch",
-      label: "Phân chi nhánh",
+      label: noSelection ? "Điều phối" : `Điều phối (${selectedOrders.length})`,
       icon: Store,
-      onClick: () => setDispatchOpen(true),
-      disabled: selectedOrders.length === 0,
-      tooltip:
-        selectedOrders.length === 0
-          ? "Chọn ít nhất một đơn để phân"
-          : `Phân ${selectedOrders.length} đơn đã chọn`,
+      onClick: openDispatch,
+      disabled: noSelection,
+      tooltip: noSelection
+        ? "Tick ít nhất một đơn để điều phối"
+        : `Chọn chi nhánh cho ${selectedOrders.length} đơn đã tick`,
+    },
+    {
+      id: "history",
+      label: "Lịch sử",
+      icon: History,
+      onClick: () => setHistoryOpen(true),
+      disabled: !focusedOrder,
+      tooltip: "Chọn một đơn để xem lịch sử",
     },
     { id: "sep-1", type: "separator" },
     { id: "reload", label: "Nạp", icon: RefreshCw, onClick: reload },
@@ -112,15 +131,23 @@ export function OrdersDispatchPage() {
       toolbar={
         <>
           <PageToolbar items={toolbarItems} tone="primary" className="m-2 rounded-md" />
-          <DispatchBranchDialog
+          <DispatchOrdersDialog
             open={dispatchOpen}
             onOpenChange={setDispatchOpen}
-            orders={selectedOrders}
+            orders={dispatchOrders}
             onDispatched={(dispatchedIds) =>
               setCheckedOrderIds(
-                checkedOrderIds.filter((id) => !dispatchedIds.includes(id)),
+                useOrdersStore
+                  .getState()
+                  .checkedOrderIds.filter((id) => !dispatchedIds.includes(id)),
               )
             }
+          />
+          <OrderHistoryModal
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            orderId={focusedOrder?.id ?? null}
+            scope="admin"
           />
         </>
       }

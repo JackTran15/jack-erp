@@ -1,9 +1,13 @@
 import {
   keepPreviousData,
+  useMutation,
   useQuery,
+  useQueryClient,
+  type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { erpApi, requireErpData } from "../../lib/erp-api";
+import { HttpError } from "../../lib/http";
 import {
   ORDER_SUMMARY_KEYS,
   type OrderColumnKey,
@@ -12,9 +16,14 @@ import {
   toOrderLineRows,
   toOrderRow,
   type SalesOrderDto,
+  type SalesOrderRow,
 } from "../../pages/orders/_lib/order-mapper";
-import type { OrderLineRow, OrderRow } from "../../pages/orders/_mock/orders.mock";
+import type { OrderLineRow } from "../../pages/orders/_mock/orders.mock";
 import { useBranchStore } from "../../store/common/branch/branch.store";
+import type { StockCheckOrder } from "./use-admin-sales-orders";
+
+/** Tiền tố khoá cache của lưới đơn chi nhánh (phần tử đầu của `queryKey` bên dưới). */
+const BRANCH_SALES_ORDERS_KEY = ["branch-sales-orders"] as const;
 
 /** Hình dạng phân trang chung của API: `{ data, total, page, limit }`. */
 interface SalesOrderListResponse {
@@ -36,7 +45,8 @@ export interface BranchSalesOrdersParams {
 }
 
 export interface BranchSalesOrdersResult {
-  rows: OrderRow[];
+  /** Mang `needsConfirmation` / `confirmedAt` cho nút "Duyệt đơn" (ADR-12). */
+  rows: SalesOrderRow[];
   total: number;
   /** Tổng của TRANG hiện tại (xem ghi chú trong `queryFn`). */
   totals: Partial<Record<OrderColumnKey, number>>;
@@ -118,5 +128,126 @@ export function useBranchSalesOrders(
     },
     enabled: Boolean(branchId),
     placeholderData: keepPreviousData,
+  });
+}
+
+interface StockCheckResponse {
+  orders: StockCheckOrder[];
+}
+
+/**
+ * Đối chiếu đủ/thiếu tồn TẠI CHI NHÁNH đang thao tác cho các đơn sắp duyệt
+ * (ADR-12, A-44). Chi nhánh lấy từ `X-Branch-Id` mà `erpApi` tự gắn — body
+ * không mang `branchId`. Đơn chi nhánh khác bị server bỏ qua im lặng.
+ *
+ * Kết quả giữ NGUYÊN thứ tự server trả — đủ → thiếu (AC-31). Là mutation vì
+ * đây là ảnh chụp ngay lúc bấm "Duyệt đơn", không phải dữ liệu để cache.
+ */
+export function useBranchStockCheck(): UseMutationResult<
+  StockCheckOrder[],
+  Error,
+  string[]
+> {
+  return useMutation({
+    mutationFn: async (orderIds: string[]): Promise<StockCheckOrder[]> => {
+      const response = requireErpData(
+        await erpApi.POST<StockCheckResponse>("/mobile/sales-orders/stock-check", {
+          body: { orderIds },
+        }),
+      );
+      return Array.isArray(response?.orders) ? response.orders : [];
+    },
+  });
+}
+
+/**
+ * Câu tiếng Việt dự phòng cho mã lỗi của `POST /mobile/sales-orders/:id/confirm`
+ * — chỉ dùng khi server không kèm `message` (server đã nói rõ lý do cụ thể).
+ */
+const CONFIRM_ERROR_MESSAGES: Record<string, string> = {
+  ORDER_NOT_CONFIRMABLE:
+    "Đơn không còn ở trạng thái chờ duyệt, hoặc không phải đơn cần chi nhánh duyệt.",
+  ORDER_NOT_HELD_BY_BRANCH:
+    "Đơn đang thuộc chi nhánh khác. Chỉ chi nhánh đang giữ đơn mới duyệt được.",
+};
+
+/**
+ * Mã nghiệp vụ nằm ở `details.code`: `HttpExceptionFilter` chỉ đẩy `HTTP_409`
+ * lên `code` mức trên cùng và trải thân `{ code, message }` vào `details`.
+ */
+function confirmErrorCodeOf(error: HttpError): string {
+  const details = error.error.details;
+  if (details && typeof details === "object") {
+    const code = (details as Record<string, unknown>).code;
+    if (typeof code === "string" && code) return code;
+  }
+  return error.error.code;
+}
+
+function describeConfirmError(error: unknown): { code: string; message: string } {
+  if (error instanceof HttpError) {
+    const code = confirmErrorCodeOf(error);
+    const serverMessage = error.error.message?.trim();
+    return {
+      code,
+      message:
+        serverMessage || CONFIRM_ERROR_MESSAGES[code] || "Không duyệt được đơn.",
+    };
+  }
+  return {
+    code: "UNKNOWN",
+    message: error instanceof Error ? error.message : "Không duyệt được đơn.",
+  };
+}
+
+export interface BranchConfirmFailure {
+  orderId: string;
+  code: string;
+  message: string;
+}
+
+export interface BranchConfirmBatchResult {
+  /** Id các đơn đã duyệt được. */
+  confirmed: string[];
+  failed: BranchConfirmFailure[];
+}
+
+/**
+ * Duyệt một MẺ đơn web chi nhánh đang giữ (AC-30, AC-33).
+ *
+ * Gọi TUẦN TỰ từng id và không bao giờ reject: một đơn hỏng không được huỷ kết
+ * quả của những đơn đã duyệt xong. Invalidate ở `onSettled` — kể cả khi mọi đơn
+ * đều hỏng, lưới vẫn phải tải lại (đơn có thể vừa bị trả về / huỷ).
+ */
+export function useBranchConfirmSalesOrders(): UseMutationResult<
+  BranchConfirmBatchResult,
+  Error,
+  string[]
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderIds: string[]): Promise<BranchConfirmBatchResult> => {
+      const confirmed: string[] = [];
+      const failed: BranchConfirmFailure[] = [];
+
+      for (const orderId of orderIds) {
+        try {
+          requireErpData(
+            await erpApi.POST<unknown>("/mobile/sales-orders/{id}/confirm", {
+              params: { path: { id: orderId } },
+            }),
+          );
+          confirmed.push(orderId);
+        } catch (error) {
+          failed.push({ orderId, ...describeConfirmError(error) });
+        }
+      }
+
+      return { confirmed, failed };
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: BRANCH_SALES_ORDERS_KEY });
+    },
   });
 }

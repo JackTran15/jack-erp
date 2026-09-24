@@ -36,6 +36,7 @@ import {
 } from './entities/sales-order-dispatch-event.entity';
 import { SalesOrderLineEntity } from './entities/sales-order-line.entity';
 import { SalesOrderEntity, SalesOrderStatus } from './entities/sales-order.entity';
+import { StockAvailabilityService } from './stock-availability.service';
 
 export const SALES_ORDER_PERMISSIONS = {
   read: 'pos.sales-order.read',
@@ -127,6 +128,25 @@ export const ORDER_NOT_HELD_BY_BRANCH = 'ORDER_NOT_HELD_BY_BRANCH';
  * nhau từ phía client.
  */
 export const ORDER_NOT_DISPATCHED = 'ORDER_NOT_DISPATCHED';
+
+/**
+ * Mã lỗi 409 khi thu ngân `approve()` một đơn WEB (`salesperson_id IS NULL`)
+ * mà chi nhánh CHƯA duyệt (taxonomy 03-logical-design, A-42, AC-34).
+ *
+ * Duyệt là bước BẮT BUỘC trước khi thu ngân xử lý — không còn là điều kiện để
+ * phân (A-41). Kiểm TRƯỚC `PosSessionService`: đơn chưa duyệt phải báo "chưa
+ * duyệt", không phải "chưa mở ca", và không được sinh hoá đơn nháp nào.
+ */
+export const ORDER_NOT_CONFIRMED = 'ORDER_NOT_CONFIRMED';
+
+/**
+ * Mã lỗi 409 khi `confirm` chạy trên đơn không còn `SENT`, CHƯA có chi nhánh
+ * (còn trong pool), hoặc là đơn tư vấn viên (taxonomy 03-logical-design, A-43).
+ *
+ * Chỉ đơn WEB mà chi nhánh đang giữ mới duyệt được (A-41). Đơn của chi nhánh
+ * KHÁC không phải mã này mà là 403 {@link ORDER_NOT_HELD_BY_BRANCH}.
+ */
+export const ORDER_NOT_CONFIRMABLE = 'ORDER_NOT_CONFIRMABLE';
 
 /**
  * Số điện thoại về MỘT dạng duy nhất trước khi khớp khách (A-01, AC-08).
@@ -276,6 +296,16 @@ export interface SalesOrderView {
    * sách luôn `null`. `null` cũng khi đơn chưa có hoá đơn.
    */
   invoiceIsDraft: boolean | null;
+  /**
+   * Lúc chi nhánh duyệt đơn (ADR-12); `null` = chưa duyệt. Trả về pool XOÁ nó
+   * (A-45). Luôn `null` với đơn tư vấn viên — xem {@link needsConfirmation}.
+   */
+  confirmedAt: Date | null;
+  /**
+   * `true` với đơn WEB (`salespersonId = null`, A-43): đơn phải được chi nhánh
+   * duyệt trước khi thu ngân xử lý. Đơn tư vấn viên không có bước duyệt.
+   */
+  needsConfirmation: boolean;
   lines: SalesOrderLineView[];
 }
 
@@ -294,14 +324,39 @@ export interface OrgSalesOrderListQuery extends SalesOrderListQueryDto {
    * Bỏ trống = không lọc chi nhánh (toàn chuỗi).
    */
   branchId?: string;
+  /**
+   * `true` = chỉ đơn ĐÃ duyệt (`confirmed_at IS NOT NULL`), `false` = chỉ đơn
+   * CHƯA duyệt. Bỏ trống = không lọc.
+   */
+  confirmed?: boolean;
 }
 
 /**
- * Một dòng của lưới *Tất cả đơn*: {@link SalesOrderView} cộng chi nhánh đang
+ * Dòng đơn trên đường `/admin/*`: {@link SalesOrderLineView} cộng tồn toàn chuỗi
+ * đã CHỤP lúc nhận đơn (ADR-10). Chỉ đường Admin mang trường này —
+ * `/mobile/sales-orders` giữ nguyên hình dạng (ADR-07).
+ */
+export interface AdminSalesOrderLineView extends SalesOrderLineView {
+  /** `numeric` về dưới dạng CHUỖI — ép số ở đây. `null` với đơn không qua đường đối tác / đơn cũ. */
+  chainStockAtIntake: number | null;
+}
+
+/**
+ * Đơn trên đường `/admin/*`: {@link SalesOrderView} cộng nhãn "Thiếu hàng" đã
+ * chốt lúc nhận đơn (ADR-10, A-35 — snapshot, không tính lại khi tồn đổi).
+ * `needsConfirmation` là cờ của đường chi nhánh — hình dạng Admin giữ nguyên.
+ */
+export interface AdminSalesOrderView extends Omit<SalesOrderView, 'lines' | 'needsConfirmation'> {
+  stockShort: boolean;
+  lines: AdminSalesOrderLineView[];
+}
+
+/**
+ * Một dòng của lưới *Tất cả đơn*: {@link AdminSalesOrderView} cộng chi nhánh đang
  * giữ đơn, gắn INLINE vào từng dòng (tiền lệ `inline_relations_over_root_map`)
  * thay vì một root map `{[id]: name}` bên cạnh `data`.
  */
-export interface OrgSalesOrderView extends SalesOrderView {
+export interface OrgSalesOrderView extends AdminSalesOrderView {
   /** `null` = đơn còn trong pool, chưa phân cho chi nhánh nào. */
   branchId: string | null;
   /**
@@ -339,6 +394,8 @@ export class SalesOrderService {
     // ADR-06: huỷ đơn KHÔNG viết đường đảo riêng — gọi lại đúng service đã đảo
     // kho, điểm và công nợ cho hoá đơn POS.
     private readonly cancelInvoiceService: CancelInvoiceService,
+    // Tồn toàn chuỗi cho nhãn "Thiếu hàng" lúc nhận đơn đối tác (ADR-09/ADR-10).
+    private readonly stockAvailability: StockAvailabilityService,
     // Tuỳ chọn: `MediaModule` là `@Global()` nên Nest luôn tiêm; spec cũ dựng
     // service bằng tay không truyền thì dòng đơn chỉ thiếu ảnh.
     @Optional() private readonly mediaQuery?: MediaQueryService,
@@ -461,11 +518,25 @@ export class SalesOrderService {
           ...prepared.totals,
         });
         const persisted = await manager.save(SalesOrderEntity, entity);
+
+        // Snapshot tồn TOÀN CHUỖI lúc nhận (A-35, ADR-10) — đọc SAU lượt insert
+        // đơn: gửi lại cùng `externalOrderId` thua ở UNIQUE ngay câu trên, nên
+        // replay không bao giờ đọc tồn và đơn cũ giữ nguyên nhãn đã chốt.
+        // Thiếu hàng KHÔNG chặn đơn và không lộ ra response (A-36).
+        const { available, stockShort } = await this.chainStockSnapshot(prepared.lines, actor.organizationId, manager);
+        const lines = prepared.lines.map((line) => ({
+          ...line,
+          chainStockAtIntake: String(available.get(line.itemId) ?? 0),
+        }));
         await manager.save(
           SalesOrderLineEntity,
-          prepared.lines.map((line) => manager.create(SalesOrderLineEntity, { ...line, salesOrderId: persisted.id })),
+          lines.map((line) => manager.create(SalesOrderLineEntity, { ...line, salesOrderId: persisted.id })),
         );
-        return { order: persisted, lines: prepared.lines };
+        if (stockShort) {
+          await manager.update(SalesOrderEntity, persisted.id, { stockShort: true });
+          persisted.stockShort = true;
+        }
+        return { order: persisted, lines };
       });
 
       this.logger.log(
@@ -581,6 +652,26 @@ export class SalesOrderService {
     });
 
     return { lines, totals: { subtotal: String(subtotal), discount: '0', amountDue: String(subtotal) } };
+  }
+
+  /**
+   * Nhãn "Thiếu hàng" của đơn đối tác: SL cần GỘP theo `itemId` trước khi so —
+   * hai dòng cùng mã, mỗi dòng đủ riêng mà cộng lại vượt tồn vẫn là thiếu.
+   * `available` là tồn toàn chuỗi (mọi chi nhánh, A-34), đọc bằng `manager` để
+   * nằm trong transaction nhận đơn.
+   */
+  private async chainStockSnapshot(
+    lines: Array<{ itemId: string; quantity: string }>,
+    organizationId: string,
+    manager: EntityManager,
+  ): Promise<{ available: Map<string, number>; stockShort: boolean }> {
+    const required = new Map<string, number>();
+    for (const line of lines) {
+      required.set(line.itemId, (required.get(line.itemId) ?? 0) + Number(line.quantity));
+    }
+    const available = await this.stockAvailability.forItems(organizationId, [...required.keys()], undefined, manager);
+    const stockShort = [...required].some(([itemId, qty]) => qty > (available.get(itemId) ?? 0));
+    return { available, stockShort };
   }
 
   /** Tiền về từ `numeric` dưới dạng CHUỖI — ép về số đúng một chỗ, như `toView`. */
@@ -735,8 +826,13 @@ export class SalesOrderService {
       qb.andWhere(own, ownParams);
     }
     if (query.awaitingCashier) {
+      // Đơn WEB chưa được chi nhánh duyệt KHÔNG phải việc của thu ngân (A-47):
+      // loại ở server để app thu ngân khỏi phải sửa. Chỉ áp cho vế `SENT` — một
+      // đơn đã `PROCESSED` luôn đã qua `approve()`, và đơn web cũ xử lý trước
+      // khi có bước duyệt vẫn phải giữ lối *Tiếp tục thu tiền* cho nháp dở.
       qb.andWhere(
-        '(so.status = :sent OR (so.status = :processed AND EXISTS ' +
+        '((so.status = :sent AND (so.salespersonId IS NOT NULL OR so.confirmedAt IS NOT NULL)) ' +
+          'OR (so.status = :processed AND EXISTS ' +
           '(SELECT 1 FROM invoices i WHERE i.id = so.invoice_id AND i.is_draft = true)))',
         { sent: SalesOrderStatus.SENT, processed: SalesOrderStatus.PROCESSED },
       );
@@ -833,6 +929,8 @@ export class SalesOrderService {
     }
     if (query.from) qb.andWhere('so.createdAt >= :from', { from: new Date(query.from) });
     if (query.to) qb.andWhere('so.createdAt <= :to', { to: new Date(query.to) });
+    if (query.confirmed === true) qb.andWhere('so.confirmedAt IS NOT NULL');
+    if (query.confirmed === false) qb.andWhere('so.confirmedAt IS NULL');
 
     const [rows, total] = await qb
       .orderBy('so.createdAt', 'DESC')
@@ -857,7 +955,7 @@ export class SalesOrderService {
 
     return {
       data: rows.map<OrgSalesOrderView>((row) => ({
-        ...this.toView(row, linesByOrder.get(row.id) ?? [], invoiceCodes.get(row.invoiceId ?? '') ?? null),
+        ...this.toAdminView(row, linesByOrder.get(row.id) ?? [], invoiceCodes.get(row.invoiceId ?? '') ?? null),
         branchId: row.branchId ?? null,
         branchName: row.branchId ? branchNames.get(row.branchId) ?? null : null,
       })),
@@ -928,8 +1026,9 @@ export class SalesOrderService {
    * nó chỉ không nằm trên đường điều phối nữa.
    *
    * Trạng thái giữ nguyên `SENT`: phân đơn là giao việc, không phải duyệt.
+   * Và KHÔNG đòi đơn đã duyệt (A-41): duyệt là việc của chi nhánh, SAU khi phân.
    */
-  async dispatch(id: string, branchId: string, actor: ActorContext): Promise<SalesOrderView> {
+  async dispatch(id: string, branchId: string, actor: ActorContext): Promise<AdminSalesOrderView> {
     await this.dataSource.transaction(async (manager) => {
       const current = await this.lockedOrder(manager, id, actor);
       if (current.status !== SalesOrderStatus.SENT) {
@@ -987,6 +1086,83 @@ export class SalesOrderService {
   }
 
   /**
+   * Chi nhánh DUYỆT một đơn web nó đang giữ (ADR-12, A-41, A-43, AC-30, AC-35).
+   *
+   * KHÔNG phải {@link approve}: `approve` là *Nhận xử lý* của thu ngân (tạo hoá
+   * đơn nháp, `PROCESSED`); `confirm` chỉ đặt `confirmed_at/by`, trạng thái giữ
+   * `SENT`. Hai tên khác hẳn là có chủ đích.
+   *
+   * Duyệt được khi `status = SENT AND branch_id = actor.branchId AND
+   * salesperson_id IS NULL`. Đơn chi nhánh khác → 403
+   * {@link ORDER_NOT_HELD_BY_BRANCH} (kiểm TRƯỚC, như `returnToPool`: người
+   * không giữ đơn không được biết trạng thái của nó); còn lại → 409
+   * {@link ORDER_NOT_CONFIRMABLE}.
+   *
+   * Duyệt lại một đơn đã duyệt là NO-OP — không ghi đè người/lúc duyệt đầu, không
+   * thêm dòng `CONFIRM` thứ hai.
+   */
+  async confirm(id: string, actor: ActorContext): Promise<SalesOrderView> {
+    await this.dataSource.transaction(async (manager) => {
+      const current = await this.lockedOrder(manager, id, actor);
+      if (current.branchId && current.branchId !== actor.branchId) {
+        throw new ForbiddenException({
+          code: ORDER_NOT_HELD_BY_BRANCH,
+          message: 'Đơn hàng không thuộc chi nhánh đang thao tác',
+        });
+      }
+      if (current.status !== SalesOrderStatus.SENT || !current.branchId || current.salespersonId != null) {
+        throw new ConflictException({
+          code: ORDER_NOT_CONFIRMABLE,
+          message:
+            current.status !== SalesOrderStatus.SENT
+              ? `Đơn hàng không ở trạng thái chờ duyệt (${current.status})`
+              : !current.branchId
+                ? 'Đơn hàng chưa được phân cho chi nhánh, chưa duyệt được'
+                : 'Đơn của tư vấn viên không cần duyệt',
+        });
+      }
+      if (current.confirmedAt != null) return;
+
+      // Cập nhật CÓ ĐIỀU KIỆN trên chi nhánh của người duyệt: lượt trả về pool
+      // chạy song song mà thắng trước thì câu này đổi 0 dòng — đơn đã rời chi
+      // nhánh, không còn gì để duyệt.
+      const confirmed = await manager
+        .createQueryBuilder()
+        .update(SalesOrderEntity)
+        .set({ confirmedAt: new Date(), confirmedBy: actor.userId })
+        .where('id = :id', { id })
+        .andWhere('organization_id = :org', { org: actor.organizationId })
+        .andWhere('branch_id = :branch', { branch: actor.branchId })
+        .execute();
+      if (!confirmed.affected) {
+        throw new ConflictException({
+          code: ORDER_NOT_CONFIRMABLE,
+          message: 'Đơn hàng đã được trả về pool, không duyệt được nữa',
+        });
+      }
+
+      // Vết điều phối, trong CÙNG transaction (ADR-08). `CONFIRM` không đổi chi
+      // nhánh — `CHK_sales_order_dispatch_events_shape` đòi from/to đều NULL;
+      // chi nhánh duyệt suy từ dòng `DISPATCH` ngay trước.
+      await manager.insert(SalesOrderDispatchEventEntity, {
+        organizationId: actor.organizationId,
+        salesOrderId: id,
+        action: SalesOrderDispatchAction.CONFIRM,
+        fromBranchId: null,
+        toBranchId: null,
+        actorUserId: actor.userId,
+        reason: null,
+      });
+
+      this.logger.log(
+        `Sales order ${id} confirmed at branch ${actor.branchId} (org=${actor.organizationId}, by=${actor.userId})`,
+      );
+    });
+
+    return this.getById(id, actor);
+  }
+
+  /**
    * Trả một đơn đang ở chi nhánh về POOL (AC-21, AC-22).
    *
    * A-05: trả về = `branch_id := NULL` + một dòng lịch sử, và `status` GIỮ
@@ -1003,8 +1179,11 @@ export class SalesOrderService {
    *
    * Mọi phép chặn chạy TRƯỚC lượt ghi đầu tiên, dưới cùng một khoá hàng: một đơn
    * bị từ chối trả về không được để lại nửa dòng lịch sử nào.
+   *
+   * Trả về XOÁ duyệt (A-45): chi nhánh nhận sau phải tự duyệt lại. Dòng
+   * `CONFIRM` cũ trong lịch sử giữ nguyên.
    */
-  async returnToPool(id: string, reason: string, actor: ActorContext): Promise<SalesOrderView> {
+  async returnToPool(id: string, reason: string, actor: ActorContext): Promise<AdminSalesOrderView> {
     // Cắt khoảng trắng ở service chứ không chỉ ở DTO: `reason` là cột BẮT BUỘC
     // của dòng `RETURN` theo `CHK_sales_order_dispatch_events_shape`, và một
     // chuỗi trắng lọt xuống đây sẽ thành 500 từ driver thay vì 400 đọc được.
@@ -1054,11 +1233,12 @@ export class SalesOrderService {
       // Cập nhật CÓ ĐIỀU KIỆN trên chính chi nhánh vừa đọc được: hai lượt trả
       // song song thì bên thua đổi 0 dòng và KHÔNG ghi vết thứ hai.
       // `() => 'NULL'` là cách TypeORM nhận một giá trị NULL ở `set()` khi cột
-      // khai `branchId?: string` (tiền lệ `voucher.service.ts`).
+      // khai `branchId?: string` (tiền lệ `voucher.service.ts`). Duyệt xoá trong
+      // CÙNG câu (A-45): không có khe nào để đơn nằm ở pool mà còn "Đã duyệt".
       const released = await manager
         .createQueryBuilder()
         .update(SalesOrderEntity)
-        .set({ branchId: () => 'NULL' })
+        .set({ branchId: () => 'NULL', confirmedAt: null, confirmedBy: null })
         .where('id = :id', { id })
         .andWhere('organization_id = :org', { org: actor.organizationId })
         .andWhere('branch_id = :from', { from: fromBranchId })
@@ -1098,11 +1278,11 @@ export class SalesOrderService {
    * chỉ cầm quyền điều phối sẽ ăn 404 trên chính đơn vừa phân xong — đúng cái
    * bẫy đã làm chết đường partner ở T-01-03.
    */
-  private async organizationView(id: string, actor: ActorContext): Promise<SalesOrderView> {
+  private async organizationView(id: string, actor: ActorContext): Promise<AdminSalesOrderView> {
     const order = await this.orders.findOne({ where: { id, organizationId: actor.organizationId } });
     if (!order) throw new NotFoundException(`Sales order ${id} not found`);
     const lines = await this.lines.find({ where: { salesOrderId: id }, order: { lineNo: 'ASC' } });
-    return this.toView(order, lines);
+    return this.toAdminView(order, lines);
   }
 
   async getById(id: string, actor: ActorContext): Promise<SalesOrderView> {
@@ -1189,6 +1369,14 @@ export class SalesOrderService {
       const current = await this.lockedOrder(manager, id, actor);
       if (!VALID_TRANSITIONS[current.status].includes(SalesOrderStatus.PROCESSED)) {
         throw new ConflictException(`Đơn hàng đã được xử lý (${current.status})`);
+      }
+      // Đơn WEB phải được chi nhánh duyệt trước (A-42). Kiểm TRƯỚC khi tra ca POS
+      // và trước khi tạo nháp. Đơn tư vấn viên không có bước duyệt (A-43).
+      if (current.salespersonId == null && current.confirmedAt == null) {
+        throw new ConflictException({
+          code: ORDER_NOT_CONFIRMED,
+          message: 'Đơn hàng chưa được chi nhánh duyệt',
+        });
       }
 
       if (!current.branchId) throw new BadRequestException(`Sales order ${id} has no branch`);
@@ -1542,6 +1730,8 @@ export class SalesOrderService {
       invoiceId: order.invoiceId ?? null,
       invoiceCode,
       invoiceIsDraft,
+      confirmedAt: order.confirmedAt ?? null,
+      needsConfirmation: order.salespersonId == null,
       lines: lines.map((line) => ({
         id: line.id,
         itemId: line.itemId,
@@ -1558,6 +1748,27 @@ export class SalesOrderService {
         lineTotal: Number(line.lineTotal),
         thumbnailUrl: thumbnails.get(line.itemId) ?? null,
       })),
+    };
+  }
+
+  /**
+   * {@link toView} cộng nhãn thiếu hàng — CHỈ cho đường `/admin/*`. Không gộp vào
+   * `toView` vì `/mobile/sales-orders` phải giữ nguyên hình dạng (ADR-07).
+   */
+  private toAdminView(
+    order: SalesOrderEntity,
+    lines: SalesOrderLineEntity[],
+    invoiceCode: string | null = null,
+  ): AdminSalesOrderView {
+    const { needsConfirmation: _branchOnly, ...view } = this.toView(order, lines, invoiceCode);
+    return {
+      ...view,
+      stockShort: order.stockShort ?? false,
+      // `toView` giữ nguyên thứ tự `lines`, nên ghép theo chỉ số là đúng dòng.
+      lines: view.lines.map((line, i) => {
+        const snapshot = lines[i].chainStockAtIntake;
+        return { ...line, chainStockAtIntake: snapshot == null ? null : Number(snapshot) };
+      }),
     };
   }
 }

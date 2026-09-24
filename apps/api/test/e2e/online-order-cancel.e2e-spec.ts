@@ -113,6 +113,7 @@ let itemId!: string;
 let cashAccountId!: string;
 let locationId!: string;
 let orderKey!: string;
+let secondBranchAccessToken!: string;
 
 function orderPayload(externalOrderId: string) {
   return {
@@ -162,6 +163,25 @@ describe('Online order cancel — rollback bằng số (E2E)', () => {
       .send({ email: 'admin@test.com', password: 'password123', organizationId: SEEDED_ORG_ID })
       .expect(200);
     fixture.seed.accessToken = relogin.body.accessToken;
+
+    // `ActorContext.branchId` is `fromJwt ?? fromHeader` (JWT WINS) — a token
+    // minted by `/auth/login` carries the user's FIRST assigned branch as its
+    // JWT `branchId`, so `X-Branch-Id: SECOND_BRANCH_ID` alone is ignored by
+    // anything that reads `actor.branchId` (e.g. `confirm()`'s branch-match
+    // check). `/auth/switch-branch` mints a token whose JWT `branchId` is
+    // actually `SECOND_BRANCH_ID` — but it also REVOKES the session behind the
+    // token passed in, so it must run on a SEPARATE login, not
+    // `fixture.seed.accessToken` (still needed for everything else below).
+    const secondLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: 'admin@test.com', password: 'password123', organizationId: SEEDED_ORG_ID })
+      .expect(200);
+    const switchBranch = await request(app.getHttpServer())
+      .post('/auth/switch-branch')
+      .set('Authorization', authHeader(secondLogin.body.accessToken))
+      .send({ branchId: SECOND_BRANCH_ID })
+      .expect(200);
+    secondBranchAccessToken = switchBranch.body.accessToken;
 
     await ds.query(
       `INSERT INTO sales_channels (id, organization_id, created_by, code, name, is_active, created_at, updated_at)
@@ -299,6 +319,16 @@ describe('Online order cancel — rollback bằng số (E2E)', () => {
       .set('X-Forwarded-For', WHITELISTED_IP)
       .send(body);
 
+  // Duyệt (T-11, ADR-12): dispatch KHÔNG còn đòi confirmed_at (T-11-01) —
+  // duyệt giờ là việc của chi nhánh, SAU khi phân, qua
+  // `/mobile/sales-orders/:id/confirm`. `approve()` vẫn đòi confirmed_at cho
+  // đơn web (A-42), nên mọi lượt approve trong file này confirm trước.
+  const confirm = (orderId: string) =>
+    request(app.getHttpServer())
+      .post(`/mobile/sales-orders/${orderId}/confirm`)
+      .set('Authorization', authHeader(secondBranchAccessToken))
+      .set('X-Branch-Id', SECOND_BRANCH_ID);
+
   const dispatch = (orderId: string, branchId: string) =>
     request(app.getHttpServer())
       .post(`/admin/sales-orders/${orderId}/dispatch`)
@@ -341,6 +371,7 @@ describe('Online order cancel — rollback bằng số (E2E)', () => {
     const orderId = created.body.id;
 
     await dispatch(orderId, SECOND_BRANCH_ID).expect(200);
+    await confirm(orderId).expect(200);
     const approveRes = await approve(orderId).expect(200);
     expect(approveRes.body.status).toBe('PROCESSED');
 
