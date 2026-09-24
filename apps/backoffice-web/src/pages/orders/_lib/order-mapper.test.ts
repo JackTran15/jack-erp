@@ -222,3 +222,45 @@ describe("toOrderLineRows", () => {
     ]);
   });
 });
+
+describe("toOrderRow — nhãn duyệt ở chi nhánh (T-11-06)", () => {
+  const webOrder: SalesOrderDto = {
+    id: "ord-web-confirm",
+    code: "DT000999",
+    status: "SENT",
+    createdAt: "2026-09-24T03:15:00.000Z",
+    salesChannel: "WEB",
+    needsConfirmation: true,
+    confirmedAt: null,
+    lines: [],
+  };
+
+  it("marks a SENT web order as waiting for confirmation", () => {
+    const row = toOrderRow(webOrder);
+    expect(row.needsConfirmation).toBe(true);
+    expect(row.confirmedAt).toBeNull();
+  });
+
+  it("keeps confirmedAt on a SENT web order already confirmed", () => {
+    const row = toOrderRow({ ...webOrder, confirmedAt: "2026-09-24T04:00:00.000Z" });
+    expect(row.needsConfirmation).toBe(true);
+    expect(row.confirmedAt).toBe("2026-09-24T04:00:00.000Z");
+  });
+
+  it("does not ask to confirm a web order that was already processed", () => {
+    const row = toOrderRow({ ...webOrder, status: "PROCESSED" });
+    expect(row.needsConfirmation).toBe(false);
+  });
+
+  it("does not ask to confirm a salesperson (mobile) order", () => {
+    const row = toOrderRow({ ...webOrder, salesChannel: "MOBILE", needsConfirmation: false });
+    expect(row.needsConfirmation).toBe(false);
+  });
+
+  it("carries no confirmation keys for an admin DTO without needsConfirmation", () => {
+    const { needsConfirmation: _omit, ...adminDto } = webOrder;
+    const row = toOrderRow({ ...adminDto, confirmedAt: "2026-09-24T04:00:00.000Z" });
+    expect("needsConfirmation" in row).toBe(false);
+    expect("confirmedAt" in row).toBe(false);
+  });
+});

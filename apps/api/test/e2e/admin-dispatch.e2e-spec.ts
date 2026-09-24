@@ -149,7 +149,7 @@ describe('Admin dispatch — POST /admin/sales-orders/:id/dispatch (E2E)', () =>
       .set('Authorization', authHeader(token))
       .send({ branchId });
 
-  it('AC-11: phân đơn pool cho chi nhánh không mở ca POS nào vẫn → 200, branch_id được set, trạng thái vẫn SENT', async () => {
+  it('AC-11/AC-46: phân đơn pool cho chi nhánh không mở ca POS nào vẫn → 200, branch_id được set, trạng thái vẫn SENT, confirmed_at vẫn NULL', async () => {
     const ds = app.get(DataSource);
 
     // Không có ca POS nào được mở cho SECOND_BRANCH_ID trong suốt suite này —
@@ -161,16 +161,23 @@ describe('Admin dispatch — POST /admin/sales-orders/:id/dispatch (E2E)', () =>
     expect(openSessions).toHaveLength(0);
 
     const orderId = await createPoolOrder(ds);
+    // AC-46: phân đơn CHƯA duyệt — duyệt giờ là việc của chi nhánh, SAU khi
+    // phân (T-11, ADR-12); Admin không còn đòi confirmed_at trước dispatch.
     const res = await dispatchOrder(seed.accessToken, orderId, SECOND_BRANCH_ID).expect(200);
     expect(res.body.id).toBe(orderId);
     expect(res.body.status).toBe('SENT');
+    expect(res.body.confirmedAt).toBeNull();
 
-    const [row] = await ds.query('SELECT branch_id, status FROM sales_orders WHERE id = $1', [orderId]);
+    const [row] = await ds.query(
+      'SELECT branch_id, status, confirmed_at FROM sales_orders WHERE id = $1',
+      [orderId],
+    );
     expect(row.branch_id).toBe(SECOND_BRANCH_ID);
     expect(row.status).toBe('SENT');
+    expect(row.confirmed_at).toBeNull();
 
     const events = await ds.query(
-      `SELECT action, to_branch_id, from_branch_id FROM sales_order_dispatch_events WHERE sales_order_id = $1`,
+      `SELECT action, to_branch_id, from_branch_id FROM sales_order_dispatch_events WHERE sales_order_id = $1 AND action = 'DISPATCH'`,
       [orderId],
     );
     expect(events).toHaveLength(1);
@@ -191,7 +198,7 @@ describe('Admin dispatch — POST /admin/sales-orders/:id/dispatch (E2E)', () =>
     expect(second.body.details.code).toBe('ORDER_ALREADY_DISPATCHED');
 
     const events = await ds.query(
-      `SELECT action FROM sales_order_dispatch_events WHERE sales_order_id = $1`,
+      `SELECT action FROM sales_order_dispatch_events WHERE sales_order_id = $1 AND action = 'DISPATCH'`,
       [orderId],
     );
     expect(events).toHaveLength(1);
@@ -211,7 +218,7 @@ describe('Admin dispatch — POST /admin/sales-orders/:id/dispatch (E2E)', () =>
     expect([resA.status, resB.status].sort()).toEqual([200, 409]);
 
     const events = await ds.query(
-      `SELECT action FROM sales_order_dispatch_events WHERE sales_order_id = $1`,
+      `SELECT action FROM sales_order_dispatch_events WHERE sales_order_id = $1 AND action = 'DISPATCH'`,
       [orderId],
     );
     expect(events).toHaveLength(1);
@@ -231,5 +238,156 @@ describe('Admin dispatch — POST /admin/sales-orders/:id/dispatch (E2E)', () =>
       [orderId],
     );
     expect(events).toHaveLength(0);
+  });
+
+  it('AC-39: GET /admin/sales-orders?unassigned=true trả stockShort và chainStockAtIntake của từng dòng', async () => {
+    const ds = app.get(DataSource);
+    const shortId = await createPoolOrder(ds);
+    const legacyId = await createPoolOrder(ds);
+
+    // Snapshot như T-08-03 ghi lúc nhận đơn: đơn thiếu hàng, dòng chụp tồn = 2.
+    await ds.query('UPDATE sales_orders SET stock_short = true WHERE id = $1', [shortId]);
+    const insertLine = (orderId: string, chainStock: string | null) =>
+      ds.query(
+        `INSERT INTO sales_order_lines
+           (id, sales_order_id, line_no, item_id, item_code, item_name, unit, quantity, unit_price, line_total, chain_stock_at_intake)
+         VALUES (gen_random_uuid(), $1::uuid, 1, gen_random_uuid(), 'SKU-500', 'Hàng thử', 'cái', 3, 10000, 30000, $2)`,
+        [orderId, chainStock],
+      );
+    await insertLine(shortId, '2');
+    // Đơn cũ / không qua đường đối tác: cột để NULL, cờ mặc định false.
+    await insertLine(legacyId, null);
+
+    const res = await request(app.getHttpServer())
+      .get('/admin/sales-orders')
+      .query({ unassigned: 'true', limit: 100 })
+      .set('Authorization', authHeader(seed.accessToken))
+      .expect(200);
+
+    const short = res.body.data.find((o: { id: string }) => o.id === shortId);
+    const legacy = res.body.data.find((o: { id: string }) => o.id === legacyId);
+    expect(short).toBeDefined();
+    expect(legacy).toBeDefined();
+
+    expect(short.stockShort).toBe(true);
+    expect(short.lines).toHaveLength(1);
+    // `numeric` ép về SỐ, không phải chuỗi "2".
+    expect(short.lines[0].chainStockAtIntake).toBe(2);
+
+    expect(legacy.stockShort).toBe(false);
+    expect(legacy.lines[0].chainStockAtIntake).toBeNull();
+  });
+
+  /**
+   * `POST /admin/sales-orders/stock-check` (ADR-09) — nền của dialog "Duyệt
+   * đơn" (AC-30/AC-31): toàn chuỗi khi `branchId` vắng, tại chi nhánh khi có.
+   * `stock_balances` đòi FK thật tới `items`/`locations` (không như
+   * `sales_order_lines.item_id`, vốn không có FK) — gieo fixture đầy đủ như
+   * `partner-order.e2e-spec.ts`.
+   */
+  describe('Đối chiếu tồn — POST /admin/sales-orders/stock-check (ADR-09)', () => {
+    const STOCK_CHECK_CATEGORY_ID = 'f1000000-0000-4000-8000-000000000001';
+    const STOCK_CHECK_PRODUCT_ID = 'f2000000-0000-4000-8000-000000000001';
+    const STOCK_CHECK_ITEM_ID = 'f3000000-0000-4000-8000-000000000001';
+    const STOCK_CHECK_ITEM_CODE = 'SKU-CHECK';
+    const STOCK_CHECK_STORAGE_A_ID = 'f4000000-0000-4000-8000-00000000000a';
+    const STOCK_CHECK_STORAGE_B_ID = 'f4000000-0000-4000-8000-00000000000b';
+    const STOCK_CHECK_LOCATION_A_ID = 'f5000000-0000-4000-8000-00000000000a';
+    const STOCK_CHECK_LOCATION_B_ID = 'f5000000-0000-4000-8000-00000000000b';
+
+    let stockCheckOrderId!: string;
+
+    beforeAll(async () => {
+      const ds = app.get(DataSource);
+
+      await ds.query(
+        `INSERT INTO inventory_item_categories
+           (id, organization_id, created_by, name, code, status, created_at, updated_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'Danh mục stock-check', 'CAT-CHECK', 'ACTIVE'::inventory_item_category_status_enum, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [STOCK_CHECK_CATEGORY_ID, SEEDED_ORG_ID, SEEDED_USER_ID],
+      );
+      await ds.query(
+        `INSERT INTO products (id, organization_id, created_by, code, name, is_active, created_at, updated_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, 'PROD-CHECK', 'Sản phẩm stock-check', true, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [STOCK_CHECK_PRODUCT_ID, SEEDED_ORG_ID, SEEDED_USER_ID],
+      );
+      await ds.query(
+        `INSERT INTO items
+           (id, organization_id, created_by, code, name, unit, is_active,
+            selling_price, purchase_price, product_id, category_id, created_at, updated_at)
+         VALUES ($1::uuid, $2::uuid, $3::uuid, $4, 'Hàng stock-check', 'pcs', true, 100000, 60000, $5::uuid, $6::uuid, NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [STOCK_CHECK_ITEM_ID, SEEDED_ORG_ID, SEEDED_USER_ID, STOCK_CHECK_ITEM_CODE, STOCK_CHECK_PRODUCT_ID, STOCK_CHECK_CATEGORY_ID],
+      );
+
+      for (const [storageId, locationId, branchId, code] of [
+        [STOCK_CHECK_STORAGE_A_ID, STOCK_CHECK_LOCATION_A_ID, seed.branchId, 'CHK-A'],
+        [STOCK_CHECK_STORAGE_B_ID, STOCK_CHECK_LOCATION_B_ID, SECOND_BRANCH_ID, 'CHK-B'],
+      ]) {
+        await ds.query(
+          `INSERT INTO storages (id, organization_id, branch_id, name, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [storageId, SEEDED_ORG_ID, branchId, `Kho ${code}`, SEEDED_USER_ID],
+        );
+        await ds.query(
+          `INSERT INTO locations (id, organization_id, branch_id, storage_id, code, name, type, created_by, created_at, updated_at)
+           VALUES ($1::uuid, $2::uuid, $3, $4::uuid, $5, $5, 'SHELF', $6::uuid, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [locationId, SEEDED_ORG_ID, branchId, storageId, `${code}-01`, SEEDED_USER_ID],
+        );
+      }
+
+      // CN-A: 2 tồn; CN-B: 3 tồn — toàn chuỗi = 5.
+      await ds.query(
+        `INSERT INTO stock_balances (id, organization_id, branch_id, item_id, location_id, quantity, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 2, $5, NOW(), NOW())`,
+        [SEEDED_ORG_ID, seed.branchId, STOCK_CHECK_ITEM_ID, STOCK_CHECK_LOCATION_A_ID, SEEDED_USER_ID],
+      );
+      await ds.query(
+        `INSERT INTO stock_balances (id, organization_id, branch_id, item_id, location_id, quantity, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, 3, $5, NOW(), NOW())`,
+        [SEEDED_ORG_ID, SECOND_BRANCH_ID, STOCK_CHECK_ITEM_ID, STOCK_CHECK_LOCATION_B_ID, SEEDED_USER_ID],
+      );
+
+      // Đơn cần 4 — đủ toàn chuỗi (5), thiếu 2 nếu chỉ soi CN-A (2).
+      stockCheckOrderId = await createPoolOrder(ds);
+      await ds.query(
+        `INSERT INTO sales_order_lines
+           (id, sales_order_id, line_no, item_id, item_code, item_name, unit, quantity, unit_price, line_total)
+         VALUES (gen_random_uuid(), $1::uuid, 1, $2::uuid, $3, 'Hàng stock-check', 'pcs', 4, 100000, 400000)`,
+        [stockCheckOrderId, STOCK_CHECK_ITEM_ID, STOCK_CHECK_ITEM_CODE],
+      );
+    });
+
+    const stockCheck = (orders: Array<{ orderId: string; branchId?: string }>) =>
+      request(app.getHttpServer())
+        .post('/admin/sales-orders/stock-check')
+        .set('Authorization', authHeader(seed.accessToken))
+        .send({ orders });
+
+    it('toàn chuỗi: shortBy = 0, sufficient = true (2 + 3 >= 4)', async () => {
+      const res = await stockCheck([{ orderId: stockCheckOrderId }]).expect(200);
+      const order = res.body.orders.find((o: { orderId: string }) => o.orderId === stockCheckOrderId);
+      expect(order).toBeDefined();
+      expect(order.branchId).toBeNull();
+      expect(order.sufficient).toBe(true);
+      expect(order.shortLineCount).toBe(0);
+      expect(order.lines[0].available).toBe(5);
+      expect(order.lines[0].shortBy).toBe(0);
+    });
+
+    it('theo chi nhánh: chỉ CN-A (2) → thiếu 2, sufficient = false', async () => {
+      const res = await stockCheck([{ orderId: stockCheckOrderId, branchId: seed.branchId }]).expect(200);
+      const order = res.body.orders.find((o: { orderId: string }) => o.orderId === stockCheckOrderId);
+      expect(order).toBeDefined();
+      expect(order.branchId).toBe(seed.branchId);
+      expect(order.sufficient).toBe(false);
+      expect(order.shortLineCount).toBe(1);
+      expect(order.lines[0].available).toBe(2);
+      expect(order.lines[0].shortBy).toBe(2);
+    });
   });
 });

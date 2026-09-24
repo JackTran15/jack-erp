@@ -928,3 +928,536 @@ history:
     by: claude
     reason: cây làm việc chưa commit theo yêu cầu người dùng — drift là toàn bộ feature
     ticket: T-01-08
+  - gate: G1
+    action: reopened
+    at: 2026-09-24T08:20:59
+    by: Akenzy
+    reason: Yêu cầu khách 2026-09-24 - (1) duyệt nhiều đơn kèm cảnh báo thiếu hàng; (2) đơn đối tác kiểm tồn toàn chuỗi theo itemCode, gắn nhãn thiếu hàng; (3) màn điều phối chọn chi nhánh từng đơn + nút Validate báo cáo đủ/thiếu theo chi nhánh, chọn chi nhánh đầu bảng auto-fill
+  - gate: G1
+    action: passed
+    at: 2026-09-24T08:32:53
+    by: Akenzy
+    evidence: 40 assumptions, none blocking-and-pending; 45 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T08:40:24
+    by: Akenzy
+    evidence: 11 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T08:40:49
+    by: Akenzy
+    evidence: graph valid - 10 UoW, 49 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T08:41:48
+    by: claude
+    ticket: T-08-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T08:41:49
+    by: claude
+    ticket: T-08-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T08:43:59
+    by: claude
+    ticket: T-08-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T08:44:07
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng trước phiên này, không thuộc ticket
+    ticket: T-08-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T08:44:07
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng trước phiên này, không thuộc ticket
+    ticket: T-08-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T08:45:38
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file của T-08-02 đã done cùng đợt song song
+    ticket: T-08-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T08:45:38
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file của T-08-02 đã done cùng đợt song song
+    ticket: T-08-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T08:46:08
+    by: claude
+    ticket: T-08-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T08:46:10
+    by: claude
+    ticket: T-09-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T08:49:13
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file còn lại thuộc T-08-03 đang chạy song song
+    ticket: T-09-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T08:49:13
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file còn lại thuộc T-08-03 đang chạy song song
+    ticket: T-09-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T08:52:32
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-08-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T08:52:32
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-08-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T09:04:48
+    by: claude
+    ticket: T-08-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T09:11:50
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-08-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T09:11:50
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-08-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T09:12:21
+    by: claude
+    ticket: T-08-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T09:12:21
+    by: claude
+    ticket: T-09-02
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T09:56:18
+    by: Akenzy
+    reason: Sửa touches - T-09-02 cần admin-sales-order.controller.ts (response DTO confirmedAt + query DTO confirmed), bỏ sales-order.constants.ts và sales-order-list.query.dto.ts không dùng; T-08-05 chuyển ô ảnh chụp sang DoD UOW-08 (chụp gộp khi frontend xong)
+  - gate: G3
+    action: passed
+    at: 2026-09-24T09:56:23
+    by: Akenzy
+    evidence: graph valid - 10 UoW, 49 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-24T09:56:23
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file api còn lại thuộc T-09-02 đang chạy
+    ticket: T-08-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T09:56:23
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file api còn lại thuộc T-09-02 đang chạy
+    ticket: T-08-05
+  - gate: G4
+    action: scope
+    at: 2026-09-24T09:57:27
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-09-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T09:57:27
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-09-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T09:57:52
+    by: claude
+    ticket: T-09-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T10:09:41
+    by: Akenzy
+    reason: T-09-03 - ô done-when 'file sinh được commit' trái yêu cầu giữ cây chưa commit; đổi thành 'có trong cây làm việc, không sửa tay' như T-08-04
+  - gate: G3
+    action: passed
+    at: 2026-09-24T10:09:41
+    by: Akenzy
+    evidence: graph valid - 10 UoW, 49 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-24T10:09:42
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-09-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T10:09:42
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-09-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T10:10:10
+    by: claude
+    ticket: T-09-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T10:10:14
+    by: claude
+    ticket: T-09-05
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T10:13:53
+    by: Akenzy
+    reason: Áp quyết định 'gộp ảnh chụp vào demo UoW' (đã chốt cho T-08-05) cho T-09-05, T-10-01, T-10-02 - chuyển ô ảnh chụp/Adminer sang DoD UOW-09/UOW-10; T-10-01 thêm ô build
+  - gate: G3
+    action: passed
+    at: 2026-09-24T10:13:53
+    by: Akenzy
+    evidence: graph valid - 10 UoW, 49 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-24T10:13:53
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-09-04 đang chạy
+    ticket: T-09-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T10:13:53
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-09-04 đang chạy
+    ticket: T-09-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T10:14:19
+    by: claude
+    ticket: T-10-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T10:17:40
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-09-04 đang chạy
+    ticket: T-10-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T10:17:40
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-09-04 đang chạy
+    ticket: T-10-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T10:18:01
+    by: claude
+    ticket: T-10-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T10:21:14
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-09-04 đang chạy
+    ticket: T-10-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T10:21:14
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-09-04 đang chạy
+    ticket: T-10-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T10:36:35
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-09-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T10:36:35
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-09-04
+  - gate: G1
+    action: reopened
+    at: 2026-09-24T11:51:40
+    by: Akenzy
+    reason: Akenzy 2026-09-24 - Duyệt đơn KHÔNG thuộc màn Điều phối; chuyển sang màn đơn hàng chi nhánh, SAU khi phân; bắt buộc trước khi thu ngân xử lý; chỉ đơn từ điều phối; cảnh báo theo tồn chi nhánh; trả về pool xoá duyệt. Đảo A-30/A-31/A-32/A-40
+  - gate: G1
+    action: passed
+    at: 2026-09-24T12:03:01
+    by: Akenzy
+    evidence: 47 assumptions, none blocking-and-pending; 48 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T12:03:01
+    by: Akenzy
+    evidence: 12 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T12:03:01
+    by: Akenzy
+    evidence: graph valid - 11 UoW, 54 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T12:03:28
+    by: claude
+    ticket: T-11-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T12:09:14
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T12:09:14
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T12:09:39
+    by: claude
+    ticket: T-11-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T12:15:01
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T12:15:01
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T12:15:33
+    by: claude
+    ticket: T-11-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T12:15:34
+    by: claude
+    ticket: T-11-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T12:18:25
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-11-03 đang chạy
+    ticket: T-11-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T12:18:25
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-11-03 đang chạy
+    ticket: T-11-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T12:18:48
+    by: claude
+    ticket: T-11-05
+  - gate: G4
+    action: scope
+    at: 2026-09-24T12:22:05
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-11-03 đang chạy
+    ticket: T-11-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T12:22:05
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-11-03 đang chạy
+    ticket: T-11-05
+  - gate: G4
+    action: scope
+    at: 2026-09-24T12:52:30
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T12:52:30
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-03
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T13:18:06
+    by: Akenzy
+    reason: Lỗi tìm thấy khi verify UOW-11 (S9.png) - đơn web ĐÃ XỬ LÝ trước khi có bước duyệt vẫn mang nhãn Chờ duyệt; thêm T-11-06 - needsConfirmation chỉ khi status SENT
+  - gate: G3
+    action: passed
+    at: 2026-09-24T13:18:13
+    by: Akenzy
+    evidence: graph valid - 11 UoW, 55 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T13:18:14
+    by: claude
+    ticket: T-11-06
+  - gate: G4
+    action: scope
+    at: 2026-09-24T13:19:14
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T13:19:14
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-11-06
+  - gate: G1
+    action: reopened
+    at: 2026-09-24T13:34:03
+    by: Akenzy
+    reason: Akenzy 2026-09-24 (lần 3) - không muốn cột chọn chi nhánh trên lưới Điều phối; tick đơn trước, bấm nút Điều phối mới mở dialog chọn chi nhánh từng đơn (ô đầu cột điền cả danh sách), Validate + Lưu trong dialog
+  - gate: G1
+    action: passed
+    at: 2026-09-24T13:35:41
+    by: Akenzy
+    evidence: 48 assumptions, none blocking-and-pending; 48 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T13:35:41
+    by: Akenzy
+    evidence: 13 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T13:35:41
+    by: Akenzy
+    evidence: graph valid - 12 UoW, 57 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T13:36:05
+    by: claude
+    ticket: T-12-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T13:38:50
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-12-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T13:38:50
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-12-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T13:38:50
+    by: claude
+    ticket: T-12-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T13:39:25
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-12-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T13:39:25
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-12-02
+  - gate: G1
+    action: reopened
+    at: 2026-09-24T13:50:42
+    by: Akenzy
+    reason: Akenzy 2026-09-24 - thêm xem lịch sử điều phối - modal mở bằng nút, đủ vòng đời (nhận, phân, duyệt, trả về, xử lý, huỷ/từ chối) kèm trạng thái, thời gian, người; trên Điều phối, Tất cả đơn, Đơn hàng chi nhánh
+  - gate: G1
+    action: passed
+    at: 2026-09-24T13:52:45
+    by: Akenzy
+    evidence: 54 assumptions, none blocking-and-pending; 54 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T13:52:45
+    by: Akenzy
+    evidence: 14 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T13:52:46
+    by: Akenzy
+    evidence: graph valid - 13 UoW, 61 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T13:53:12
+    by: claude
+    ticket: T-13-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T13:58:02
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-13-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T13:58:02
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-13-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T13:58:25
+    by: claude
+    ticket: T-13-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T14:01:23
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-13-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T14:01:23
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-13-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T14:01:51
+    by: claude
+    ticket: T-13-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T14:01:54
+    by: claude
+    ticket: T-13-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T14:05:18
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-13-03 đang chạy
+    ticket: T-13-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T14:05:18
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng; file e2e thuộc T-13-03 đang chạy
+    ticket: T-13-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T14:12:30
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-13-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T14:12:30
+    by: claude
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn của người dùng
+    ticket: T-13-03

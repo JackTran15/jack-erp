@@ -88,6 +88,27 @@ verify:
           identifier: '#login-email'
           password: '#login-password'
           submit: 'button[type="submit"]'
+    # Backoffice của CHECKOUT NÀY (erp2) trỏ vào API của chính nó.
+    # `local-backoffice` (:3000) gọi http://localhost:4000 — trên máy này cổng đó là
+    # API của checkout erp3, nối vào `erp_clone_prod` (dữ liệu cấp production). Bước
+    # verify có GHI (duyệt đơn, phân đơn) thì KHÔNG được chạy qua :3000.
+    # Dựng: API `PORT=4199 DB_NAME=erp_dev_3008 OUTBOX_RELAY_DISABLED=1 node dist/main`
+    # (apps/api), backoffice `VITE_API_BASE_URL=http://localhost:4199 vite --port 3010`.
+    # Không post_login: tài khoản LOCAL_BACKOFFICE_* vào thẳng; màn Admin là cấp tổ chức.
+    local-backoffice-erp2:
+      url: http://localhost:3010
+      required: true
+      auth:
+        recipe: form
+        path: /login
+        landing: /
+        credentials_prefix: LOCAL_BACKOFFICE
+        ready_when: { gone: 'text=Đang khôi phục phiên' }
+        selectors:
+          organization: '#login-org-id'
+          identifier: '#login-email'
+          password: 'input[type="password"]'
+          submit: 'button[type="submit"]'
     local-pos:
       url: http://localhost:3001
       required: true

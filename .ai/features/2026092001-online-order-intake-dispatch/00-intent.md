@@ -159,3 +159,21 @@ của `/orders`, khác nhau ở phạm vi dòng và cột Chi nhánh.
 Đơn trong pool **không xuất hiện ở bất kỳ chi nhánh nào** — đây là hệ quả tự
 nhiên của `branch_id IS NULL` + `list()` đang hard-filter theo branch
 (`sales-order.service.ts:271`), không phải một cơ chế ẩn phải viết thêm.
+
+## Mở rộng 2026-09-24 — yêu cầu khách (G1 reopened)
+
+Ba việc thêm, cùng một mục tiêu: người điều phối biết **đủ hay thiếu hàng** trước
+khi quyết định, nhưng không bị hệ thống chặn.
+
+1. **Duyệt đơn** (US-09): **chi nhánh** duyệt đơn web vừa được phân về, trên màn
+   đơn hàng của chi nhánh; duyệt nhiều đơn một lúc, cảnh báo thiếu hàng theo tồn
+   của chi nhánh, đồng ý thì vẫn duyệt. Thu ngân chỉ xử lý đơn đã duyệt. Màn
+   Điều phối không có bước duyệt (Akenzy đổi 2026-09-24, lần 2).
+2. **Nhãn Thiếu hàng** (US-10): đơn đối tác vào ERP được đối chiếu tồn toàn chuỗi
+   theo `itemCode`; thiếu thì vẫn nhận nhưng gắn nhãn.
+3. **Chọn chi nhánh từng đơn** (US-11): tick đơn trên lưới Điều phối, bấm "Điều phối"
+   → dialog chọn chi nhánh cho từng đơn (ô đầu cột điền cả danh sách), nút Validate
+   bên trái nút Lưu (Akenzy đổi 2026-09-24, lần 3: bỏ cột chọn trên lưới).
+
+Vẫn **ngoài phạm vi**: giữ hàng / reservation (xem trên) — đủ/thiếu so với tồn
+thực tế, không trừ đơn đang chờ (A-33).

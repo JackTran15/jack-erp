@@ -21,7 +21,9 @@ import {
 import { AdminSalesOrderController } from './controllers/admin-sales-order.controller';
 import { PartnerOrderV2Controller } from './controllers/partner-order-v2.controller';
 import { SalesOrderController } from './sales-order.controller';
+import { SalesOrderHistoryService } from './sales-order-history.service';
 import { SalesOrderService } from './sales-order.service';
+import { StockAvailabilityService } from './stock-availability.service';
 
 @Module({
   imports: [
@@ -41,6 +43,10 @@ import { SalesOrderService } from './sales-order.service';
   controllers: [SalesOrderController, AdminSalesOrderController, PartnerOrderV2Controller],
   providers: [
     SalesOrderService,
+    // Đối chiếu tồn (ADR-09) — đọc `stock_balances` qua `DataSource`/`manager`.
+    StockAvailabilityService,
+    // Lịch sử đơn ghép lúc đọc (ADR-14) — đọc qua `DataSource`, không ghi gì.
+    SalesOrderHistoryService,
     SalesChannelCrudService,
     { provide: SALES_CHANNEL_SERVICE_TOKEN, useExisting: SalesChannelCrudService },
   ],

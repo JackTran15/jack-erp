@@ -1,7 +1,7 @@
 ---
 feature: online-order-intake-dispatch
-stories: 8
-acceptance_criteria: 29
+stories: 12
+acceptance_criteria: 54
 ---
 
 # Requirements — Nhận đơn web qua API key, Admin phân thủ công về chi nhánh
@@ -320,4 +320,265 @@ Then không còn các mục ĐT giao hàng, Trạng thái ĐVVC, Mã vận đơn
      Thông tin gói hàng, Phiếu đối soát, Trạng thái đối soát, Mã đơn hàng trên sàn
 And vẫn còn "Thu hộ" và "Phí GH thu khách"
 And cột "Thu hộ" hiển thị đúng bằng amount_due của hoá đơn (đã gồm phí)
+```
+
+---
+
+## US-09 — Chi nhánh duyệt đơn được phân về, được cảnh báo thiếu hàng
+
+Là quản lý chi nhánh, tôi duyệt một lúc nhiều đơn web vừa được điều phối phân về
+và biết trước đơn nào **kho mình** không đủ hàng, để quyết định nhận mà không bị
+chặn; thu ngân chỉ xử lý đơn đã duyệt.
+
+**Priority:** must · **Depends on:** US-02, US-04 · Yêu cầu khách 2026-09-24, Task 1
+(đổi chỗ 2026-09-24, lần 2: duyệt thuộc màn đơn hàng chi nhánh, không thuộc Điều phối — A-41)
+
+Fixture bổ sung: `SKU-500` còn 1 ở CN-A và 1 ở CN-B; `SKU-900` = 0. Các đơn dưới
+đây là đơn web đã được phân về CN-A.
+
+**AC-30** — Chi nhánh duyệt nhiều đơn đủ hàng (A-41, A-43) [DB][ẢNH]
+```gherkin
+Given CN-A còn SKU-500 = 2 và 2 đơn web đã phân về CN-A, mỗi đơn SKU-500 × 1
+When quản lý CN-A mở /orders, tick cả hai và bấm "Duyệt đơn"
+Then không có cảnh báo thiếu hàng nào hiện ra
+And [DB] cả hai đơn có confirmed_at, branch_id vẫn CN-A, status vẫn 'SENT'
+And lịch sử điều phối ghi ai duyệt, lúc nào
+And trên lưới /orders hai đơn mang "Đã duyệt"
+```
+
+**AC-31** — Có đơn thiếu theo tồn chi nhánh thì cảnh báo, xếp đủ → thiếu (A-44, A-33) [ẢNH]
+```gherkin
+Given CN-A còn SKU-500 = 1, SKU-900 = 0
+And 3 đơn web đã phân về CN-A: X (SKU-500 × 1), Y (SKU-500 × 3), Z (SKU-500 × 1, SKU-900 × 2)
+When quản lý CN-A tick cả ba và bấm "Duyệt đơn"
+Then dialog cảnh báo liệt kê X, Y, Z theo thứ tự đó (đủ → thiếu nhiều dòng)
+And mỗi dòng thiếu ghi SL cần, tồn TẠI CN-A và SL thiếu, tô vàng
+And dialog có "Vẫn duyệt" và "Huỷ"
+When bấm "Vẫn duyệt"
+Then [DB] cả X, Y, Z có confirmed_at
+```
+
+**AC-32** — Huỷ ở cảnh báo thì không đơn nào đổi [DB]
+```gherkin
+Given dialog cảnh báo của AC-31 đang mở
+When bấm "Huỷ"
+Then [DB] X, Y, Z vẫn confirmed_at IS NULL, không có dòng lịch sử CONFIRM mới
+```
+
+**AC-33** — Duyệt một phần hỏng thì báo đúng đơn [API][ẢNH]
+```gherkin
+Given 2 đơn được tick, và đơn thứ hai vừa bị trả về pool (hoặc bị huỷ)
+When quản lý CN-A duyệt
+Then đơn thứ nhất Đã duyệt
+And đơn thứ hai báo lỗi ngay cạnh mã đơn của nó, không đổi gì
+```
+
+**AC-34** — Thu ngân không xử lý được đơn web chưa duyệt (A-42) [API][DB]
+```gherkin
+Given một đơn web ở CN-A chưa duyệt, CN-A đang mở ca
+When thu ngân CN-A xử lý đơn đó (approve)
+Then API trả 409 ORDER_NOT_CONFIRMED
+And [DB] không có hoá đơn nháp nào, status vẫn 'SENT'
+When quản lý duyệt đơn rồi thu ngân xử lý lại
+Then xử lý thành công như trước
+```
+
+**AC-35** — Chỉ duyệt được đơn của chính chi nhánh, và phải có quyền (A-46) [API]
+```gherkin
+Given một đơn web ở CN-B
+When người dùng CN-A gọi endpoint duyệt đơn đó
+Then API trả 403 (hoặc 404) và đơn không đổi
+Given một người dùng CN-A không có quyền xử lý đơn
+When gọi endpoint duyệt
+Then API trả 403
+```
+
+**AC-46** — Điều phối phân đơn chưa duyệt được, và không có nút duyệt (A-41) [API][ẢNH]
+```gherkin
+Given một đơn web trong pool, chưa ai duyệt
+When Admin mở màn Điều phối
+Then không có nút "Duyệt đơn" và không có trạng thái Chờ duyệt / Đã duyệt
+When Admin phân đơn cho CN-A
+Then thành công; [DB] branch_id = CN-A, confirmed_at IS NULL
+```
+
+**AC-47** — Trả đơn về pool xoá duyệt (A-45) [DB]
+```gherkin
+Given một đơn đã được CN-A duyệt
+When CN-A trả đơn về pool rồi Admin phân lại cho CN-B
+Then [DB] confirmed_at IS NULL — đơn là Chờ duyệt ở CN-B
+And lịch sử vẫn còn dòng CONFIRM cũ của CN-A
+```
+
+**AC-48** — Đơn tư vấn viên (mobile) không qua duyệt (A-43) [API][ẢNH]
+```gherkin
+Given một đơn tư vấn viên gửi từ mobile về CN-A
+When mở /orders của CN-A
+Then đơn đó không có trạng thái Chờ duyệt / Đã duyệt và không tick-duyệt được
+When thu ngân CN-A xử lý đơn đó
+Then thành công như trước, không cần duyệt
+```
+
+---
+
+## US-10 — Đơn đối tác mang nhãn "Thiếu hàng" khi toàn chuỗi không đủ
+
+Là Admin điều phối, tôi thấy ngay trên lưới đơn nào lúc vào đã thiếu hàng toàn
+chuỗi, không phải mở từng đơn ra đếm.
+
+**Priority:** must · **Depends on:** US-01 · Yêu cầu khách 2026-09-24, Task 2
+
+**AC-36** — Đủ hàng toàn chuỗi thì không có nhãn (A-34) [DB]
+```gherkin
+Given SKU-500 còn 1 ở CN-A và 1 ở CN-B
+When website đặt đơn SKU-500 × 2
+Then [DB] đơn không mang nhãn thiếu hàng
+# tồn rải hai chi nhánh vẫn được cộng thành đủ
+```
+
+**AC-37** — Thiếu hàng vẫn nhận đơn, gắn nhãn (A-35, A-36) [API][DB]
+```gherkin
+Given SKU-500 toàn chuỗi còn 2, SKU-900 toàn chuỗi còn 0
+When website đặt đơn SKU-500 × 3 và SKU-900 × 1
+Then API trả 201, body giống hệt một đơn đủ hàng
+And [DB] đơn mang nhãn thiếu hàng
+And [DB] ghi lại từng dòng thiếu: SKU-500 cần 3 có 2, SKU-900 cần 1 có 0
+```
+
+**AC-38** — Nhãn là snapshot lúc nhận đơn (A-35) [DB]
+```gherkin
+Given đơn của AC-37 đang mang nhãn thiếu hàng
+When nhập thêm 10 SKU-500 và 10 SKU-900 vào CN-A
+Then nhãn trên đơn vẫn giữ nguyên
+And màn duyệt (AC-31) tính lại theo tồn mới và không còn báo thiếu cho đơn đó
+```
+
+**AC-39** — Nhãn hiện trên màn Điều phối và Tất cả đơn [ẢNH]
+```gherkin
+Given một đơn thiếu hàng và một đơn đủ hàng trong pool
+When Admin mở màn Điều phối, rồi màn Tất cả đơn
+Then đơn thiếu có nhãn vàng "Thiếu hàng" ở cả hai màn, đơn đủ không có
+```
+
+---
+
+## US-11 — Chọn chi nhánh cho từng đơn, Validate trước khi Lưu
+
+Là Admin điều phối, tôi gán mỗi đơn về một chi nhánh khác nhau ngay trên lưới,
+kiểm tra từng chi nhánh có đủ hàng không, rồi lưu cả mẻ.
+
+**Priority:** must · **Depends on:** US-02 · Yêu cầu khách 2026-09-24, Task 3
+
+**AC-40** — Lưới Điều phối chỉ có ô tick; nút "Điều phối" mở dialog chọn chi nhánh (A-48) [ẢNH]
+```gherkin
+When Admin mở màn Điều phối
+Then lưới không có cột / ô chọn chi nhánh nào, chỉ có ô tick
+And toolbar có nút "Điều phối", bị khoá khi chưa tick đơn nào
+When Admin tick 3 đơn và bấm "Điều phối"
+Then một dialog liệt kê đúng 3 đơn đó, mỗi dòng một ô chọn chi nhánh
+And footer dialog có nút "Validate" nằm ngay bên trái nút "Lưu"
+```
+
+**AC-41** — Chọn ở đầu cột trong dialog thì điền cho mọi đơn (A-48) [ẢNH]
+```gherkin
+Given dialog Điều phối đang mở với 3 đơn
+When Admin chọn CN-A ở ô đầu cột Chi nhánh của dialog
+Then cả 3 dòng hiện CN-A
+When Admin đổi riêng dòng thứ hai thành CN-B
+Then dòng thứ hai là CN-B, hai dòng kia vẫn CN-A
+```
+
+**AC-42** — Lưu phân mỗi đơn về chi nhánh của chính nó (A-38) [DB][ẢNH]
+```gherkin
+Given trong dialog Điều phối: đơn P chọn CN-A, đơn Q chọn CN-B, đơn R chưa chọn
+When Admin bấm "Lưu"
+Then [DB] P.branch_id = CN-A, Q.branch_id = CN-B, R.branch_id vẫn NULL
+And P, Q rời màn Điều phối, R còn lại
+And lịch sử điều phối ghi hai lần phân riêng biệt
+```
+
+**AC-43** — Validate báo đủ/thiếu theo chi nhánh đã chọn, xếp đủ → thiếu (A-39) [ẢNH]
+```gherkin
+Given SKU-500 còn 1 ở CN-A, 1 ở CN-B
+And đơn P (SKU-500 × 2) chọn CN-A, đơn Q (SKU-500 × 1) chọn CN-B, đơn R chưa chọn
+When Admin bấm "Validate"
+Then một dialog báo cáo hiện Q trước, P sau; R không có trong báo cáo
+And mỗi dòng ghi SL cần và tồn tại chi nhánh đã chọn
+And dòng SKU-500 của P tô vàng "thiếu 1 tại CN-A"
+And không có gì được lưu
+```
+
+**AC-44** — Thiếu hàng không chặn Lưu (A-38) [DB]
+```gherkin
+Given đơn P của AC-43 thiếu 1 tại CN-A
+When Admin bấm "Lưu" (có hoặc không bấm Validate trước)
+Then [DB] P.branch_id = CN-A
+```
+
+**AC-45** — Lưu một phần hỏng thì giữ lựa chọn và báo đúng dòng [ẢNH]
+```gherkin
+Given P chọn CN-A, Q chọn CN-B, và Q vừa bị người khác huỷ
+When Admin bấm "Lưu"
+Then P được phân
+And dialog giữ mở; dòng Q trong dialog báo lỗi ngay tại dòng, ô chi nhánh của Q vẫn giữ CN-B
+```
+
+---
+
+## US-12 — Xem lịch sử điều phối của một đơn
+
+Là Admin điều phối hoặc quản lý chi nhánh, tôi mở lịch sử một đơn để biết đơn đã đi
+qua những đâu, ai làm gì, lúc nào, vì sao — không phải mở Adminer.
+
+**Priority:** must · **Depends on:** US-02, US-06, US-09 · Akenzy 2026-09-24
+
+**AC-49** — Nút "Lịch sử" mở modal cho đơn đang chọn, trên cả ba màn (A-49, A-52) [ẢNH]
+```gherkin
+Given Admin đang ở màn Điều phối (hoặc Tất cả đơn, hoặc Đơn hàng chi nhánh)
+When chưa chọn dòng nào
+Then nút "Lịch sử" bị khoá
+When click một dòng đơn rồi bấm "Lịch sử"
+Then modal "Lịch sử đơn <mã đơn>" mở ra, click dòng không tự mở modal
+```
+
+**AC-50** — Đủ vòng đời, xếp theo thời gian (A-50, A-51) [API][ẢNH]
+```gherkin
+Given một đơn web: nhận → phân CN-A → CN-A duyệt → CN-A trả về (lý do "hết hàng") → phân CN-B → CN-B duyệt → thu ngân CN-B xử lý
+When mở lịch sử đơn đó
+Then có đúng 7 mốc theo thứ tự thời gian
+And mỗi mốc có: thời gian (vi-VN), loại mốc, người làm, chi nhánh liên quan, lý do (nếu có), trạng thái sau mốc
+And mốc xử lý có mã hoá đơn
+```
+
+**AC-51** — Huỷ / từ chối có lý do; đơn cũ vẫn có mốc (A-51) [API]
+```gherkin
+Given một đơn bị huỷ với lý do "khách đổi ý"
+When mở lịch sử
+Then mốc cuối là "Huỷ đơn", có người huỷ, thời gian và lý do
+Given một đơn xử lý TRƯỚC khi có tính năng này (không có dòng sự kiện nào)
+Then lịch sử vẫn có mốc "Nhận đơn" và "Thu ngân xử lý" lấy từ cột của đơn
+```
+
+**AC-52** — Chi nhánh chỉ xem đơn mình đang giữ (A-53) [API]
+```gherkin
+Given một đơn đang ở CN-B
+When người dùng CN-A gọi lịch sử đơn đó
+Then API trả 403 (hoặc 404) và không lộ mốc nào
+When người dùng CN-B gọi
+Then thấy toàn bộ lịch sử, kể cả mốc CN-A trả về kèm lý do
+```
+
+**AC-53** — Không có quyền điều phối / xem toàn chuỗi thì không đọc được lịch sử Admin [API]
+```gherkin
+Given một người dùng không có `pos.sales-order.dispatch` lẫn `pos.sales-order.read-all`
+When gọi lịch sử qua đường Admin
+Then API trả 403
+```
+
+**AC-54** — Đơn tư vấn viên (mobile) có mốc tạo và xử lý, không có mốc điều phối (A-54) [API]
+```gherkin
+Given một đơn tư vấn viên gửi từ mobile rồi được thu ngân xử lý
+When mở lịch sử
+Then có mốc "Nhận đơn" với người = tư vấn viên và mốc "Thu ngân xử lý"
+And không có mốc phân / duyệt / trả về
 ```

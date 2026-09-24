@@ -81,6 +81,8 @@ describe('SalesOrderService', () => {
      */
     let heldBranch: string | null = (current?.branchId as string | undefined) ?? null;
     let pendingSet: Record<string, unknown> | null = null;
+    /** Tham số `:branch` của mệnh đề `branch_id = :branch` — điều kiện của lượt DUYỆT. */
+    let pendingBranch: unknown;
     // Chú thích kiểu tường minh: `update()`/`where()` trả về chính đối tượng
     // đang khai, nên thiếu nó TS không suy được kiểu (TS7022).
     const updateQb: Record<string, jest.Mock> = {
@@ -90,7 +92,10 @@ describe('SalesOrderService', () => {
         return updateQb;
       }),
       where: jest.fn(() => updateQb),
-      andWhere: jest.fn(() => updateQb),
+      andWhere: jest.fn((_clause: string, params?: Record<string, unknown>) => {
+        if (params && 'branch' in params) pendingBranch = params.branch;
+        return updateQb;
+      }),
       execute: jest.fn(async () => {
         const patch = pendingSet as Record<string, unknown> | null;
         // `returnToPool` set `branchId: () => 'NULL'` (cách TypeORM nhận NULL ở
@@ -98,10 +103,21 @@ describe('SalesOrderService', () => {
         // `branch_id = :from`, tức ngược hẳn lượt phân: chỉ thắng khi đơn ĐANG
         // có chi nhánh. Ghi lại dưới dạng `{ branchId: null }` để `updates` đọc
         // được và để `orders.findOne` thấy đúng giá trị sau lượt ghi.
+        // Lượt trả về cũng XOÁ duyệt trong cùng câu (A-45) — mọi hàm `() => 'NULL'`
+        // ghi lại thành `null`, giá trị thường giữ nguyên.
         if (patch && typeof patch.branchId === 'function') {
           if (!heldBranch) return { affected: 0 };
           heldBranch = null;
-          updates.push({ branchId: null });
+          updates.push(
+            Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, typeof v === 'function' ? null : v])),
+          );
+          return { affected: 1 };
+        }
+        // Không đụng `branchId` = lượt DUYỆT: chỉ thắng khi đơn còn ở đúng chi
+        // nhánh của người duyệt (`branch_id = :branch`).
+        if (patch && !('branchId' in patch)) {
+          if (!heldBranch || heldBranch !== pendingBranch) return { affected: 0 };
+          updates.push(patch);
           return { affected: 1 };
         }
         if (heldBranch) return { affected: 0 };
@@ -115,7 +131,11 @@ describe('SalesOrderService', () => {
     const lockQb: Record<string, jest.Mock> = {
       setLock: jest.fn(() => lockQb),
       where: jest.fn(() => lockQb),
-      getOne: jest.fn(async () => (current ? { ...current, branchId: heldBranch ?? undefined } : null)),
+      // Gộp mọi patch đã `manager.update` — lượt thứ hai (vd duyệt lần hai) phải
+      // đọc thấy `confirmedAt` mà lượt đầu vừa ghi, như hàng thật dưới khoá.
+      getOne: jest.fn(async () =>
+        current ? { ...current, ...Object.assign({}, ...updates), branchId: heldBranch ?? undefined } : null,
+      ),
     };
 
     const manager = {
@@ -289,8 +309,9 @@ describe('SalesOrderService', () => {
       posSessions as never,
       points as never,
       cancelInvoiceService as never,
+      { forItems: jest.fn(async () => new Map()) } as never,
     );
-    return { service, saved, updates, dispatchEvents, manager, listQb, numbering, invoiceService, posSessions, points, orders, lines, rbac, branchRepo, dataSource, cancelInvoiceService, invoices };
+    return { service, saved, updates, dispatchEvents, manager, lockQb, listQb, numbering, invoiceService, posSessions, points, orders, lines, rbac, branchRepo, dataSource, cancelInvoiceService, invoices };
   }
 
   const lineA = { itemId: 'i-1', itemCode: 'A', itemName: 'A', unit: 'Cái', quantity: 2, unitPrice: 800000, manualDiscount: 160000, promotionDiscount: 432000, promotionName: 'Giảm giá 30%' };
@@ -814,6 +835,22 @@ describe('SalesOrderService', () => {
       });
     });
 
+    it('view chi nhánh mang confirmedAt + needsConfirmation: đơn web true, đơn tư vấn viên false (AC-48)', async () => {
+      const confirmedAt = new Date('2026-09-24T03:00:00Z');
+      const web = build({ canApprove: true, current: { ...webOrderRow, confirmedAt } });
+      await expect(web.service.getById('so-web', actor)).resolves.toMatchObject({ confirmedAt, needsConfirmation: true });
+
+      const webPending = build({ canApprove: true, rows: [{ ...webOrderRow, confirmedAt: null }] });
+      const page = await webPending.service.list({}, actor);
+      expect(page.data[0]).toMatchObject({ confirmedAt: null, needsConfirmation: true });
+
+      const mobile = build();
+      await expect(mobile.service.getById('so-1', actor)).resolves.toMatchObject({
+        confirmedAt: null,
+        needsConfirmation: false,
+      });
+    });
+
     it('tên phường trả về là tên đã CHỐT trên đơn, không phải tên hiện tại trong geo_wards (AC-03)', async () => {
       // Đợt sáp nhập địa giới đổi tên phường sau khi đơn đã đặt: `geo_wards` mã
       // `26734` nay mang tên khác. Đơn cũ phải giữ nguyên cái tên đã in.
@@ -846,7 +883,10 @@ describe('SalesOrderService', () => {
    * `SENT` mới phân được, và mỗi lượt phân để lại đúng một vết.
    */
   describe('dispatch', () => {
-    /** Một đơn web đang nằm trong pool: `SENT`, chưa có chi nhánh, không tư vấn viên. */
+    /**
+     * Một đơn web đang nằm trong pool: `SENT`, chưa có chi nhánh, không tư vấn
+     * viên, và CHƯA ai duyệt — trạng thái thường của pool từ ADR-12 (A-41).
+     */
     const pooled = {
       id: 'so-web',
       status: SalesOrderStatus.SENT,
@@ -854,7 +894,17 @@ describe('SalesOrderService', () => {
       salespersonId: null,
       salespersonName: null,
       salesChannel: 'Website công ty',
+      confirmedAt: null,
     };
+
+    it('đơn CHƯA duyệt vẫn phân được — điều phối không đòi duyệt (A-41, AC-46)', async () => {
+      const { service, updates, dispatchEvents } = build({ current: pooled });
+
+      await service.dispatch('so-web', 'br-2', actor);
+
+      expect(updates).toEqual([{ branchId: 'br-2' }]);
+      expect(dispatchEvents.map((e) => e.action)).toEqual([SalesOrderDispatchAction.DISPATCH]);
+    });
 
     it('chạy được khi chi nhánh KHÔNG có ca POS nào mở, và không sinh hoá đơn nháp (AC-11)', async () => {
       // `openSession: false` = mọi ca của chi nhánh đã đóng. `approve` ở ca này
@@ -983,6 +1033,257 @@ describe('SalesOrderService', () => {
   });
 
   /**
+   * Chi nhánh duyệt đơn web nó đang giữ (ADR-12, A-41, A-43, AC-30, AC-35).
+   * Luật: chỉ đơn `SENT` + `branch_id = actor.branchId` + `salesperson_id IS
+   * NULL` duyệt được; đơn chi nhánh khác là 403; duyệt ghi `confirmed_at/by`
+   * cùng MỘT dòng `CONFIRM`; duyệt lại là no-op.
+   */
+  describe('confirm', () => {
+    /** Đơn web đã được phân về `br-1` — chi nhánh của `actor` — chưa ai duyệt. */
+    const held = {
+      id: 'so-web',
+      status: SalesOrderStatus.SENT,
+      branchId: 'br-1',
+      salespersonId: null,
+      salespersonName: null,
+      salesChannel: 'Website công ty',
+      confirmedAt: null,
+      confirmedBy: null,
+    };
+    /** Người duyệt ở chi nhánh cầm `pos.sales-order.approve` (A-46). */
+    const cashier = { canApprove: true };
+
+    it('đơn web chi nhánh đang giữ → ghi confirmed_at/by, một dòng CONFIRM from/to NULL, status VẪN SENT (AC-30)', async () => {
+      const { service, updates, dispatchEvents, manager } = build({ ...cashier, current: held });
+
+      const view = await service.confirm('so-web', actor);
+
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).toEqual({ confirmedAt: expect.any(Date), confirmedBy: 'u-1' });
+      // Duyệt KHÔNG đổi chi nhánh, KHÔNG đổi trạng thái — đó là `approve()` của thu ngân.
+      expect(updates[0]).not.toHaveProperty('status');
+      expect(updates[0]).not.toHaveProperty('branchId');
+      expect(dispatchEvents).toEqual([
+        {
+          organizationId: 'org-1',
+          salesOrderId: 'so-web',
+          action: SalesOrderDispatchAction.CONFIRM,
+          // `CHK_sales_order_dispatch_events_shape`: `CONFIRM` đòi from/to đều NULL.
+          fromBranchId: null,
+          toBranchId: null,
+          actorUserId: 'u-1',
+          reason: null,
+        },
+      ]);
+      expect(manager.insert).toHaveBeenCalledTimes(1);
+      // View CHI NHÁNH (toView), không phải view Admin: không có `stockShort`.
+      expect(view.status).toBe(SalesOrderStatus.SENT);
+      expect(view.confirmedAt).toBeInstanceOf(Date);
+      expect(view.needsConfirmation).toBe(true);
+      expect(view).not.toHaveProperty('stockShort');
+    });
+
+    it('đơn còn trong POOL → 409 ORDER_NOT_CONFIRMABLE, không ghi gì (A-41)', async () => {
+      const { service, updates, dispatchEvents } = build({ ...cashier, current: { ...held, branchId: null } });
+
+      await expect(service.confirm('so-web', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CONFIRMABLE' },
+      });
+      expect(updates).toHaveLength(0);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+
+    it('đơn tư vấn viên (mobile) → 409 ORDER_NOT_CONFIRMABLE, không ghi gì (A-43)', async () => {
+      const { service, updates, dispatchEvents } = build({
+        ...cashier,
+        current: { ...held, salespersonId: 'sp-1', salesChannel: 'Ứng dụng Tư Vấn' },
+      });
+
+      await expect(service.confirm('so-web', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CONFIRMABLE' },
+      });
+      expect(updates).toHaveLength(0);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+
+    it('đơn của chi nhánh KHÁC → 403 ORDER_NOT_HELD_BY_BRANCH, không ghi gì (AC-35)', async () => {
+      const { service, updates, dispatchEvents } = build({ ...cashier, current: { ...held, branchId: 'br-2' } });
+
+      const attempt = service.confirm('so-web', actor);
+      await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(attempt).rejects.toMatchObject({ response: { code: 'ORDER_NOT_HELD_BY_BRANCH' } });
+      expect(updates).toHaveLength(0);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+
+    it.each([SalesOrderStatus.PROCESSED, SalesOrderStatus.CANCELLED, SalesOrderStatus.REJECTED])(
+      'đơn %s → 409 ORDER_NOT_CONFIRMABLE, không ghi gì',
+      async (status) => {
+        const { service, updates, dispatchEvents } = build({ ...cashier, current: { ...held, status } });
+
+        await expect(service.confirm('so-web', actor)).rejects.toBeInstanceOf(ConflictException);
+        await expect(service.confirm('so-web', actor)).rejects.toMatchObject({
+          response: { code: 'ORDER_NOT_CONFIRMABLE' },
+        });
+        expect(updates).toHaveLength(0);
+        expect(dispatchEvents).toHaveLength(0);
+      },
+    );
+
+    it('duyệt hai lần → lần hai no-op: không ghi đè người duyệt, chỉ MỘT dòng CONFIRM', async () => {
+      const { service, updates, dispatchEvents } = build({ ...cashier, current: held });
+
+      const first = await service.confirm('so-web', actor);
+      const second = await service.confirm('so-web', { ...actor, userId: 'u-2' });
+
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).toMatchObject({ confirmedBy: 'u-1' });
+      expect(dispatchEvents).toHaveLength(1);
+      expect(second.confirmedAt).toEqual(first.confirmedAt);
+    });
+
+    it('trả về pool thắng cuộc đua → UPDATE đổi 0 dòng → 409 ORDER_NOT_CONFIRMABLE, không vết CONFIRM', async () => {
+      // Lượt đọc có khoá còn thấy `br-1`, nhưng hàng thật đã rời chi nhánh
+      // (`current.branchId = null` ⇒ `heldBranch` null): câu UPDATE có điều kiện
+      // `branch_id = :branch` là thứ quyết định, không phải lượt đọc.
+      const { service, updates, dispatchEvents, lockQb } = build({ ...cashier, current: { ...held, branchId: null } });
+      lockQb.getOne.mockResolvedValueOnce({ ...held });
+
+      await expect(service.confirm('so-web', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CONFIRMABLE' },
+      });
+      expect(updates).toHaveLength(0);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+
+    it('phân → duyệt ở chi nhánh → thu ngân xử lý được (ADR-12)', async () => {
+      const { service, dispatchEvents, invoiceService } = build({
+        ...cashier,
+        current: { ...held, branchId: null },
+      });
+
+      await service.dispatch('so-web', 'br-1', actor);
+      await expect(service.approve('so-web', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CONFIRMED' },
+      });
+      await service.confirm('so-web', actor);
+      await service.approve('so-web', actor);
+
+      expect(dispatchEvents.map((e) => e.action)).toEqual([
+        SalesOrderDispatchAction.DISPATCH,
+        SalesOrderDispatchAction.CONFIRM,
+      ]);
+      expect(invoiceService.createDraftIn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * Thu ngân chỉ xử lý đơn web ĐÃ duyệt (A-42, AC-34); đơn tư vấn viên giữ luồng
+   * cũ (A-43, AC-48).
+   */
+  describe('approve: guard duyệt của đơn web', () => {
+    const webHeld = {
+      id: 'so-web',
+      status: SalesOrderStatus.SENT,
+      branchId: 'br-1',
+      salespersonId: null,
+      salesChannel: 'Website công ty',
+      confirmedAt: null,
+    };
+
+    it('đơn web CHƯA duyệt → 409 ORDER_NOT_CONFIRMED, không tra ca POS, không tạo nháp, không ghi (AC-34)', async () => {
+      const { service, updates, posSessions, invoiceService } = build({ canApprove: true, current: webHeld });
+
+      await expect(service.approve('so-web', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CONFIRMED', message: 'Đơn hàng chưa được chi nhánh duyệt' },
+      });
+      expect(posSessions.findOpenForBranch).not.toHaveBeenCalled();
+      expect(invoiceService.createDraftIn).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(0);
+    });
+
+    it('đơn web chưa duyệt VÀ chi nhánh chưa mở ca → vẫn báo chưa duyệt, không phải NO_OPEN_SESSION', async () => {
+      const { service } = build({ canApprove: true, current: webHeld, openSession: false });
+
+      await expect(service.approve('so-web', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_CONFIRMED' },
+      });
+    });
+
+    it('đơn web ĐÃ duyệt → tạo nháp, PROCESSED như trước', async () => {
+      const { service, updates, invoiceService } = build({
+        canApprove: true,
+        current: { ...webHeld, confirmedAt: new Date('2026-09-24T02:00:00Z') },
+      });
+
+      await service.approve('so-web', actor);
+
+      expect(invoiceService.createDraftIn).toHaveBeenCalledTimes(1);
+      expect(updates.some((u) => u.status === SalesOrderStatus.PROCESSED)).toBe(true);
+    });
+
+    it('đơn tư vấn viên (mobile) không cần duyệt: confirmedAt NULL vẫn xử lý được (AC-48)', async () => {
+      const { service, posSessions, invoiceService } = build({
+        current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1', confirmedAt: null },
+      });
+
+      await service.approve('so-1', actor);
+
+      expect(posSessions.findOpenForBranch).toHaveBeenCalledTimes(1);
+      expect(invoiceService.createDraftIn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * Hộp việc của thu ngân (`awaitingCashier`, A-47): đơn web chưa duyệt bị loại
+   * ở server. Bộ giả `list()` không thi hành SQL, nên đây kiểm MỆNH ĐỀ — ca kết
+   * quả thật là bước 3 của demo UOW-11.
+   */
+  describe('list: awaitingCashier', () => {
+    it('loại đơn web chưa duyệt khỏi vế SENT; đơn tư vấn viên và đơn đã duyệt vẫn vào', async () => {
+      const { service, listQb } = build({ canApprove: true });
+
+      await service.list({ awaitingCashier: true }, actor);
+
+      const clause = listQb.andWhere.mock.calls
+        .map(([sql]) => String(sql))
+        .find((sql) => sql.includes(':sent'));
+      expect(clause).toContain('(so.status = :sent AND (so.salespersonId IS NOT NULL OR so.confirmedAt IS NOT NULL))');
+    });
+
+    it('không awaitingCashier → không lọc theo duyệt (lưới /orders thấy đủ để duyệt)', async () => {
+      const { service, listQb } = build({ canApprove: true });
+
+      await service.list({}, actor);
+
+      const sqls = listQb.andWhere.mock.calls.map(([sql]) => String(sql));
+      expect(sqls.some((sql) => sql.includes('confirmedAt'))).toBe(false);
+    });
+  });
+
+  /**
+   * Lọc "Chờ duyệt / Đã duyệt" của lưới Admin.
+   */
+  describe('listForOrganization: lọc confirmed', () => {
+    it('confirmed=true → confirmed_at IS NOT NULL; false → IS NULL; bỏ trống → không lọc', async () => {
+      const yes = build({ canDispatch: true });
+      await yes.service.listForOrganization({ unassigned: true, confirmed: true }, actor);
+      expect(yes.listQb.andWhere).toHaveBeenCalledWith('so.confirmedAt IS NOT NULL');
+      expect(yes.listQb.andWhere).not.toHaveBeenCalledWith('so.confirmedAt IS NULL');
+
+      const no = build({ canDispatch: true });
+      await no.service.listForOrganization({ unassigned: true, confirmed: false }, actor);
+      expect(no.listQb.andWhere).toHaveBeenCalledWith('so.confirmedAt IS NULL');
+      expect(no.listQb.andWhere).not.toHaveBeenCalledWith('so.confirmedAt IS NOT NULL');
+
+      const any = build({ canDispatch: true });
+      await any.service.listForOrganization({ unassigned: true }, actor);
+      expect(any.listQb.andWhere).not.toHaveBeenCalledWith('so.confirmedAt IS NULL');
+      expect(any.listQb.andWhere).not.toHaveBeenCalledWith('so.confirmedAt IS NOT NULL');
+    });
+  });
+
+  /**
    * Trả đơn về pool (AC-21, AC-22). Bốn luật không nhìn thấy được trên màn hình:
    * trạng thái KHÔNG đổi (chỉ `branch_id` rơi về NULL), lý do là bắt buộc vì DB
    * đòi, đơn đã sinh hoá đơn thì chặn hẳn, và một lần rời chi nhánh để lại đúng
@@ -998,6 +1299,8 @@ describe('SalesOrderService', () => {
       salespersonName: null,
       salesChannel: 'Website công ty',
       invoiceId: null,
+      confirmedAt: new Date('2026-09-24T01:00:00Z'),
+      confirmedBy: 'u-9',
     };
     /** Người điều phối: có `pos.sales-order.dispatch`, thao tác trên đơn của mọi chi nhánh. */
     const dispatcher = { canDispatch: true };
@@ -1007,10 +1310,13 @@ describe('SalesOrderService', () => {
 
       const view = await service.returnToPool('so-web', '  Hết hàng tại chi nhánh  ', actor);
 
-      // CHỈ `branch_id` đổi. Không có `status` trong patch: thêm một trạng thái
-      // mới cho "đã bị trả về" là đúng thứ A-05 loại bỏ.
-      expect(updates).toEqual([{ branchId: null }]);
+      // `branch_id` rơi về NULL và duyệt bị xoá trong CÙNG câu (A-45). Không có
+      // `status` trong patch: thêm một trạng thái mới cho "đã bị trả về" là đúng
+      // thứ A-05 loại bỏ.
+      expect(updates).toEqual([{ branchId: null, confirmedAt: null, confirmedBy: null }]);
       expect(view.status).toBe(SalesOrderStatus.SENT);
+      // Trả về XOÁ duyệt: chi nhánh nhận sau phải tự duyệt lại (A-45, AC-47).
+      expect(view.confirmedAt).toBeNull();
       expect(dispatchEvents).toEqual([
         {
           organizationId: 'org-1',
@@ -1094,7 +1400,7 @@ describe('SalesOrderService', () => {
         response: { code: 'ORDER_NOT_DISPATCHED' },
       });
 
-      expect(updates).toEqual([{ branchId: null }]);
+      expect(updates).toEqual([{ branchId: null, confirmedAt: null, confirmedBy: null }]);
       expect(dispatchEvents).toHaveLength(1);
     });
 
@@ -1127,7 +1433,7 @@ describe('SalesOrderService', () => {
         branchId: 'br-2',
       });
 
-      expect(updates).toEqual([{ branchId: null }]);
+      expect(updates).toEqual([{ branchId: null, confirmedAt: null, confirmedBy: null }]);
       expect(dispatchEvents).toEqual([
         expect.objectContaining({
           action: SalesOrderDispatchAction.RETURN,
@@ -1447,7 +1753,7 @@ describe('SalesOrderService', () => {
 
     it('tài khoản thu ngân gọi thẳng API → 403, branch_id KHÔNG đổi (AC-13)', async () => {
       const { service, updates, dispatchEvents } = build({
-        current: { id: 'so-web', status: SalesOrderStatus.SENT, branchId: null },
+        current: { id: 'so-web', status: SalesOrderStatus.SENT, branchId: null, confirmedAt: new Date() },
       });
       const controller = new AdminSalesOrderController(service);
       const { guard, context } = pipeline(CASHIER_PERMISSION_KEYS);
@@ -1467,7 +1773,7 @@ describe('SalesOrderService', () => {
 
     it('tài khoản CÓ quyền điều phối đi lọt và phân được đơn (endpoint không chết như T-01-03)', async () => {
       const { service, updates } = build({
-        current: { id: 'so-web', status: SalesOrderStatus.SENT, branchId: null },
+        current: { id: 'so-web', status: SalesOrderStatus.SENT, branchId: null, confirmedAt: new Date() },
       });
       const controller = new AdminSalesOrderController(service);
       const { guard, context } = pipeline(SYSTEM_ADMIN_PERMISSION_KEYS);
@@ -1548,8 +1854,11 @@ describe('SalesOrderService.createFromPartner', () => {
       string,
       { id: string; code: string; name: string; unit: string; sellingPrice: number }
     >,
+    balances = [] as Array<{ itemId: string; branchId: string; quantity: number }>,
   }: {
     catalog?: Record<string, { id: string; code: string; name: string; unit: string; sellingPrice: number }>;
+    /** `stock_balances` giả, từng dòng một chi nhánh — `forItems` giả cộng như câu SQL thật. */
+    balances?: Array<{ itemId: string; branchId: string; quantity: number }>;
   } = {}) {
     const orderRows: Record<string, any>[] = [];
     const lineRows: Record<string, any>[] = [];
@@ -1580,6 +1889,9 @@ describe('SalesOrderService.createFromPartner', () => {
         const row = { ...data, id: `so-${orderRows.length + 1}` };
         orderRows.push(row);
         return row;
+      }),
+      update: jest.fn(async (_entity: unknown, id: string, patch: Record<string, unknown>) => {
+        Object.assign(orderRows.find((row) => row.id === id) ?? {}, patch);
       }),
     };
 
@@ -1620,6 +1932,21 @@ describe('SalesOrderService.createFromPartner', () => {
       ),
     };
 
+    // Bản giả của `StockAvailabilityService.forItems`: cộng mọi dòng balance
+    // của món (lọc chi nhánh chỉ khi có `branchId`), món vắng mặt = 0.
+    const stockAvailability = {
+      forItems: jest.fn(async (_org: string, itemIds: string[], branchId?: string, _manager?: unknown) => {
+        const available = new Map<string, number>();
+        for (const id of itemIds) {
+          const total = balances
+            .filter((b) => b.itemId === id && (!branchId || b.branchId === branchId))
+            .reduce((sum, b) => sum + b.quantity, 0);
+          available.set(id, total);
+        }
+        return available;
+      }),
+    };
+
     const service = new SalesOrderService(
       orders as never,
       lines as never,
@@ -1634,9 +1961,10 @@ describe('SalesOrderService.createFromPartner', () => {
       { findOpenForBranch: jest.fn() } as never,
       { applyRedemptionIn: jest.fn() } as never,
       { cancel: jest.fn() } as never,
+      stockAvailability as never,
     );
 
-    return { service, orderRows, lineRows, customerRows, catalog, numbering };
+    return { service, orderRows, lineRows, customerRows, catalog, numbering, stockAvailability, manager, balances };
   }
 
   it('đơn web rơi vào POOL: branch_id và salesperson_id NULL, status SENT', async () => {
@@ -1793,5 +2121,99 @@ describe('SalesOrderService.createFromPartner', () => {
     );
     // Dòng mang `items.id` thật — đối tác gửi mã, hệ thống vẫn ghi UUID lên dòng.
     expect(created.lines[0]).toMatchObject({ itemId: 'i-500', itemCode: 'SKU-500', unitPrice: 500000 });
+  });
+
+  /**
+   * Nhãn "Thiếu hàng" lúc nhận (T-08-03, AC-36..AC-38): tồn TOÀN CHUỖI, gộp SL
+   * theo món trước khi so, chốt một lần — replay không tính lại.
+   */
+  describe('snapshot thiếu hàng', () => {
+    const twoItems = {
+      'i-500': { id: 'i-500', code: 'SKU-500', name: 'Ghế gỗ', unit: 'Cái', sellingPrice: 500000 },
+      'i-900': { id: 'i-900', code: 'SKU-900', name: 'Bàn đá', unit: 'Cái', sellingPrice: 900000 },
+    };
+
+    it('đủ NHỜ cộng hai chi nhánh (1 + 1, đặt 2) → stockShort false, dòng ghi tồn chuỗi = 2', async () => {
+      const { service, orderRows, lineRows, stockAvailability, manager } = buildPartner({
+        balances: [
+          { itemId: 'i-500', branchId: 'cn-a', quantity: 1 },
+          { itemId: 'i-500', branchId: 'cn-b', quantity: 1 },
+        ],
+      });
+
+      await service.createFromPartner(partnerDto(), webChannel, partnerActor);
+
+      // Hỏi TOÀN CHUỖI (không chi nhánh), trong CÙNG transaction nhận đơn.
+      expect(stockAvailability.forItems).toHaveBeenCalledWith('org-1', ['i-500'], undefined, manager);
+      expect(orderRows[0].stockShort ?? false).toBe(false);
+      expect(manager.update).not.toHaveBeenCalled();
+      expect(lineRows[0].chainStockAtIntake).toBe('2');
+    });
+
+    it('một dòng thiếu → stockShort true; từng dòng ghi tồn chuỗi của món; response không thêm trường (A-36)', async () => {
+      const { service, orderRows, lineRows } = buildPartner({
+        catalog: twoItems,
+        balances: [{ itemId: 'i-500', branchId: 'cn-a', quantity: 2 }],
+      });
+
+      const result = await service.createFromPartner(
+        partnerDto({
+          lines: [
+            { itemCode: 'SKU-500', quantity: 1 },
+            { itemCode: 'SKU-900', quantity: 1 },
+          ],
+        }),
+        webChannel,
+        partnerActor,
+      );
+
+      expect(orderRows[0].stockShort).toBe(true);
+      expect(lineRows.map((l) => [l.itemCode, l.chainStockAtIntake])).toEqual([
+        ['SKU-500', '2'],
+        ['SKU-900', '0'],
+      ]);
+      // Đối tác không biết đơn thiếu hàng: hình dạng body y như đơn đủ.
+      expect(Object.keys(result).sort()).toEqual(['amountDue', 'documentNumber', 'id', 'lines', 'replayed', 'shippingFee', 'status']);
+      expect(Object.keys(result.lines[0]).sort()).toEqual(['itemCode', 'itemId', 'itemName', 'lineTotal', 'quantity', 'unitPrice']);
+    });
+
+    it('hai dòng CÙNG món, mỗi dòng đủ riêng nhưng cộng lại vượt tồn → stockShort true', async () => {
+      const { service, orderRows, lineRows, stockAvailability } = buildPartner({
+        balances: [{ itemId: 'i-500', branchId: 'cn-a', quantity: 2 }],
+      });
+
+      await service.createFromPartner(
+        partnerDto({
+          lines: [
+            { itemCode: 'SKU-500', quantity: 2 },
+            { itemCode: 'SKU-500', quantity: 1 },
+          ],
+        }),
+        webChannel,
+        partnerActor,
+      );
+
+      // Món hỏi MỘT lần, không lặp theo dòng.
+      expect(stockAvailability.forItems).toHaveBeenCalledWith('org-1', ['i-500'], undefined, expect.anything());
+      expect(orderRows[0].stockShort).toBe(true);
+      expect(lineRows.map((l) => l.chainStockAtIntake)).toEqual(['2', '2']);
+    });
+
+    it('replay KHÔNG đọc tồn và giữ nguyên nhãn đã chốt, kể cả khi tồn đã đủ', async () => {
+      const { service, orderRows, stockAvailability, balances } = buildPartner();
+
+      await service.createFromPartner(partnerDto(), webChannel, partnerActor);
+      expect(orderRows[0].stockShort).toBe(true);
+      expect(stockAvailability.forItems).toHaveBeenCalledTimes(1);
+
+      // Nhập thêm hàng rồi đối tác gửi lại cùng externalOrderId.
+      balances.push({ itemId: 'i-500', branchId: 'cn-a', quantity: 10 });
+      const replay = await service.createFromPartner(partnerDto(), webChannel, partnerActor);
+
+      expect(replay.replayed).toBe(true);
+      expect(stockAvailability.forItems).toHaveBeenCalledTimes(1);
+      expect(orderRows).toHaveLength(1);
+      expect(orderRows[0].stockShort).toBe(true);
+    });
   });
 });

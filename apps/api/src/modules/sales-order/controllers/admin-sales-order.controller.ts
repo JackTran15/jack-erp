@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   ParseUUIDPipe,
   Post,
@@ -14,6 +15,7 @@ import {
 import {
   ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiPropertyOptional,
   ApiProperty,
@@ -26,12 +28,22 @@ import { RequirePermission } from '../../auth/decorators';
 import { AuditInterceptor } from '../../crud/audit.interceptor';
 import { PermissionGuard } from '../../rbac/permission.guard';
 import { ReturnSalesOrderDto } from '../dto/return-sales-order.dto';
+import { SalesOrderHistoryResponseDto } from '../dto/sales-order-history.dto';
+import { StockCheckDto, StockCheckResponseDto } from '../dto/stock-check.dto';
 import {
   BRANCH_ID_FILTER_PATTERN,
   UNASSIGNED_BRANCH_FILTER,
 } from '../dto/sales-order-list.query.dto';
 import { SalesOrderStatus } from '../entities/sales-order.entity';
-import { SALES_ORDER_PERMISSIONS, SalesOrderService } from '../sales-order.service';
+import {
+  AdminSalesOrderLineView,
+  AdminSalesOrderView,
+  OrgSalesOrderView,
+  SALES_ORDER_PERMISSIONS,
+  SalesOrderService,
+} from '../sales-order.service';
+import { SalesOrderHistoryService } from '../sales-order-history.service';
+import { StockAvailabilityService } from '../stock-availability.service';
 
 /**
  * Trạng thái mà đường đọc cấp tổ chức CHO PHÉP lọc.
@@ -98,6 +110,16 @@ export class AdminSalesOrderListQueryDto {
   unassigned?: boolean;
 
   /**
+   * `true` = chỉ đơn ĐÃ duyệt (`confirmed_at IS NOT NULL`), `false` = chỉ đơn
+   * CHƯA duyệt. Bỏ trống = không lọc.
+   */
+  @ApiPropertyOptional({ description: 'Lọc theo trạng thái duyệt: true = Đã duyệt, false = Chờ duyệt' })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  confirmed?: boolean;
+
+  /**
    * Lọc theo chi nhánh đang giữ đơn: uuid, hoặc `UNASSIGNED` cho pool.
    *
    * Không nhận chuỗi rỗng — xem {@link UNASSIGNED_BRANCH_FILTER}. Bỏ trống mới
@@ -123,6 +145,103 @@ export class DispatchSalesOrderDto {
 }
 
 /**
+ * Hình dạng trả về của đường `/admin/sales-orders` — CHỈ để OpenAPI mô tả đúng
+ * (service trả interface, không trả instance). `implements` giữ lớp này khớp
+ * với {@link AdminSalesOrderView}: thêm trường ở service mà quên ở đây là lỗi
+ * biên dịch. `/mobile/sales-orders` không dùng lớp nào ở đây (ADR-07).
+ */
+export class AdminSalesOrderLineResponseDto implements AdminSalesOrderLineView {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ format: 'uuid' }) itemId: string;
+  @ApiProperty() code: string;
+  @ApiProperty() name: string;
+  @ApiProperty() unit: string;
+  @ApiProperty() quantity: number;
+  @ApiProperty() unitPrice: number;
+  @ApiProperty() manualDiscount: number;
+  @ApiProperty({ type: String, nullable: true }) manualDiscountReason: string | null;
+  @ApiProperty() promotionDiscount: number;
+  @ApiProperty({ type: String, nullable: true }) promotionName: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty() lineTotal: number;
+  @ApiProperty({ type: String, nullable: true }) thumbnailUrl: string | null;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Tồn toàn chuỗi của mặt hàng CHỤP lúc nhận đơn (ADR-10); `null` với đơn không qua đường đối tác hoặc đơn cũ.',
+  })
+  chainStockAtIntake: number | null;
+}
+
+export class AdminSalesOrderResponseDto implements AdminSalesOrderView {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty() code: string;
+  @ApiProperty({ enum: SalesOrderStatus }) status: SalesOrderStatus;
+  @ApiProperty({ type: String, format: 'date-time' }) createdAt: Date;
+  @ApiProperty({ type: String, nullable: true }) salespersonId: string | null;
+  @ApiProperty({ type: String, nullable: true }) salespersonName: string | null;
+  @ApiProperty() salesChannel: string;
+  @ApiProperty({ type: String, nullable: true }) customerId: string | null;
+  @ApiProperty({ type: String, nullable: true }) customerName: string | null;
+  @ApiProperty({ type: String, nullable: true }) customerPhone: string | null;
+  @ApiProperty() subtotal: number;
+  @ApiProperty() discount: number;
+  @ApiProperty() amountDue: number;
+  @ApiProperty() shippingFee: number;
+  @ApiProperty({ type: String, nullable: true }) recipientName: string | null;
+  @ApiProperty({ type: String, nullable: true }) recipientPhone: string | null;
+  @ApiProperty({ type: String, nullable: true }) shipProvinceName: string | null;
+  @ApiProperty({ type: String, nullable: true }) shipWardName: string | null;
+  @ApiProperty({ type: String, nullable: true }) shipAddressLine: string | null;
+  @ApiProperty({ type: String, nullable: true }) externalOrderId: string | null;
+  @ApiProperty({ type: String, nullable: true }) salesChannelId: string | null;
+  @ApiProperty({ type: String, nullable: true }) note: string | null;
+  @ApiProperty({ type: String, nullable: true }) rejectReason: string | null;
+  @ApiProperty({ type: String, nullable: true }) cancelReason: string | null;
+  @ApiProperty() pointsRedeemed: number;
+  @ApiProperty({ type: [String] }) selectedProgramIds: string[];
+  @ApiProperty({ type: [String] }) excludedProgramIds: string[];
+  @ApiProperty({ type: String, nullable: true }) invoiceId: string | null;
+  @ApiProperty({ type: String, nullable: true }) invoiceCode: string | null;
+  @ApiProperty({ type: Boolean, nullable: true }) invoiceIsDraft: boolean | null;
+
+  @ApiProperty({
+    description:
+      'Nhãn "Thiếu hàng": tồn toàn chuỗi lúc nhận đơn không đủ cho ít nhất một mặt hàng (ADR-10). ' +
+      'Snapshot — không tính lại khi tồn đổi (A-35).',
+  })
+  stockShort: boolean;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Lúc chi nhánh duyệt đơn (ADR-12); `null` = "Chờ duyệt". Trả về pool xoá duyệt.',
+  })
+  confirmedAt: Date | null;
+
+  @ApiProperty({ type: [AdminSalesOrderLineResponseDto] })
+  lines: AdminSalesOrderLineResponseDto[];
+}
+
+export class OrgSalesOrderResponseDto extends AdminSalesOrderResponseDto implements OrgSalesOrderView {
+  @ApiProperty({ type: String, nullable: true, description: '`null` = đơn còn trong pool' })
+  branchId: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  branchName: string | null;
+}
+
+export class AdminSalesOrderListResponseDto {
+  @ApiProperty({ type: [OrgSalesOrderResponseDto] }) data: OrgSalesOrderResponseDto[];
+  @ApiProperty() total: number;
+  @ApiProperty() page: number;
+  @ApiProperty() limit: number;
+}
+
+/**
  * Đường đọc + điều phối CẤP TỔ CHỨC.
  *
  * KHÔNG `BranchScopeGuard`, và đó là cả điểm của controller này (ADR-07):
@@ -144,6 +263,16 @@ export class AdminSalesOrderController {
   constructor(private readonly service: SalesOrderService) {}
 
   /**
+   * Tiêm theo thuộc tính, không qua constructor: giữ nguyên chữ ký
+   * `new AdminSalesOrderController(service)` mà các spec quyền đang dựng.
+   */
+  @Inject(StockAvailabilityService)
+  private readonly stockAvailability: StockAvailabilityService;
+
+  @Inject(SalesOrderHistoryService)
+  private readonly history: SalesOrderHistoryService;
+
+  /**
    * Hai phạm vi trên MỘT route, vì chúng là cùng một lưới với một bộ lọc khác.
    *
    * Guard đòi `dispatch` HOẶC `read-all` (mảng = OR, xem `PermissionGuard`);
@@ -161,8 +290,24 @@ export class AdminSalesOrderController {
       'Mỗi dòng mang kèm `branchId` + `branchName` của chi nhánh đang giữ đơn ' +
       '(`null` cả hai khi đơn còn trong pool); lọc bằng `branchId`.',
   })
+  @ApiOkResponse({ type: AdminSalesOrderListResponseDto })
   list(@Query() query: AdminSalesOrderListQueryDto, @Actor() actor: ActorContext) {
     return this.service.listForOrganization(query, actor);
+  }
+
+  /**
+   * Lịch sử xử lý của MỘT đơn bất kỳ trong tổ chức (ADR-14): cùng cặp quyền
+   * OR với lưới `GET /`, không thu hẹp theo chi nhánh.
+   */
+  @Get(':id/history')
+  @RequirePermission([SALES_ORDER_PERMISSIONS.dispatch, SALES_ORDER_PERMISSIONS.readAll])
+  @ApiOperation({ summary: 'Dòng thời gian xử lý của một đơn' })
+  @ApiOkResponse({ type: SalesOrderHistoryResponseDto })
+  historyOf(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Actor() actor: ActorContext,
+  ): Promise<SalesOrderHistoryResponseDto> {
+    return this.history.timeline(id, actor.organizationId);
   }
 
   @Post(':id/dispatch')
@@ -179,6 +324,7 @@ export class AdminSalesOrderController {
       '`ORDER_NOT_DISPATCHABLE` (đơn không còn ở `SENT`) hoặc ' +
       '`ORDER_ALREADY_DISPATCHED` (đơn đã có chi nhánh)',
   })
+  @ApiOkResponse({ type: AdminSalesOrderResponseDto })
   dispatch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: DispatchSalesOrderDto,
@@ -213,11 +359,32 @@ export class AdminSalesOrderController {
       '(đơn không còn ở `SENT`) hoặc `ORDER_NOT_DISPATCHED` (đơn đang ở pool)',
   })
   @ApiForbiddenResponse({ description: '`ORDER_NOT_HELD_BY_BRANCH` — đơn thuộc chi nhánh khác' })
+  @ApiOkResponse({ type: AdminSalesOrderResponseDto })
   returnToPool(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReturnSalesOrderDto,
     @Actor() actor: ActorContext,
   ) {
     return this.service.returnToPool(id, dto.reason, actor);
+  }
+
+  /**
+   * Đối chiếu tồn sống cho nhiều đơn (ADR-09) — cho Validate (chi nhánh của
+   * từng đơn). Dialog duyệt đã sang `POST /mobile/sales-orders/stock-check`
+   * (ADR-12). POST vì body là danh sách; nó KHÔNG ghi gì.
+   */
+  @Post('stock-check')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(SALES_ORDER_PERMISSIONS.dispatch)
+  @ApiOperation({
+    summary: 'Đối chiếu đủ/thiếu tồn cho nhiều đơn',
+    description:
+      '`branchId` vắng = tồn toàn chuỗi, có = tồn tại chi nhánh đó. Đơn trả về đã ' +
+      'xếp đủ → thiếu (`shortLineCount` tăng dần, rồi mã đơn); trong đơn dòng đủ ' +
+      'trước dòng thiếu. Đơn ngoài tổ chức bị bỏ qua, không báo lỗi. Tối đa 100 đơn.',
+  })
+  @ApiOkResponse({ type: StockCheckResponseDto })
+  async stockCheck(@Body() dto: StockCheckDto, @Actor() actor: ActorContext): Promise<StockCheckResponseDto> {
+    return { orders: await this.stockAvailability.checkOrders(actor.organizationId, dto.orders) };
   }
 }

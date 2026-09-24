@@ -9,12 +9,17 @@ import {
 } from 'typeorm';
 import { SalesOrderEntity } from './sales-order.entity';
 
-/** Hai việc Admin làm với một đơn chưa có chi nhánh xử lý. */
+/** Các việc được ghi vết trên một đơn: phân, trả về, duyệt. */
 export enum SalesOrderDispatchAction {
   /** Phân đơn cho một chi nhánh: `sales_orders.branch_id := toBranchId`. */
   DISPATCH = 'DISPATCH',
   /** Chi nhánh trả đơn về pool: `sales_orders.branch_id := NULL` (A-05). */
   RETURN = 'RETURN',
+  /**
+   * Duyệt đơn (ADR-08): đặt `sales_orders.confirmed_at/by`, KHÔNG đổi chi nhánh
+   * — `from_branch_id` và `to_branch_id` đều NULL.
+   */
+  CONFIRM = 'CONFIRM',
 }
 
 /**
@@ -37,7 +42,8 @@ export enum SalesOrderDispatchAction {
  * migration, không dùng `@Check` (xem `CHK_cash_transfer_destination`):
  * - `DISPATCH` → `to_branch_id` bắt buộc; `from_branch_id` NULL ở lần phân đầu,
  *   có giá trị khi phân lại từ chi nhánh khác;
- * - `RETURN`  → `from_branch_id` và `reason` bắt buộc, `to_branch_id` NULL.
+ * - `RETURN`  → `from_branch_id` và `reason` bắt buộc, `to_branch_id` NULL;
+ * - `CONFIRM` → `from_branch_id` và `to_branch_id` đều NULL (migration `1790100600000`).
  */
 @Entity('sales_order_dispatch_events')
 @Index('IDX_sales_order_dispatch_events_org_order_created', [

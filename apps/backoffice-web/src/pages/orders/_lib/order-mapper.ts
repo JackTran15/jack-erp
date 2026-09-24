@@ -65,6 +65,42 @@ export interface SalesOrderDto {
   shipProvinceName?: string | null;
   /** Chưa có trong view — `sales_orders.shipping_fee`. */
   shippingFee?: number | string | null;
+
+  /**
+   * Snapshot "thiếu hàng toàn chuỗi" lúc nhận đơn — `sales_orders.stock_short`
+   * (A-35). CHỈ `GET /admin/sales-orders` trả trường này; `/mobile/sales-orders`
+   * của lưới chi nhánh thì không, và vắng trường nghĩa là không có nhãn.
+   */
+  stockShort?: boolean | null;
+
+  /**
+   * ISO datetime chi nhánh duyệt đơn, `null` = Chờ duyệt (ADR-12). Chỉ được
+   * đọc cùng {@link needsConfirmation} — tức chỉ trên lưới chi nhánh.
+   */
+  confirmedAt?: string | null;
+
+  /**
+   * `true` = đơn web cần chi nhánh duyệt trước khi thu ngân xử lý (ADR-12);
+   * `false` = đơn tư vấn viên, không có bước duyệt (AC-48). CHỈ
+   * `GET /mobile/sales-orders` trả cờ này; vắng hẳn = dòng pool của Điều phối.
+   */
+  needsConfirmation?: boolean | null;
+}
+
+/**
+ * `OrderRow` cộng cờ thiếu hàng. Optional vì lưới chi nhánh (`/orders`) dùng
+ * chung mapper mà nguồn của nó không có cờ này — ở đó dòng luôn không nhãn.
+ */
+export interface SalesOrderRow extends OrderRow {
+  stockShort?: boolean;
+  /**
+   * Hai khoá dưới chỉ có mặt trên dòng lưới chi nhánh (DTO mang
+   * `needsConfirmation`); VẮNG hẳn trên dòng pool của Điều phối. Cột trạng thái
+   * và nút "Duyệt đơn" chỉ đọc chúng khi `needsConfirmation === true`.
+   */
+  needsConfirmation?: boolean;
+  /** `null` = Chờ duyệt, chuỗi = Đã duyệt. */
+  confirmedAt?: string | null;
 }
 
 /**
@@ -122,7 +158,7 @@ function joinShippingAddress(dto: SalesOrderDto): string {
     .join(", ");
 }
 
-export function toOrderRow(dto: SalesOrderDto): OrderRow {
+export function toOrderRow(dto: SalesOrderDto): SalesOrderRow {
   const status = dto.status ?? "";
   const amountDue = money(dto.amountDue);
 
@@ -166,6 +202,19 @@ export function toOrderRow(dto: SalesOrderDto): OrderRow {
     reconciliationStatus: "",
     // Bảng nhãn chưa tồn tại ở backend; nhãn là thứ của mock.
     tags: [],
+    // Chỉ `true` mới là thiếu: `null`/vắng (đơn cũ, đơn mobile) là không nhãn.
+    stockShort: dto.stockShort === true,
+    // Nhãn duyệt chỉ đến từ DTO chi nhánh: `confirmedAt` của `/admin` (vẫn
+    // trả) KHÔNG được mang sang, kẻo dòng pool trông như có bước duyệt.
+    // Server trả `needsConfirmation` = "là đơn web"; chỉ đơn còn SENT mới còn
+    // gì để duyệt — đơn web đã xử lý trước khi có bước duyệt không được hiện
+    // "Chờ duyệt" hay bật nút "Duyệt đơn" (T-11-06).
+    ...(dto.needsConfirmation !== undefined && dto.needsConfirmation !== null
+      ? {
+          needsConfirmation: dto.needsConfirmation === true && status === "SENT",
+          confirmedAt: dto.confirmedAt ?? null,
+        }
+      : {}),
   };
 }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { DocumentListShell } from "@erp/ui";
+import { DocumentListShell, PageToolbar, type ToolbarItem } from "@erp/ui";
+import { History } from "lucide-react";
 import { BaseDataTable } from "../../../components/table/BaseDataTable";
 import { useBranches } from "../../../hooks/iam/useBranches";
 import { ADMIN_SALES_ORDERS_KEY } from "../../../hooks/orders/use-admin-sales-orders";
@@ -26,6 +27,7 @@ import {
   type SalesOrderDto,
 } from "../_lib/order-mapper";
 import type { OrderLineRow, OrderRow } from "../_mock/orders.mock";
+import { OrderHistoryModal } from "../OrderHistoryModal/OrderHistoryModal";
 import { OrdersDetailPanel } from "../OrdersDetailPanel/OrdersDetailPanel";
 import { OrdersPageFilterBar } from "../OrdersPageFilterBar/OrdersPageFilterBar";
 import { OrdersPagePagination } from "../OrdersPagePagination/OrdersPagePagination";
@@ -93,6 +95,7 @@ export function OrdersAllPage() {
   // Dòng đang xem là chuyện riêng của màn này: panel chi tiết đọc từ state cục
   // bộ thay vì `focusedOrderId` dùng chung, để rời màn là nó tự sạch.
   const [focusedOrderId, setFocusedOrderId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Vào màn là về trang 1 — số trang mang sang từ `/orders` trỏ vào một tập kết
   // quả khác hẳn.
@@ -222,9 +225,32 @@ export function OrdersAllPage() {
     );
   }, [columnPrefs, totals, branchFilterOptions]);
 
+  // Màn tra cứu nên toolbar chỉ có đúng nút xem lịch sử của dòng đang chọn (A-52).
+  const toolbarItems: ToolbarItem[] = [
+    {
+      id: "history",
+      label: "Lịch sử",
+      icon: History,
+      onClick: () => setHistoryOpen(true),
+      disabled: !focusedOrder,
+      tooltip: "Chọn một đơn để xem lịch sử",
+    },
+  ];
+
   return (
     <DocumentListShell
       title="Tất cả đơn hàng"
+      toolbar={
+        <>
+          <PageToolbar items={toolbarItems} tone="primary" className="m-2 rounded-md" />
+          <OrderHistoryModal
+            open={historyOpen}
+            onOpenChange={setHistoryOpen}
+            orderId={focusedOrder?.id ?? null}
+            scope="admin"
+          />
+        </>
+      }
       filters={<OrdersPageFilterBar />}
       pagination={
         <OrdersPagePagination

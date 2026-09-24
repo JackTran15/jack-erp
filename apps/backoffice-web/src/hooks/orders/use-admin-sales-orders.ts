@@ -55,8 +55,8 @@ export interface AdminSalesOrdersResult {
   linesByOrderId: Record<string, OrderLineRow[]>;
   /**
    * Mã chứng từ theo id đơn. `OrderRow` không mang mã đơn (chỉ có mã HOÁ ĐƠN,
-   * mà đơn trong pool thì chưa có), nên dialog phân chi nhánh lấy nhãn từ đây
-   * để báo lỗi đúng từng dòng thay vì đọc ra một UUID.
+   * mà đơn trong pool thì chưa có), nên nút "Lưu" của màn Điều phối lấy nhãn
+   * từ đây để báo lỗi đúng từng đơn thay vì đọc ra một UUID.
    */
   codeById: Record<string, string>;
 }
@@ -162,26 +162,31 @@ export interface DispatchBatchResult {
   failed: DispatchFailure[];
 }
 
-export interface DispatchBatchInput {
-  orderIds: string[];
+/** Một đơn và chi nhánh Admin chọn cho CHÍNH nó trên lưới (ADR-11). */
+export interface DispatchAssignment {
+  orderId: string;
   branchId: string;
 }
 
-function describeDispatchError(error: unknown): { code: string; message: string } {
+function describeOrderActionError(
+  error: unknown,
+  messages: Record<string, string>,
+  fallback: string,
+): { code: string; message: string } {
   if (error instanceof HttpError) {
     const { code, message } = error.error;
     // Lỗi 400 "chi nhánh không thuộc tổ chức" đã là câu tiếng Việt từ server —
     // giữ nguyên thay vì thay bằng một câu chung chung.
-    return { code, message: DISPATCH_ERROR_MESSAGES[code] ?? message };
+    return { code, message: messages[code] ?? message };
   }
   return {
     code: "UNKNOWN",
-    message: error instanceof Error ? error.message : "Không phân được đơn.",
+    message: error instanceof Error ? error.message : fallback,
   };
 }
 
 /**
- * Phân một MẺ đơn về cùng một chi nhánh (AC-10).
+ * Phân một MẺ đơn, mỗi đơn về chi nhánh của riêng nó (AC-42, ADR-11).
  *
  * Gọi TUẦN TỰ và không bao giờ reject: mỗi đơn là một quyết định riêng, nên
  * một đơn 409 không được huỷ kết quả của những đơn đã phân xong. Trả về cả hai
@@ -194,19 +199,18 @@ function describeDispatchError(error: unknown): { code: string; message: string 
 export function useDispatchSalesOrders(): UseMutationResult<
   DispatchBatchResult,
   Error,
-  DispatchBatchInput
+  DispatchAssignment[]
 > {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      orderIds,
-      branchId,
-    }: DispatchBatchInput): Promise<DispatchBatchResult> => {
+    mutationFn: async (
+      assignments: DispatchAssignment[],
+    ): Promise<DispatchBatchResult> => {
       const dispatched: string[] = [];
       const failed: DispatchFailure[] = [];
 
-      for (const orderId of orderIds) {
+      for (const { orderId, branchId } of assignments) {
         try {
           requireErpData(
             await erpApi.POST<unknown>("/admin/sales-orders/{id}/dispatch", {
@@ -216,7 +220,14 @@ export function useDispatchSalesOrders(): UseMutationResult<
           );
           dispatched.push(orderId);
         } catch (error) {
-          failed.push({ orderId, ...describeDispatchError(error) });
+          failed.push({
+            orderId,
+            ...describeOrderActionError(
+              error,
+              DISPATCH_ERROR_MESSAGES,
+              "Không phân được đơn.",
+            ),
+          });
         }
       }
 
@@ -224,6 +235,73 @@ export function useDispatchSalesOrders(): UseMutationResult<
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ADMIN_SALES_ORDERS_KEY });
+    },
+  });
+}
+
+/** Một dòng hàng trong kết quả `POST /admin/sales-orders/stock-check` (ADR-09). */
+export interface StockCheckLine {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  /** Tổng SL cần của món trong đơn (dòng trùng món đã gộp). */
+  required: number;
+  /** Tồn trong phạm vi đối chiếu — toàn chuỗi khi không gửi `branchId`. Có thể âm. */
+  available: number;
+  /** `max(0, required - available)`; 0 = đủ. */
+  shortBy: number;
+}
+
+export interface StockCheckOrder {
+  orderId: string;
+  orderCode: string;
+  /** `null` = đối chiếu trên tồn toàn chuỗi. */
+  branchId: string | null;
+  sufficient: boolean;
+  shortLineCount: number;
+  /** Dòng đủ trước dòng thiếu — server đã xếp. */
+  lines: StockCheckLine[];
+}
+
+interface StockCheckResponse {
+  orders: StockCheckOrder[];
+}
+
+/** Một đơn cần đối chiếu; `branchId` bỏ trống = đối chiếu trên tồn toàn chuỗi. */
+export interface StockCheckInput {
+  orderId: string;
+  branchId?: string;
+}
+
+/**
+ * Đối chiếu đủ/thiếu tồn cho một mẻ đơn trong pool.
+ *
+ * "Validate" của màn Điều phối gửi `branchId` Admin đã chọn cho TỪNG đơn
+ * (A-39) — tồn tại chính chi nhánh đó. Bỏ trống `branchId` = tồn toàn chuỗi.
+ *
+ * Kết quả giữ NGUYÊN thứ tự server trả — đủ → thiếu (A-39); sắp lại ở client
+ * là hai nơi cùng quyết một thứ tự.
+ *
+ * Là mutation chứ không phải query: đây là ảnh chụp ngay lúc bấm nút, không
+ * phải dữ liệu nên nằm trong cache rồi tái dùng ở lượt bấm sau.
+ */
+export function useStockCheck(): UseMutationResult<
+  StockCheckOrder[],
+  Error,
+  StockCheckInput[]
+> {
+  return useMutation({
+    mutationFn: async (orders: StockCheckInput[]): Promise<StockCheckOrder[]> => {
+      const response = requireErpData(
+        await erpApi.POST<StockCheckResponse>("/admin/sales-orders/stock-check", {
+          body: {
+            orders: orders.map(({ orderId, branchId }) =>
+              branchId ? { orderId, branchId } : { orderId },
+            ),
+          },
+        }),
+      );
+      return Array.isArray(response?.orders) ? response.orders : [];
     },
   });
 }
