@@ -82,6 +82,21 @@ export class AuthService {
     password: string,
     orgId: string,
   ): Promise<LoginResponse> {
+    // Lưới thứ hai dưới `LoginDto`, và nó KHÔNG thừa: `login` là method công
+    // khai, gọi được từ chỗ không có `ValidationPipe` nào đi qua.
+    //
+    // Thiếu guard này thì `orgId` rỗng đi thẳng vào `findOne` bên dưới, và
+    // TypeORM **bỏ luôn** điều kiện `undefined` thay vì khớp `IS NULL` — user
+    // vẫn tìm thấy theo mỗi email, lượt đăng nhập TRẢ 200, và token phát ra
+    // không mang claim `organizationId`. Hỏng hoàn toàn im lặng: người dùng
+    // vào được rồi mới ăn 403 ở mọi màn.
+    //
+    // Cùng câu `Invalid credentials` với ba nhánh dưới, cố ý — mọi thất bại
+    // xác thực trả một câu, không nói cho người gọi biết họ sai ở vế nào.
+    if (!orgId) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const user = await this.userRepo.findOne({
       where: { email, organizationId: orgId },
     });

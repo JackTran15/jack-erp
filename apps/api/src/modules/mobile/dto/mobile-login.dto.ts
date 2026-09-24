@@ -1,26 +1,21 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { LoginDto } from '../../auth/dto/login.dto';
 
 /**
- * Cố ý KHÔNG dùng `@IsEmail()` / `@IsUUID()`. `LoginBloc` của app mobile không
- * có nhánh nào cho `BadRequestException` (nó rơi vào `LoginError.unknown`), nên
- * một validator chặt hơn chỉ đổi thông báo "Sai thông tin đăng nhập" thành
- * "Lỗi không xác định". Giá trị của DTO này là whitelist + schema trong /docs.
+ * Cùng ba field với `POST /auth/login`, nên **kế thừa thẳng `LoginDto`** thay
+ * vì chép lại — `class-validator` và `@nestjs/swagger` đều đi theo chuỗi
+ * nguyên mẫu, nên whitelist lẫn schema `/docs` giữ nguyên.
+ *
+ * Chiều phụ thuộc đúng: `mobile` là facade mỏng trên `auth`
+ * (`mobile-auth.controller.ts` vốn đã import `AuthService`), không phải ngược
+ * lại.
+ *
+ * Lý do CỐ Ý không dùng `@IsEmail()` / `@IsUUID()` — của riêng app mobile:
+ * `LoginBloc` không có nhánh nào cho `BadRequestException` (nó rơi vào
+ * `LoginError.unknown`), nên một validator chặt hơn chỉ đổi thông báo "Sai
+ * thông tin đăng nhập" thành "Lỗi không xác định". `LoginDto` giữ cùng lựa
+ * chọn đó vì một lý do khác, ghi ở chính nó.
+ *
+ * Giữ một class RIÊNG chứ không dùng thẳng `LoginDto`: tên hiện trong `/docs`
+ * là tên class, và hợp đồng của hai route được quyền tách nhau về sau.
  */
-export class MobileLoginDto {
-  @ApiProperty({ description: 'Email đăng nhập' })
-  @IsString()
-  @IsNotEmpty()
-  email!: string;
-
-  @ApiProperty({ description: 'Mật khẩu' })
-  @IsString()
-  @IsNotEmpty()
-  password!: string;
-
-  /** `format` chỉ ghi vào Swagger, không ép kiểu — xem chú thích đầu class. */
-  @ApiProperty({ description: 'Id tổ chức (tenant)', format: 'uuid' })
-  @IsString()
-  @IsNotEmpty()
-  organizationId!: string;
-}
+export class MobileLoginDto extends LoginDto {}
