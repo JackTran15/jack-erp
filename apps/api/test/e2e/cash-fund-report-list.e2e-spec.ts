@@ -430,4 +430,119 @@ describe('Cash-fund report "Bảng kê thu chi" (E2E)', () => {
       expect(Number(totalsRow.getCell(6).value)).toBe(400000);
     });
   });
+
+  // Last in the file on purpose: it re-points PT-02 / PC-04 at an invoice, and
+  // every case above reads the fixture as seeded. `afterAll` puts them back.
+  describe('AC-08 (UOW-02) — rows tied to an invoice carry invoiceNumber and _invoiceId', () => {
+    const INVOICE_CODE = 'HD-A1';
+    let invoiceId: string;
+    let original: { PT02: any; PC04: any };
+    let body: { rows: any[]; totals: any; total: number };
+
+    beforeAll(async () => {
+      // The shared fixture has no invoice: a minimal one on branch A, then PT-02
+      // becomes its POS receipt (INVOICE) and PC-04 its refund (REFUND).
+      const [row] = await ds.query(
+        `INSERT INTO invoices
+           (id, organization_id, branch_id, code, status, type, subtotal, discount_amount,
+            points_redeemed, points_discount_amount, deposit_amount, amount_due, total_paid,
+            is_draft, session_id, staff_id, customer_id, issued_at, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3, 'paid', 'SALE', 700000, 0,
+            0, 0, 0, 700000, 700000,
+            false, '00000000-0000-4000-8000-000000000001', $4::uuid, NULL, '2026-09-02T03:00:00Z',
+            $4::uuid, NOW(), NOW())
+         RETURNING id`,
+        [seed.organizationId, fx.branchAId, INVOICE_CODE, seed.userId],
+      );
+      invoiceId = row.id;
+
+      const [pt02] = await ds.query(
+        `SELECT reference_type, reference_id FROM cash_receipts WHERE id = $1`,
+        [fx.vouchers.PT02],
+      );
+      const [pc04] = await ds.query(
+        `SELECT reference_type, reference_id FROM cash_payments WHERE id = $1`,
+        [fx.vouchers.PC04],
+      );
+      original = { PT02: pt02, PC04: pc04 };
+
+      await ds.query(
+        `UPDATE cash_receipts SET reference_type = 'INVOICE', reference_id = $2 WHERE id = $1`,
+        [fx.vouchers.PT02, invoiceId],
+      );
+      await ds.query(
+        `UPDATE cash_payments SET reference_type = 'REFUND', reference_id = $2 WHERE id = $1`,
+        [fx.vouchers.PC04, invoiceId],
+      );
+
+      body = await search({ period: SEPTEMBER, store: storeA }, { page: 1, limit: 50 });
+    });
+
+    afterAll(async () => {
+      await ds.query(
+        `UPDATE cash_receipts SET reference_type = $2, reference_id = $3 WHERE id = $1`,
+        [fx.vouchers.PT02, original.PT02.reference_type, original.PT02.reference_id],
+      );
+      await ds.query(
+        `UPDATE cash_payments SET reference_type = $2, reference_id = $3 WHERE id = $1`,
+        [fx.vouchers.PC04, original.PC04.reference_type, original.PC04.reference_id],
+      );
+    });
+
+    const rowOf = (key: 'PT02' | 'PC04') =>
+      details(body.rows).find((r) => r.voucherId === fx.vouchers[key]);
+
+    it('PT-02 (INVOICE) → invoiceNumber, _invoiceId and reference "INVOICE <mã>"', () => {
+      expect(rowOf('PT02')).toMatchObject({
+        invoiceNumber: INVOICE_CODE,
+        _invoiceId: invoiceId,
+        reference: `INVOICE ${INVOICE_CODE}`,
+      });
+    });
+
+    it('PC-04 (REFUND) → invoiceNumber, _invoiceId and reference "REFUND <mã>"', () => {
+      expect(rowOf('PC04')).toMatchObject({
+        invoiceNumber: INVOICE_CODE,
+        _invoiceId: invoiceId,
+        reference: `REFUND ${INVOICE_CODE}`,
+      });
+    });
+
+    it('every other detail row has _invoiceId = null and no invoiceNumber', () => {
+      const others = details(body.rows).filter(
+        (r) => r.voucherId !== fx.vouchers.PT02 && r.voucherId !== fx.vouchers.PC04,
+      );
+      expect(others).toHaveLength(7);
+      for (const r of others) {
+        expect(r._invoiceId).toBeNull();
+        expect(r.invoiceNumber).toBeNull();
+      }
+    });
+
+    it('rows, running balance and footer are unchanged: 9 vouchers, Σ thu 2.670.000 / Σ chi 400.000', () => {
+      expect(voucherIds(body.rows)).toEqual(SEPTEMBER_ORDER.map((k) => fx.vouchers[k]));
+      expect(details(body.rows).map((r) => r.runningBalance)).toEqual(RUNNING);
+      expect(body.total).toBe(9);
+      expect(body.totals.amountIn).toBe(2670000);
+      expect(body.totals.amountOut).toBe(400000);
+    });
+
+    it('/columns does not expose _invoiceId', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/reports/cash-fund/columns?reportType=${LIST}`)
+        .set(headers())
+        .expect(200);
+      const cols: string[] = res.body.columns.map((c: any) => c.col);
+      expect(cols).toEqual(COLUMNS);
+      expect(cols).not.toContain('_invoiceId');
+    });
+
+    it('column filter "Số hóa đơn" contains the code → PT-02 and PC-04 (A-04: REFUND now matches)', async () => {
+      const filtered = await search(
+        { period: SEPTEMBER, store: storeA },
+        { columnFilters: [{ col: 'invoiceNumber', contains: INVOICE_CODE }] },
+      );
+      expect(voucherIds(filtered.rows)).toEqual([fx.vouchers.PT02, fx.vouchers.PC04]);
+    });
+  });
 });

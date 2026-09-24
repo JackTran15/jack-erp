@@ -45,6 +45,6 @@ Cùng môi trường UOW-01.
 
 ## Definition of done
 
-- [ ] AC-08 xanh ở unit + e2e (`cash-fund-report-list`, `cash-fund-report-expenses`)
-- [ ] AC-09..11 xanh trong `verify-t0204.py`, có ảnh chụp
+- [x] AC-08 xanh ở unit + e2e (`cash-fund-report-list`, `cash-fund-report-expenses`)
+- [x] AC-09..11 xanh trong `verify-t0204.py`, có ảnh chụp
 - [ ] Demo script chạy trước Akenzy và được chấp nhận tại G4

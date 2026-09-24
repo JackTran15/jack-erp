@@ -54,6 +54,6 @@ erp_dev_3008, tài khoản admin của My Company.
 
 ## Definition of done
 
-- [ ] AC-01..07 xanh trong `verify-t0103.py`, ảnh chụp mỗi loại phiếu + drill-down + tài khoản thiếu quyền
-- [ ] `pnpm --filter @erp/backoffice-web exec tsc --noEmit` xanh
+- [x] AC-01..07 xanh trong `verify-t0103.py`, ảnh chụp mỗi loại phiếu + drill-down + tài khoản thiếu quyền
+- [x] `pnpm --filter @erp/backoffice-web exec tsc --noEmit` xanh
 - [ ] Demo script chạy trước Akenzy và được chấp nhận tại G4

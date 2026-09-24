@@ -776,6 +776,91 @@ describe('Cash-fund expense reports "Chi tiền theo mục chi / Bảng kê ti�
     });
   });
 
+  // Last describe on purpose: it re-points PC-04 at an invoice, and every case
+  // above (AC-14 asserts invoiceNumber = null) reads the fixture as seeded.
+  describe('AC-08 (UOW-02) — the REFUND line PC-04 carries invoiceNumber and _invoiceId on #5', () => {
+    const INVOICE_CODE = 'HD-A1';
+    let invoiceId: string;
+    let original: { reference_type: string | null; reference_id: string | null };
+    let body: SearchResult;
+
+    beforeAll(async () => {
+      // The shared fixture has no invoice: a minimal one on branch A, then PC-04
+      // becomes its refund payment (REFUND → invoices.id).
+      const [row] = await ds.query(
+        `INSERT INTO invoices
+           (id, organization_id, branch_id, code, status, type, subtotal, discount_amount,
+            points_redeemed, points_discount_amount, deposit_amount, amount_due, total_paid,
+            is_draft, session_id, staff_id, customer_id, issued_at, created_by, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1::uuid, $2::uuid, $3, 'paid', 'SALE', 700000, 0,
+            0, 0, 0, 700000, 700000,
+            false, '00000000-0000-4000-8000-000000000001', $4::uuid, NULL, '2026-09-02T03:00:00Z',
+            $4::uuid, NOW(), NOW())
+         RETURNING id`,
+        [seed.organizationId, fx.branchAId, INVOICE_CODE, seed.userId],
+      );
+      invoiceId = row.id;
+
+      [original] = await ds.query(
+        `SELECT reference_type, reference_id FROM cash_payments WHERE id = $1`,
+        [fx.vouchers.PC04],
+      );
+      await ds.query(
+        `UPDATE cash_payments SET reference_type = 'REFUND', reference_id = $2 WHERE id = $1`,
+        [fx.vouchers.PC04, invoiceId],
+      );
+
+      body = await list({ period: SEPTEMBER }, { page: 1, limit: 50 });
+    });
+
+    afterAll(async () => {
+      await ds.query(
+        `UPDATE cash_payments SET reference_type = $2, reference_id = $3 WHERE id = $1`,
+        [fx.vouchers.PC04, original.reference_type, original.reference_id],
+      );
+    });
+
+    it('PC-04 detail → invoiceNumber = mã hóa đơn, _invoiceId = its id', () => {
+      const pc04 = details(body.rows).filter((r) => r.voucherId === fx.vouchers.PC04);
+      expect(pc04).toHaveLength(1);
+      expect(pc04[0]).toMatchObject({ invoiceNumber: INVOICE_CODE, _invoiceId: invoiceId });
+    });
+
+    it('the other detail lines (PC-03, PC-02 ×2) have _invoiceId = null and no invoiceNumber', () => {
+      const others = details(body.rows).filter((r) => r.voucherId !== fx.vouchers.PC04);
+      expect(others.map((r) => r.voucherId)).toEqual([
+        fx.vouchers.PC03,
+        fx.vouchers.PC02,
+        fx.vouchers.PC02,
+      ]);
+      for (const r of others) {
+        expect(r._invoiceId).toBeNull();
+        expect(r.invoiceNumber).toBeNull();
+      }
+    });
+
+    it('layout and footer unchanged: TỔNG CHI 200.000, Chi khác 40.000, 7 rows counted', () => {
+      expect(body.rows[0]).toMatchObject({ rowKind: 'grandTotal', amount: 200000 });
+      expect(groups(body.rows).map((g) => [g.reason, g.amount])).toEqual([
+        ['Chi khác', 40000],
+        ['Tiền điện', 150000],
+        ['Tiền nước', 10000],
+      ]);
+      expect(body.total).toBe(7);
+      expect(body.totals).toEqual({ amount: 200000 });
+    });
+
+    it('/columns does not expose _invoiceId', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/reports/cash-fund/columns?reportType=${LIST}`)
+        .set(headers())
+        .expect(200);
+      const cols: string[] = res.body.columns.map((c: any) => c.col);
+      expect(cols).toEqual(LIST_COLUMNS);
+      expect(cols).not.toContain('_invoiceId');
+    });
+  });
+
   /** Σ of the AC-15 lines whose date lies in [from, to] (both `YYYY-MM-DD`, in 10/2026). */
   function sumOctober(from: string, to: string): number {
     let sum = 0;
