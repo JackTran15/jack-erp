@@ -2,6 +2,10 @@ import type { PushTemplateTable } from '../core/templates/template.types';
 
 /** Push text, English. Mirrors `vi.ts` — see the note there. */
 export const en: PushTemplateTable = {
+  sales_order: {
+    title: 'New order {{code}}',
+    body: 'You have received order {{code}} worth {{amount}} from {{channel}}.',
+  },
   invoice: {
     title: 'New invoice {{code}}',
     body: '{{actor}} created invoice {{code}} worth {{amount}} at {{store}}.',

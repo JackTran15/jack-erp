@@ -6,6 +6,7 @@ import { InvoiceCancelNotificationDefinition } from './invoice-cancel.definition
 import { InvoiceReturnNotificationDefinition } from './invoice-return.definition';
 import { PurchaseNotificationDefinition } from './purchase.definition';
 import { StockInNotificationDefinition } from './stock-in.definition';
+import { SalesOrderNotificationDefinition } from './sales-order.definition';
 import { StockOutNotificationDefinition } from './stock-out.definition';
 
 const lookup = {
@@ -32,6 +33,10 @@ describe('event-driven notification definitions', () => {
     expect(registry.typesForApp('erp_manager').sort()).toEqual(
       ['invoice', 'invoice_cancel', 'invoice_return', 'purchase', 'revenue', 'stock_alert', 'stock_in', 'stock_out'].sort(),
     );
+    // `sales_order` là loại ĐẦU TIÊN của app bán hàng. Trước nó,
+    // `typesForApp('erp_sales')` rỗng nên hộp thư của erp_sales luôn trống.
+    expect(registry.typesForApp('erp_sales')).toEqual(['sales_order']);
+    expect(registry.typesForApp('erp_manager')).not.toContain('sales_order');
     expect(registry.scheduled().map((d) => d.type).sort()).toEqual(['revenue', 'stock_alert']);
     expect(registry.byTopic(ERP_TOPICS.GOODS_RECEIPT_POSTED).map((d) => d.type).sort()).toEqual([
       'purchase',
@@ -39,13 +44,61 @@ describe('event-driven notification definitions', () => {
     ]);
   });
 
-  it('không loại nào loại trừ người thực hiện — quyết định 23/09/2026', () => {
-    // Chốt duy nhất chống việc một loại MỚI copy-paste từ file cũ rồi mang lại
+  it('CHỈ `sales_order` loại trừ người thực hiện — mọi loại khác vẫn là quyết định 23/09/2026', () => {
+    // Chốt chống việc một loại MỚI copy-paste từ file cũ rồi mang theo
     // `excludeActor: true`: nó compile sạch, chạy sạch, và chỉ lộ ra khi có
     // người ngồi hỏi "sao lập chứng từ mà máy mình không rung".
+    //
+    // `sales_order` là ngoại lệ DUY NHẤT và có khai báo (ADR-02): thu ngân giữ
+    // CẢ `pos.sales-order.create` lẫn `pos.sales-order.approve`, nên người gửi
+    // đơn nằm trong chính tập người nhận — khác hẳn 8 loại kia, nơi ca đó hiếm
+    // và có nghĩa. Danh sách này ĐÓNG: thêm tên thứ hai vào đây phải kèm một ADR.
     const definitions = NOTIFICATION_DEFINITION_CLASSES.map((cls) => new cls(lookup as any));
 
-    expect(definitions.filter((d) => d.excludeActor).map((d) => d.type)).toEqual([]);
+    expect(definitions.filter((d) => d.excludeActor).map((d) => d.type)).toEqual(['sales_order']);
+  });
+
+  describe('sales_order — đơn tư vấn gửi cho thu ngân', () => {
+    const definition = new SalesOrderNotificationDefinition(lookup as any);
+    const payload = {
+      salesOrderId: 'so-1',
+      documentNumber: 'DT000003',
+      totalAmount: 447500,
+      actorId: 'u-1',
+      channel: 'Ứng dụng Tư Vấn',
+    };
+
+    it('nghe đúng topic và chỉ tới app bán hàng', () => {
+      expect(definition.trigger.topic).toBe(ERP_TOPICS.SALES_ORDER_SENT);
+      expect(definition.targetApps).toEqual(['erp_sales']);
+    });
+
+    it('người nhận chọn theo quyền DUYỆT đơn, không theo vai', () => {
+      // Đây là vế giữ tư vấn viên ở ngoài: `SALES_PERMISSION_KEYS` dừng ở
+      // `read/create/cancel`, chỉ `CASHIER_PERMISSION_KEYS` mới có `approve`.
+      expect(definition.permissions).toEqual(['pos.sales-order.approve']);
+    });
+
+    it('build ra data thô + target mở đúng đơn', async () => {
+      expect(await definition.build(ctx(payload))).toEqual({
+        data: { code: 'DT000003', amount: 447500, channel: 'Ứng dụng Tư Vấn', actor: 'Nguyễn Văn A' },
+        target: { type: 'sales_order', id: 'so-1' },
+      });
+    });
+
+    it('amount giữ dạng SỐ thô — app tự định dạng theo locale', async () => {
+      const built = await definition.build(ctx({ ...payload, totalAmount: 1463000 }));
+      expect(typeof built?.data.amount).toBe('number');
+    });
+
+    it('nhãn kênh lấy từ chứng từ, nên đơn đối tác mang nhãn của nó', async () => {
+      const built = await definition.build(ctx({ ...payload, channel: 'Website công ty' }));
+      expect(built?.data.channel).toBe('Website công ty');
+    });
+
+    it('payload hỏng thì BỎ QUA, không ném', async () => {
+      await expect(definition.build(ctx({} as any))).resolves.toBeNull();
+    });
   });
 
   describe('goods receipt → purchase XOR stock_in', () => {

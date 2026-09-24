@@ -5,6 +5,7 @@ import { InvoiceReturnNotificationDefinition } from './invoice-return.definition
 import { InvoiceNotificationDefinition } from './invoice.definition';
 import { PurchaseNotificationDefinition } from './purchase.definition';
 import { RevenueNotificationDefinition } from './revenue.definition';
+import { SalesOrderNotificationDefinition } from './sales-order.definition';
 import { StockAlertNotificationDefinition } from './stock-alert.definition';
 import { StockInNotificationDefinition } from './stock-in.definition';
 import { StockOutNotificationDefinition } from './stock-out.definition';
@@ -21,6 +22,7 @@ import { StockOutNotificationDefinition } from './stock-out.definition';
  * absent from `availableTypes` = "Sắp có" on the mobile settings screen.
  */
 export const NOTIFICATION_DEFINITION_CLASSES: Type<NotificationDefinition>[] = [
+  SalesOrderNotificationDefinition,
   InvoiceNotificationDefinition,
   InvoiceReturnNotificationDefinition,
   InvoiceCancelNotificationDefinition,

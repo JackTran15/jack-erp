@@ -26,7 +26,15 @@ export const DEFAULT_NOTIFICATION_LOCALE: NotificationLocale = 'vi';
  * a target to its own router, so erp_sales can open the same target elsewhere.
  */
 export interface NotificationTarget {
-  type: 'invoice' | 'stock_document' | 'store' | 'overview' | 'inventory_store' | 'product' | 'notifications';
+  type:
+    | 'sales_order'
+    | 'invoice'
+    | 'stock_document'
+    | 'store'
+    | 'overview'
+    | 'inventory_store'
+    | 'product'
+    | 'notifications';
   id?: string;
   /** stock_document only: goods-receipt | purchase-return | stock-in | stock-out. */
   slug?: string;
