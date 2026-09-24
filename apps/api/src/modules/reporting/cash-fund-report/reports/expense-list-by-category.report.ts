@@ -10,6 +10,7 @@ import {
   CashFundKind,
   ColumnFilter,
   InvoiceReportResult,
+  REPORT_ROW_INVOICE_ID,
   ReportColumnDataType,
   ReportColumnHeader,
   ReportFilterOption,
@@ -58,8 +59,17 @@ const PAYMENT_METHOD_OPTIONS: ReportFilterOption[] = (
   Object.keys(CASH_FUND_KIND_LABELS_VI) as CashFundKind[]
 ).map((kind) => ({ value: kind, label: CASH_FUND_KIND_LABELS_VI[kind] }));
 
-/** Reference types whose `reference_id` is an `invoices.id` (A-20). */
-const INVOICE_REFERENCE_TYPES = ['INVOICE', 'INVOICE_DEBT', 'INVOICE_KEPT_CHANGE', 'RETURN_CANCEL'];
+/**
+ * Reference types whose `reference_id` is an `invoices.id` (A-20). `REFUND` is the
+ * refund payment of a returned / cancelled invoice — its reference is the invoice too.
+ */
+const INVOICE_REFERENCE_TYPES = [
+  'INVOICE',
+  'INVOICE_DEBT',
+  'INVOICE_KEPT_CHANGE',
+  'RETURN_CANCEL',
+  'REFUND',
+];
 
 // Group order over the `rows` relation: the no-category group first (AC-14,
 // A-13 evidence), then categories by display order and name; `category_id`
@@ -119,6 +129,8 @@ interface RawRow {
   branch_code: string | null;
   branch_name: string | null;
   invoice_number: string | null;
+  /** `invoices.id` behind `invoice_number` — the drill-down's unambiguous key. */
+  invoice_id: string | null;
   /** Only selected by the page query: 0-based position in the flat list, header rows counted. */
   flat_pos?: unknown;
   /** Only selected by the page query: this is the first detail of its group. */
@@ -397,7 +409,8 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
         COALESCE(h.partner_name, h.party_name) AS partner_name,
         h.party_name AS payee_name,
         b.code AS branch_code, b.name AS branch_name,
-        inv.code AS invoice_number
+        inv.code AS invoice_number,
+        inv.id AS invoice_id
       FROM (${voucherLinesSql()}) v
       JOIN (${voucherHeadersSql()}) h ON h.id = v.voucher_id AND h.kind = v.kind
       LEFT JOIN cash_voucher_categories c ON c.id = v.category_id
@@ -512,6 +525,7 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
       branchCode: r.branch_code ?? null,
       branchName: r.branch_name ?? null,
       invoiceNumber: r.invoice_number ?? null,
+      [REPORT_ROW_INVOICE_ID]: r.invoice_id ?? null,
       [CASH_FUND_ROW_KEYS.ROW_KIND]: 'detail',
       [CASH_FUND_ROW_KEYS.CATEGORY_ID]: groupKey(r.category_id),
       [CASH_FUND_ROW_KEYS.VOUCHER_ID]: r.voucher_id,

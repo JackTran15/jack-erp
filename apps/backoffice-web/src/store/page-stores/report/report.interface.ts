@@ -1,4 +1,8 @@
-import type { CashFundKind, CashFundTimeBucket } from "@erp/shared-interfaces";
+import type {
+  CashFundDocumentKind,
+  CashFundKind,
+  CashFundTimeBucket,
+} from "@erp/shared-interfaces";
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
 import { STORE_TYPE } from "../../../constants/store.constant";
@@ -89,6 +93,15 @@ export interface InvoiceDetailTarget {
 }
 
 /**
+ * Phiếu thu/chi đang mở chi tiết (báo cáo Quỹ tiền). `kind` chọn dialog Sổ quỹ
+ * tương ứng — tiền mặt và tiền gửi là bốn bảng, bốn endpoint khác nhau.
+ */
+export interface VoucherDetailTarget {
+  id: string;
+  kind: CashFundDocumentKind;
+}
+
+/**
  * Một drill-down đã được giải xong: report type đích, tiêu đề hiển thị, và bộ
  * filter đã thu hẹp sẵn. Dialog chỉ việc dựng một report lồng từ đây — nó không
  * biết gì về dòng nào vừa được click.
@@ -145,6 +158,8 @@ export interface ReportActions {
   reset: () => void;
   // Hóa đơn đang xem chi tiết (mở dialog); null = đóng.
   setDetailInvoice: (target: InvoiceDetailTarget | null) => void;
+  // Phiếu thu/chi đang xem chi tiết (mở dialog Sổ quỹ); null = đóng.
+  setDetailVoucher: (target: VoucherDetailTarget | null) => void;
   // Drill-down đang mở (dialog báo cáo lồng); null = đóng.
   setDrillDown: (drillDown: ReportDrillDown | null) => void;
 }
@@ -152,6 +167,8 @@ export interface ReportActions {
 export interface ReportState extends ReportInitialState {
   // UI state cho dialog chi tiết hóa đơn (không thuộc initial metadata).
   detailInvoice: InvoiceDetailTarget | null;
+  // UI state cho dialog chi tiết phiếu thu/chi; độc lập với hóa đơn (phiếu thu mở được hóa đơn chồng lên).
+  detailVoucher: VoucherDetailTarget | null;
   // UI state cho dialog drill-down (báo cáo lồng); song song với cái trên, không thay thế.
   drillDown: ReportDrillDown | null;
   actions: ReportActions;

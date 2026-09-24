@@ -35,6 +35,7 @@ import {
 import { useTableStore } from "../../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../../store/page-stores/report/report.context";
 import { getReportBackendKey } from "../../../../../constants/reports/report-type.constant";
+import { usePermissionCheck } from "../../../../../hooks/usePermissionCheck";
 import {
   resolveDrillDown,
   type DrillDownAction,
@@ -81,6 +82,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
   const columnFilters = useReportStore((s) => s.columnFilters);
   const setColumnFilter = useReportStore((s) => s.actions.setColumnFilter);
   const setDetailInvoice = useReportStore((s) => s.actions.setDetailInvoice);
+  const setDetailVoucher = useReportStore((s) => s.actions.setDetailVoucher);
   const setDrillDown = useReportStore((s) => s.actions.setDrillDown);
   const reportType = useReportStore((s) => s.reportType);
   // Filter đã áp dụng, không phải filter đang gõ dở: dialog phải mở ra trên đúng
@@ -89,13 +91,16 @@ export function ReportPageTableView({ rows, totals }: Props) {
   // Tên chi nhánh neo do dialog cha truyền xuống; undefined ở trang gốc.
   const anchorName = useReportStore((state) => state.anchorName);
   const backendKey = getReportBackendKey(reportType);
+  // Ô mở phiếu/hóa đơn chỉ là link khi người xem đọc được chứng từ đó (A-03).
+  const { has: can } = usePermissionCheck();
 
   const runDrillDown = useCallback(
     (action: DrillDownAction) => {
       if (action.kind === "invoiceDetail") setDetailInvoice(action.target);
+      else if (action.kind === "voucherDetail") setDetailVoucher(action.target);
       else setDrillDown(action.drillDown);
     },
-    [setDetailInvoice, setDrillDown],
+    [setDetailInvoice, setDetailVoucher, setDrillDown],
   );
 
   // Tra cứu cấu hình cột theo id để render metadata (label, group, mã, align, link).
@@ -488,6 +493,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
                       row: row.original,
                       filters,
                       anchorName,
+                      can,
                     });
                     const display = isReportNumberColumn(col)
                       ? formatReportNumber(raw)

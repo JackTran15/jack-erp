@@ -1,5 +1,10 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { CASH_FUND_ROW_KEYS, CASH_FUND_UNCATEGORIZED, ReportRow } from '@erp/shared-interfaces';
+import {
+  CASH_FUND_ROW_KEYS,
+  CASH_FUND_UNCATEGORIZED,
+  REPORT_ROW_INVOICE_ID,
+  ReportRow,
+} from '@erp/shared-interfaces';
 import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { RbacService } from '../../../rbac/rbac.service';
@@ -45,6 +50,7 @@ interface Raw {
   branch_code: string | null;
   branch_name: string | null;
   invoice_number: string | null;
+  invoice_id: string | null;
 }
 
 const CATEGORIES: Record<string, { name: string; order: number }> = {
@@ -81,6 +87,7 @@ function line(
     branch_code: 'CN-A',
     branch_name: 'Chi nhánh A',
     invoice_number: null,
+    invoice_id: null,
     ...extra,
   };
 }
@@ -359,6 +366,24 @@ describe('ExpenseListByCategoryReport', () => {
       });
     });
 
+    it('carries the invoice id of a REFUND line, null elsewhere, and keeps it out of the catalogue (T-02-01)', async () => {
+      const rows = FIXTURE.map((r) =>
+        r.line_id === 'l-04' ? { ...r, invoice_number: 'HD0001', invoice_id: 'inv-1' } : r,
+      );
+      const { rows: out, totals } = await build(rows).buildData(dto(), actor);
+      const details = out.filter((r) => r[CASH_FUND_ROW_KEYS.ROW_KIND] === 'detail');
+      const pc04 = details.find((r) => r.documentNumber === 'PC-04')!;
+      expect(pc04).toMatchObject({ invoiceNumber: 'HD0001', [REPORT_ROW_INVOICE_ID]: 'inv-1' });
+      for (const r of details.filter((d) => d.documentNumber !== 'PC-04')) {
+        expect(r[REPORT_ROW_INVOICE_ID]).toBeNull();
+      }
+      for (const r of out.filter((x) => x[CASH_FUND_ROW_KEYS.ROW_KIND] !== 'detail')) {
+        expect(r[REPORT_ROW_INVOICE_ID]).toBeUndefined();
+      }
+      expect(totals).toEqual((await build().buildData(dto(), actor)).totals);
+      expect((await build().buildColumns()).map((c) => c.col)).not.toContain(REPORT_ROW_INVOICE_ID);
+    });
+
     it('returns an empty page with null totals when nothing matches', async () => {
       const { rows, totals, total } = await build([]).buildData(dto(), actor);
       expect(rows).toEqual([expect.objectContaining({ reason: GRAND_TOTAL_LABEL, amount: 0 })]);
@@ -482,6 +507,8 @@ describe('ExpenseListByCategoryReport', () => {
       expect(sql).toContain('cash_payment_lines');
       expect(sql).toContain('bank_payment_lines');
       expect(sql).toContain('LEFT JOIN cash_voucher_categories c ON c.id = v.category_id');
+      expect(sql).toContain("'INVOICE', 'INVOICE_DEBT', 'INVOICE_KEPT_CHANGE', 'RETURN_CANCEL', 'REFUND'");
+      expect(sql).toContain('inv.id AS invoice_id');
       expect(params.slice(0, 4)).toEqual(['org-1', [BRANCH_A], '2026-09-01', '2026-09-30']);
     });
 
