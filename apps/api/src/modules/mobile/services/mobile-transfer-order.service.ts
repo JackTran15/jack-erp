@@ -3,6 +3,7 @@ import { ImportableTransferOrderListItem } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../common/decorators/actor-context.decorator';
 import { TransferOrderService } from '../../inventory/transfer-order/transfer-order.service';
 import { MobileStockDocumentLineDto } from '../dto/mobile-stock-document-detail.response.dto';
+import { withBranch } from '../../../common/utils/branch-request.util';
 import {
   MobileTransferOrderPageDto,
   MobileTransferOrderResponseDto,
@@ -83,15 +84,6 @@ export class MobileTransferOrderService {
  * Yêu cầu một chi nhánh ngoài tầm thì **NÉM**, không lặng lẽ lùi về mặc định —
  * cùng lập luận đã ghi ở bản gốc.
  */
-function withBranch(actor: ActorContext, requested?: string): ActorContext {
-  if (!requested || requested === actor.branchId) return actor;
-
-  if (!actor.branchIds?.includes(requested)) {
-    throw new ForbiddenException(`Access denied for branch: ${requested}`);
-  }
-
-  return { ...actor, branchId: requested };
-}
 
 /** Bỏ trống thì nhận mọi cửa hàng nguồn. */
 function matchesSource(

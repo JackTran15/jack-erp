@@ -9,6 +9,20 @@ export class MobileReturnableQueryDto {
   @IsOptional() @IsString() @MaxLength(100) search?: string;
   @IsOptional() @Transform(({ value }) => parseInt(value, 10)) @IsInt() @Min(1) page?: number;
   @IsOptional() @Transform(({ value }) => parseInt(value, 10)) @IsInt() @Min(1) @Max(100) limit?: number;
+
+  /**
+   * Cửa hàng cần xem, thay cho cửa hàng đang làm việc của người gọi.
+   *
+   * Màn Đổi trả cho thu ngân tra hoá đơn của một cửa hàng KHÁC (A-63). Bản
+   * trước app gửi ý định đó bằng header `X-Branch-Id`, và nó KHÔNG BAO GIỜ có
+   * tác dụng: `@Actor` giải chi nhánh theo `jwt > header > jwtList` còn token
+   * thì luôn mang `branchId`. Đo 2026-09-24 trên dữ liệu dev — hai cửa hàng
+   * khác nhau trả về cùng 204 hoá đơn, cùng mã.
+   *
+   * **KHÔNG nới quyền:** `withBranch` vẫn đòi id nằm trong tập chi nhánh được
+   * phân công; gửi cửa hàng lạ vẫn là 403. Vắng thì lấy cửa hàng của người gọi.
+   */
+  @IsOptional() @IsUUID() branchId?: string;
 }
 
 export class MobileReturnLineDto {

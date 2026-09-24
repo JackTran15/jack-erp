@@ -37,6 +37,7 @@ import { SalesOrderEntity } from '../../sales-order/entities/sales-order.entity'
 import { MobileCreateDraftDto, MobileUpdateDraftDto } from '../dto/mobile-cashier-draft.dto';
 import { SessionStatus } from '@erp/shared-interfaces';
 import { MobileCloseShiftDto, MobileOpenShiftDto } from '../dto/mobile-session.dto';
+import { withBranch } from '../../../common/utils/branch-request.util';
 
 /** Hoá đơn NHÁP dưới hình dạng GIỎ của app (T-15-01) — thứ màn Thu tiền đọc và sửa. */
 export interface MobileDraftView {
@@ -659,7 +660,16 @@ export class MobileCashierService {
    * kỳ vào `createdAt`, ô tìm rẽ theo hình dạng: toàn số dài (≥ 9) là SĐT, toàn
    * số là số HĐ, còn lại là tên khách. Phạm vi chi nhánh do query v2 áp theo actor.
    */
+  /**
+   * Hoá đơn đủ điều kiện đổi trả. `query.branchId` cho phép tra cửa hàng KHÁC
+   * cửa hàng đang đứng — xem doc của nó ở `MobileReturnableQueryDto`.
+   *
+   * Chỉ đường ĐỌC. Lập phiếu (`exchange`) vẫn ở cửa hàng của người gọi, vì nó
+   * đòi một ca đang mở (`findOpenForBranch`) và thu ngân chỉ mở ca ở chỗ mình
+   * đứng. Mở rộng vế đó là một quyết định nghiệp vụ, không phải đường ống.
+   */
   async returnableInvoices(query: MobileReturnableQueryDto, actor: ActorContext) {
+    actor = withBranch(actor, query.branchId);
     const term = query.search?.trim();
     const dto = new ReturnableInvoiceSearchV2Dto();
     dto.page = query.page ?? 1;

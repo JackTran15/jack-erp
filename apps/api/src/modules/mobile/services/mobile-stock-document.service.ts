@@ -30,6 +30,7 @@ import { GoodsReceiptEntity } from '../../inventory/goods-receipt/goods-receipt.
 import { GoodsReceiptLineEntity } from '../../inventory/goods-receipt/goods-receipt-line.entity';
 import { GoodsReceiptSearchV2Dto } from '../../inventory/goods-receipt/dto/goods-receipt-search-v2.dto';
 import { SearchGoodsReceiptsV2Query } from '../../inventory/goods-receipt/queries/search-goods-receipts-v2.query';
+import { withBranch } from '../../../common/utils/branch-request.util';
 import {
   MobileStockDocumentKind,
   MobileStockDocumentPurpose,
@@ -672,15 +673,6 @@ function toMobileFromIssue(
  * lùi im lặng nghĩa là màn hình nói "Chi nhánh Hà Nội" trong khi bày dữ liệu
  * của chi nhánh khác — sai theo kiểu không ai phát hiện ra.
  */
-function withBranch(actor: ActorContext, requested?: string): ActorContext {
-  if (!requested || requested === actor.branchId) return actor;
-
-  if (!actor.branchIds?.includes(requested)) {
-    throw new ForbiddenException(`Access denied for branch: ${requested}`);
-  }
-
-  return { ...actor, branchId: requested };
-}
 
 /**
  * Phạm vi tra cứu của MỌI lượt đọc chi tiết.
