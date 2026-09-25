@@ -298,13 +298,18 @@ export interface RoleSummary {
   id: string;
   name: string;
   description: string | null;
-  /** When true, the role was auto-created during org setup and cannot be renamed/deleted. */
+  /**
+   * When true, the role was auto-created during org setup. It cannot be renamed
+   * or deleted — the seeds and several call sites find these roles by name — but
+   * its description and permissions are editable by anyone `assignable` allows.
+   */
   isSystem: boolean;
   /**
-   * True when the caller may grant this role: it holds no permission key the
-   * caller lacks. Computed per request from the caller's own permission set —
-   * never from a role hierarchy — so it always agrees with the 403 the server
-   * would raise on POST /admin/users/:id/roles.
+   * True when the caller may grant *and edit* this role: it holds no permission
+   * key the caller lacks. Computed per request from the caller's own permission
+   * set — never from a role hierarchy — so it always agrees with the 403 the
+   * server would raise on POST /admin/users/:id/roles or on
+   * PUT /admin/roles/:id/permissions.
    */
   assignable: boolean;
   createdAt: string;

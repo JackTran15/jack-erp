@@ -23,7 +23,7 @@ export class RoleEntity {
   @Column({ type: 'varchar', length: 500, nullable: true, comment: 'Optional longer explanation of the roles purpose' })
   description: string | null;
 
-  @Column({ name: 'is_system', type: 'boolean', default: false, comment: 'If true, role was auto-created during org setup and cannot be deleted' })
+  @Column({ name: 'is_system', type: 'boolean', default: false, comment: 'If true, role was auto-created during org setup; cannot be renamed or deleted' })
   isSystem: boolean;
 
   @CreateDateColumn({ name: 'created_at' })
