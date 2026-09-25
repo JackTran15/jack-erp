@@ -167,7 +167,7 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     IDS.roleSystemAdmin,
     IDS.organization,
     SEED_ROLE_NAMES.SYSTEM_ADMIN,
-    'User Root — toàn quyền hệ thống (không chỉnh trên UI)',
+    'User Root — toàn quyền hệ thống (không đổi tên hoặc xóa)',
     true,
   );
   await assignPermissionsToRole(IDS.roleSystemAdmin, SYSTEM_ADMIN_PERMISSION_KEYS);
@@ -194,7 +194,7 @@ export async function seedOrgBaselineData(params: OrgBaselineSeedParams): Promis
     IDS.roleSales,
     IDS.organization,
     SEED_ROLE_NAMES.SALES,
-    'Đơn hàng, kho tạm, hóa đơn, ca làm việc',
+    'Đơn hàng, kho tạm, hóa đơn, ca làm việc, yêu cầu điều chuyển',
     false,
   );
   await assignPermissionsToRole(IDS.roleSales, SALES_PERMISSION_KEYS);

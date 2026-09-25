@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { RbacService } from './rbac.service';
 import { CacheService } from '../redis/cache.service';
@@ -42,6 +46,8 @@ describe('RolesService', () => {
       | 'invalidateUserPermissions'
       | 'invalidateOrgPermissions'
       | 'getGrantableRoleIds'
+      | 'getUserPermissions'
+      | 'getRolePermissionKeys'
     >
   >;
   let cacheService: jest.Mocked<Pick<CacheService, 'invalidate'>>;
@@ -58,6 +64,17 @@ describe('RolesService', () => {
       getGrantableRoleIds: jest.fn(
         async (_userId: string, _orgId: string, roleIds: string[]) =>
           new Set(roleIds),
+      ),
+      // The default actor is Quản trị hệ thống: it holds every key any test
+      // hands out, so the authority guards pass unless a test narrows this.
+      getUserPermissions: jest.fn().mockResolvedValue([
+        'pos.sale.create',
+        'iam.role.write',
+        'iam.role.permissions.write',
+      ]),
+      getRolePermissionKeys: jest.fn(
+        async (roleIds: string[]) =>
+          new Map<string, string[]>(roleIds.map((id) => [id, []])),
       ),
     };
     cacheService = {
@@ -140,18 +157,48 @@ describe('RolesService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('refuses description updates on system roles', async () => {
+    /**
+     * The counterpart of the rename ban above: `isSystem` is about the role's
+     * name and lifecycle, not about who may touch it. Quản trị hệ thống holds
+     * every key in the catalogue, so it may rewrite the description of the very
+     * role it wears — refusing that is what locked the administrator out.
+     */
+    it('lets a caller who may grant a system role edit its description', async () => {
       roleRepo.findOne.mockResolvedValue({
         id: 'r-1',
         name: 'Quản trị hệ thống',
         isSystem: true,
         description: null,
         organizationId: 'org-1',
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
+      rolePermissionRepo.find.mockResolvedValue([]);
+
+      await service.update('r-1', { description: 'updated' }, actor);
+
+      expect(roleRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'r-1', description: 'updated' }),
+      );
+    });
+
+    it('refuses an edit by a caller who lacks one of the role\'s permissions', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        name: 'Quản lý tổng',
+        isSystem: false,
+        description: null,
+        organizationId: 'org-1',
+      });
+      rbac.getGrantableRoleIds.mockResolvedValue(new Set());
+      rbac.getRolePermissionKeys.mockResolvedValue(
+        new Map([['r-1', ['pos.invoice.cancel']]]),
+      );
 
       await expect(
         service.update('r-1', { description: 'updated' }, actor),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(roleRepo.save).not.toHaveBeenCalled();
     });
   });
 
@@ -268,9 +315,14 @@ describe('RolesService', () => {
         { id: 'p-1', key: 'pos.sale.create' },
       ]);
       rolePermissionRepo.find.mockResolvedValue([]);
-      userRoleRepo.find.mockResolvedValue([
-        { userId: 'u-3', roleId: 'r-1', organizationId: 'org-1' },
-      ]);
+      // Two different reads of user_roles now: the actor's own rows (for the
+      // self-demotion guard) and the rows carrying this role. The mock repo
+      // ignores `where`, so answer per caller — the actor holds nothing here.
+      userRoleRepo.find.mockImplementation(async (opts?: any) =>
+        opts?.where?.userId === actor.userId
+          ? []
+          : [{ userId: 'u-3', roleId: 'r-1', organizationId: 'org-1' }],
+      );
 
       await service.setPermissions('r-1', ['pos.sale.create'], actor);
 
@@ -288,16 +340,95 @@ describe('RolesService', () => {
       );
     });
 
-    it('refuses to change permissions on a system role', async () => {
+    /** Same point as the description test above, on the permission matrix. */
+    it('lets a caller who may grant a system role rewrite its permissions', async () => {
       roleRepo.findOne.mockResolvedValue({
         id: 'r-1',
         isSystem: true,
         organizationId: 'org-1',
+        name: 'Quản trị hệ thống',
+        description: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       });
+      permissionRepo.find.mockResolvedValue([
+        { id: 'p-1', key: 'pos.sale.create' },
+      ]);
+      rolePermissionRepo.find.mockResolvedValue([]);
+
+      await service.setPermissions('r-1', ['pos.sale.create'], actor);
+
+      expect(rbac.invalidateOrgPermissions).toHaveBeenCalledWith('org-1');
+    });
+
+    it('refuses to write a permission the caller does not hold', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        isSystem: false,
+        organizationId: 'org-1',
+        name: 'Quản lý tổng',
+      });
+      permissionRepo.find.mockResolvedValue([
+        { id: 'p-9', key: 'org.registration.approve' },
+      ]);
+
+      await expect(
+        service.setPermissions('r-1', ['org.registration.approve'], actor),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(rbac.invalidateOrgPermissions).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The trap opened by letting an administrator edit their own role: the last
+     * Quản trị hệ thống unchecking their own boxes leaves nobody able to undo
+     * it. Only self-demotion is refused — trimming a role the caller does not
+     * wear stays ordinary administration.
+     */
+    it('refuses to drop a permission the caller only holds through this role', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        isSystem: true,
+        organizationId: 'org-1',
+        name: 'Quản trị hệ thống',
+      });
+      userRoleRepo.find.mockResolvedValue([
+        { userId: 'admin-1', roleId: 'r-1', organizationId: 'org-1' },
+      ]);
+      permissionRepo.find.mockResolvedValue([
+        { id: 'p-1', key: 'pos.sale.create' },
+      ]);
 
       await expect(
         service.setPermissions('r-1', ['pos.sale.create'], actor),
-      ).rejects.toBeInstanceOf(BadRequestException);
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(rbac.invalidateOrgPermissions).not.toHaveBeenCalled();
+    });
+
+    it('allows the same drop when another role gives the permission back', async () => {
+      roleRepo.findOne.mockResolvedValue({
+        id: 'r-1',
+        isSystem: true,
+        organizationId: 'org-1',
+        name: 'Quản trị hệ thống',
+        description: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      userRoleRepo.find.mockResolvedValue([
+        { userId: 'admin-1', roleId: 'r-1', organizationId: 'org-1' },
+        { userId: 'admin-1', roleId: 'r-2', organizationId: 'org-1' },
+      ]);
+      rbac.getRolePermissionKeys.mockResolvedValue(
+        new Map([['r-2', ['iam.role.write', 'iam.role.permissions.write']]]),
+      );
+      permissionRepo.find.mockResolvedValue([
+        { id: 'p-1', key: 'pos.sale.create' },
+      ]);
+      rolePermissionRepo.find.mockResolvedValue([]);
+
+      await service.setPermissions('r-1', ['pos.sale.create'], actor);
+
+      expect(rbac.invalidateOrgPermissions).toHaveBeenCalledWith('org-1');
     });
 
     it('rejects unknown permission keys', async () => {

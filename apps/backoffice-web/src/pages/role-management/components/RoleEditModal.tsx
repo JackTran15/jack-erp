@@ -9,8 +9,13 @@ interface RoleEditModalProps {
   open: boolean;
   mode: RoleEditMode;
   draft: RoleFormDraft;
+  /**
+   * Seeded role. Locks the name field only — a system role's description and
+   * permissions save like any other role's; whether the form is writable at all
+   * is `readOnly`'s job.
+   */
   isSystem?: boolean;
-  /** Forces view-only mode. Defaults to "system role being edited". */
+  /** Forces view-only mode. Defaults to writable. */
   readOnly?: boolean;
   saving?: boolean;
   onDraftChange: (draft: RoleFormDraft) => void;
@@ -29,7 +34,7 @@ export function RoleEditModal({
   onClose,
   onSave,
 }: RoleEditModalProps) {
-  const readOnly = readOnlyProp ?? (isSystem && mode === "edit");
+  const readOnly = readOnlyProp ?? false;
   const title = readOnly
     ? isSystem
       ? "Xem vai trò hệ thống"
@@ -84,7 +89,7 @@ export function RoleEditModal({
       <div className="flex h-full min-h-0 flex-col gap-6">
         {isSystem && (
           <Badge variant="secondary" className="shrink-0">
-            Vai trò hệ thống — không chỉnh sửa hoặc xóa
+            Vai trò hệ thống — không đổi tên hoặc xóa
           </Badge>
         )}
         <section className="shrink-0 space-y-3">
@@ -94,7 +99,7 @@ export function RoleEditModal({
           <FormField label="Tên vai trò" required>
             <Input
               value={draft.name}
-              disabled={readOnly}
+              disabled={readOnly || isSystem}
               onChange={(e) =>
                 onDraftChange({ ...draft, name: e.target.value })
               }

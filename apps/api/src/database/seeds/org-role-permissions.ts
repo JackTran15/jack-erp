@@ -163,7 +163,8 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
 );
 
 /**
- * Sales staff — orders, temp warehouse ("chuyển kho tạm" in POS), invoices, shifts.
+ * Sales staff — orders, temp warehouse ("chuyển kho tạm" in POS), invoices,
+ * shifts, and raising a transfer request ("yêu cầu điều chuyển").
  * Warehouse documents (phiếu nhập/xuất/chuyển kho) belong to WAREHOUSE below.
  */
 export const SALES_PERMISSION_KEYS: string[] = [
@@ -203,6 +204,21 @@ export const SALES_PERMISSION_KEYS: string[] = [
   REPORT_PERMISSION_KEYS['revenue-by-item']!,
   // POS Checkout + Fast stock transfer: GET /branches/:id/salesmen
   'sales-hierarchy.read',
+  // "Yêu cầu điều chuyển": POST /inventory/transfer-orders raises the request,
+  // and `.read` lets the salesperson follow it. Stock only actually moves when
+  // someone else confirms — `inventory.transfer.export` at the sending branch,
+  // `.import` at the receiving one — and neither key is granted here.
+  //
+  // CAVEAT, and it is the reason this pair is called out rather than slipped in
+  // with the rest: `inventory.transfer.create` is overloaded. The same key also
+  // opens two endpoints that move stock with no second pair of eyes —
+  // `POST /inventory/transfer-orders/direct-export` (create + confirm export in
+  // one call) and `POST /inventory/stock/transfers` (`createAndPost`). There is
+  // no request-only key today, so granting the request grants those too. If
+  // that is not wanted, the fix is a new `inventory.transfer.request` gating
+  // TransferOrderController.create, not a narrower list here.
+  'inventory.transfer.read',
+  'inventory.transfer.create',
 ];
 
 /** Cashier — sells like SALES, plus the cash drawer (phiếu thu/chi, kiểm kê, sổ tiền mặt). */

@@ -7,7 +7,7 @@
  *   Password:         DEV_ADMIN_PLAIN_PASSWORD (constant below; bcrypt-hashed before insert)
  *
  *   Email:            inventory.admin@erp.local
- *   Role:             Quản trị hệ thống (system, full access — read-only on UI)
+ *   Role:             Quản trị hệ thống (system, full access — cannot be renamed or deleted)
  *
  *   Other seeded roles (CRUD on UI): Quản lý tổng, Quản lý chi nhánh, Nhân viên
  *
@@ -374,7 +374,7 @@ async function seedInventoryData() {
       [IDS.user, IDS.organization, devAdminPasswordHash],
     );
 
-    // Rename legacy `admin` role id to Quản trị hệ thống (system, immutable on UI).
+    // Rename legacy `admin` role id to Quản trị hệ thống (system: no rename, no delete).
     await AppDataSource.query(
       `
       UPDATE roles
@@ -395,7 +395,7 @@ async function seedInventoryData() {
       IDS.roleSystemAdmin,
       IDS.organization,
       SEED_ROLE_NAMES.SYSTEM_ADMIN,
-      'User Root — toàn quyền hệ thống (không chỉnh trên UI)',
+      'User Root — toàn quyền hệ thống (không đổi tên hoặc xóa)',
       true,
     );
     await assignPermissionsToRole(
@@ -431,7 +431,7 @@ async function seedInventoryData() {
       IDS.roleSales,
       IDS.organization,
       SEED_ROLE_NAMES.SALES,
-      'Đơn hàng, kho tạm, hóa đơn, ca làm việc',
+      'Đơn hàng, kho tạm, hóa đơn, ca làm việc, yêu cầu điều chuyển',
       false,
     );
     await assignPermissionsToRole(IDS.roleSales, SALES_PERMISSION_KEYS);

@@ -116,8 +116,19 @@ export function RoleManagementPage() {
   const editingIsSystem =
     editRoleDetail?.isSystem ?? selectedRole?.isSystem ?? false;
 
+  /**
+   * Authority comes from the server's `assignable`, not from `isSystem`: a role
+   * is editable when the caller already holds every key it carries. Quản trị hệ
+   * thống holds every key in the catalogue, so for that account every role —
+   * including its own — comes back editable, while a branch manager still
+   * cannot open Quản lý tổng for writing. Gating on `isSystem` instead is what
+   * locked the administrator out of a role that is, by permissions, below them.
+   */
+  const editingAssignable =
+    editRoleDetail?.assignable ?? selectedRole?.assignable ?? false;
+
   // Viewing a role only needs iam.role.read; editing needs iam.role.write.
-  const roleReadOnly = !canWrite || editingIsSystem;
+  const roleReadOnly = !canWrite || !editingAssignable;
 
   const roleUsers = useMemo((): UserDetail[] => {
     if (!selectedRoleId) return [];
@@ -183,17 +194,15 @@ export function RoleManagementPage() {
         await createRole.mutateAsync(editDraft);
         toast.success("Đã tạo vai trò mới.");
       } else if (editRoleId) {
-        if (editingIsSystem) {
-          toast.error("Vai trò hệ thống không thể chỉnh sửa.");
-          return;
-        }
         if (roleReadOnly) {
           toast.error("Bạn không có quyền chỉnh sửa vai trò.");
           return;
         }
+        // `isSystem` only drops `name` from the PATCH body — a system role keeps
+        // its name, everything else on the form saves like any other role's.
         await updateRole.mutateAsync({
           draft: editDraft,
-          isSystem: false,
+          isSystem: editingIsSystem,
         });
         if (permissionsChanged(editDraft)) {
           await setPermissions.mutateAsync(editDraft);
@@ -275,7 +284,7 @@ export function RoleManagementPage() {
     },
     {
       id: "edit",
-      label: canWrite && !selectedRole?.isSystem ? "Sửa" : "Xem",
+      label: canWrite && selectedRole?.assignable ? "Sửa" : "Xem",
       icon: Pencil,
       onClick: openEdit,
       disabled: !selectedRole,

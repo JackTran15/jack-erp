@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -173,6 +174,8 @@ export class RolesService {
       throw new NotFoundException(`Role ${id} not found`);
     }
 
+    await this.assertCanManageRole(role.id, role.name, actor);
+
     if (dto.name !== undefined) {
       const trimmedName = dto.name.trim();
       if (role.isSystem && trimmedName !== role.name) {
@@ -191,11 +194,6 @@ export class RolesService {
       role.name = trimmedName;
     }
     if (dto.description !== undefined) {
-      if (role.isSystem) {
-        throw new BadRequestException(
-          'System roles cannot be updated',
-        );
-      }
       role.description = dto.description?.trim() ?? null;
     }
 
@@ -257,15 +255,20 @@ export class RolesService {
     if (!role) {
       throw new NotFoundException(`Role ${id} not found`);
     }
-    if (role.isSystem) {
-      throw new BadRequestException(
-        'System role permissions cannot be changed',
-      );
-    }
+    // May the actor touch this role at all — asked before the payload is even
+    // read, so an unauthorised caller learns nothing about the catalogue.
+    await this.assertCanManageRole(role.id, role.name, actor);
 
+    // Then the payload itself: an unknown key is a client bug and deserves its
+    // own 400 rather than being reported as a permission the actor lacks.
     const permissionIds = permissionKeys.length
       ? await this.resolvePermissionIds(permissionKeys)
       : [];
+
+    // Finally the two ways the change can go wrong: keys the actor may not hand
+    // out, and keys the actor would be taking away from themselves.
+    await this.assertKeysWithinActorAuthority(permissionKeys, role.name, actor);
+    await this.assertNotSelfDemotion(role.id, permissionKeys, actor);
 
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(RolePermissionEntity, { roleId: id });
@@ -298,6 +301,117 @@ export class RolesService {
     );
 
     return this.findById(id, actor);
+  }
+
+  /**
+   * "Quản trị hệ thống" is the organization's administrator, so authority here
+   * is read off the actor's own permission set, never off `isSystem`: a role is
+   * editable when it carries no key the actor lacks. That is the same predicate
+   * `RbacService.getGrantableRoleIds` uses for granting — a role you may hand to
+   * someone else is a role you may rewrite — so the edit button and the grant
+   * button can never disagree.
+   *
+   * `isSystem` survives only as a naming/lifecycle flag: it still blocks a
+   * rename (`update`) and a delete (`delete`), because the seeds and several
+   * call sites find these roles by name. It no longer blocks editing, which is
+   * what locked a full-permission administrator out of the roles below them.
+   */
+  private async assertCanManageRole(
+    roleId: string,
+    roleName: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    const grantable = await this.rbacService.getGrantableRoleIds(
+      actor.userId,
+      actor.organizationId,
+      [roleId],
+    );
+    if (grantable.has(roleId)) return;
+
+    // Only on the rejection path: name the offending keys for the message.
+    const [actorKeys, keysByRole] = await Promise.all([
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
+      this.rbacService.getRolePermissionKeys([roleId]),
+    ]);
+    const actorSet = new Set(actorKeys);
+    const excess = (keysByRole.get(roleId) ?? []).filter(
+      (key) => !actorSet.has(key),
+    );
+    this.logger.warn(
+      `User ${actor.userId} tried to edit role ${roleId} holding ${excess.length} permission(s) they lack: ${excess.join(', ')}`,
+    );
+    throw new ForbiddenException(
+      `Cannot edit role "${roleName}": it holds ${excess.length} permission(s) you do not have`,
+    );
+  }
+
+  /**
+   * You cannot write a permission into a role that you do not hold yourself —
+   * otherwise `iam.role.permissions.write` alone would be a route to any key in
+   * the catalogue: add it to a role you already manage, then wear that role.
+   * Mirrors `UsersService.assertCanGrantRoles`, one level down.
+   */
+  private async assertKeysWithinActorAuthority(
+    permissionKeys: string[],
+    roleName: string,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (permissionKeys.length === 0) return;
+    const actorKeys = await this.rbacService.getUserPermissions(
+      actor.userId,
+      actor.organizationId,
+    );
+    const actorSet = new Set(actorKeys);
+    const excess = permissionKeys.filter((key) => !actorSet.has(key));
+    if (excess.length === 0) return;
+
+    this.logger.warn(
+      `User ${actor.userId} tried to put ${excess.length} permission(s) they lack into role "${roleName}": ${excess.join(', ')}`,
+    );
+    throw new ForbiddenException(
+      `Cannot save role "${roleName}": it would grant ${excess.length} permission(s) you do not have`,
+    );
+  }
+
+  /**
+   * Letting an administrator edit the role they themselves wear opens the trap
+   * `UsersService.assertNotSelfDemotion` guards on the user side: the last
+   * Quản trị hệ thống of an organization could uncheck their own boxes and leave
+   * nobody able to undo it. Refused when the actor holds this role and the new
+   * key set drops something their other roles do not give back.
+   *
+   * Only *self*-demotion is blocked. Trimming a role the actor does not wear
+   * stays allowed — that is ordinary administration, and the actor is still
+   * there to reverse it.
+   */
+  private async assertNotSelfDemotion(
+    roleId: string,
+    nextKeys: string[],
+    actor: ActorContext,
+  ): Promise<void> {
+    const ownRoles = await this.userRoleRepo.find({
+      where: { userId: actor.userId, organizationId: actor.organizationId },
+      select: { roleId: true },
+    });
+    if (!ownRoles.some((ur) => ur.roleId === roleId)) return;
+
+    const otherRoleIds = ownRoles
+      .map((ur) => ur.roleId)
+      .filter((rid) => rid !== roleId);
+    const [currentKeys, keysByOtherRole] = await Promise.all([
+      this.rbacService.getUserPermissions(actor.userId, actor.organizationId),
+      this.rbacService.getRolePermissionKeys(otherRoleIds),
+    ]);
+    const kept = new Set([...nextKeys, ...[...keysByOtherRole.values()].flat()]);
+    const lost = currentKeys.filter((key) => !kept.has(key));
+    if (lost.length === 0) return;
+
+    this.logger.warn(
+      `User ${actor.userId} tried to drop ${lost.length} of their own permission(s) via role ${roleId}: ${lost.join(', ')}`,
+    );
+    throw new ForbiddenException(
+      `Cannot remove your own permissions: this would drop ${lost.length} permission(s) you currently hold. Ask another administrator to do it.`,
+    );
   }
 
   private async resolvePermissionIds(keys: string[]): Promise<string[]> {
