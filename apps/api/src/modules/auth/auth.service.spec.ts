@@ -303,6 +303,33 @@ describe('AuthService', () => {
         service.login('nobody@example.com', 'password', 'org-1'),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    // Ca đắt nhất của `login`, và nó KHÔNG hỏng một cách ồn ào.
+    //
+    // TypeORM bỏ luôn điều kiện `undefined` thay vì khớp `IS NULL`, nên thiếu
+    // guard thì `findOne` chỉ còn lọc theo email: user vẫn tìm thấy, mật khẩu
+    // vẫn khớp, và lượt đăng nhập TRẢ VỀ 200 kèm một access token không mang
+    // claim `organizationId`. Người dùng vào được app rồi mới ăn
+    // 403 `Authentication context missing` ở mọi màn — thông điệp nghe như
+    // thiếu Bearer, trong khi Bearer vẫn đúng và phiên vẫn sống.
+    //
+    // Vì vậy hai `expect` dưới đây là MỘT cặp, không phải một cái thừa: ném
+    // thôi chưa đủ, phải chứng minh lượt gọi DB không bao giờ xảy ra.
+    it.each([
+      ['undefined', undefined],
+      ['chuỗi rỗng', ''],
+    ])(
+      'từ chối khi organizationId là %s, và KHÔNG chạm tới DB',
+      async (_label, orgId) => {
+        setupValidLogin();
+
+        await expect(
+          service.login('admin@example.com', 'password', orgId as string),
+        ).rejects.toThrow(UnauthorizedException);
+
+        expect(userRepo.findOne).not.toHaveBeenCalled();
+      },
+    );
   });
 
   // =========================================================================

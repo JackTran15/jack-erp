@@ -15,13 +15,13 @@ import { SwitchBranchDto } from './dto/switch-branch.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateHandoffDto } from './dto/create-handoff.dto';
 import { ExchangeHandoffDto } from './dto/exchange-handoff.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import type {
   CreateHandoffResponse,
   ExchangeHandoffResponse,
   JwtPayload,
-  LoginRequest,
   LoginResponse,
-  RefreshRequest,
   RefreshResponse,
   SessionInfo,
   SwitchBranchResponse,
@@ -34,21 +34,15 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(
-    @Body() body: LoginRequest & { organizationId: string },
-  ): Promise<LoginResponse> {
-    return this.authService.login(
-      body.email,
-      body.password,
-      body.organizationId,
-    );
+  async login(@Body() dto: LoginDto): Promise<LoginResponse> {
+    return this.authService.login(dto.email, dto.password, dto.organizationId);
   }
 
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refresh(@Body() body: RefreshRequest): Promise<RefreshResponse> {
-    return this.authService.refresh(body.refreshToken);
+  async refresh(@Body() dto: RefreshDto): Promise<RefreshResponse> {
+    return this.authService.refresh(dto.refreshToken);
   }
 
   @Post('switch-branch')
