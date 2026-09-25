@@ -37,6 +37,14 @@ export const ERP_TOPICS = {
   GOODS_RECEIPT_POSTED: 'erp.inventory.goods_receipt.posted',
   /** A goods issue (phiếu xuất kho) was posted — document-level, one message per voucher. */
   GOODS_ISSUE_POSTED: 'erp.inventory.goods_issue.posted',
+  /**
+   * Một đơn tư vấn (sales order) vừa vào trạng thái SENT — tức tư vấn viên đã
+   * gửi nó cho thu ngân. Document-level, một message cho mỗi chứng từ.
+   *
+   * Phát ở CẢ BA đường vào SENT của `SalesOrderService`: `create` (không nháp),
+   * `createFromPartner`, và `update` ở chuyển tiếp DRAFT → SENT.
+   */
+  SALES_ORDER_SENT: 'erp.sales_order.sent',
   DEBT_OVERDUE: 'erp.debt.overdue',
   // Alert: a POS deposit auto-post landed on a doc_date whose period is locked (BR-LOCK-02).
   DEPOSIT_LOCKED_PERIOD_BLOCKED: 'erp.deposit.locked_period.blocked',

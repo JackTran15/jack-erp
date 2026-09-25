@@ -9,7 +9,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
-import { DocumentType } from '@erp/shared-interfaces';
+import { DocumentType, DomainEventType } from '@erp/shared-interfaces';
+import { ERP_TOPICS } from '@erp/shared-kafka-client';
+import { randomUUID } from 'crypto';
+import { EventPublisher } from '../events/event-publisher.service';
 import type { ActorContext } from '../../common/decorators/actor-context.decorator';
 import { BranchEntity } from '../branch/branch.entity';
 import { UserBranchAssignmentEntity } from '../branch/user-branch-assignment.entity';
@@ -396,6 +399,11 @@ export class SalesOrderService {
     private readonly cancelInvoiceService: CancelInvoiceService,
     // Tồn toàn chuỗi cho nhãn "Thiếu hàng" lúc nhận đơn đối tác (ADR-09/ADR-10).
     private readonly stockAvailability: StockAvailabilityService,
+    // `EventsModule` là `@Global()` nên không phải import gì ở
+    // `sales-order.module.ts`. Tuỳ chọn vì spec dựng service bằng tay; thiếu nó
+    // thì không sự kiện nào bay đi và thu ngân không nhận được thông báo — đúng
+    // hành vi của bản trước feature này, nên không có gì hỏng thêm.
+    @Optional() private readonly events?: EventPublisher,
     // Tuỳ chọn: `MediaModule` là `@Global()` nên Nest luôn tiêm; spec cũ dựng
     // service bằng tay không truyền thì dòng đơn chỉ thiếu ảnh.
     @Optional() private readonly mediaQuery?: MediaQueryService,
@@ -446,6 +454,8 @@ export class SalesOrderService {
     });
 
     this.logger.log(`Sales order ${saved.documentNumber} created (org=${actor.organizationId}, branch=${branchId})`);
+    // Chỉ đơn ĐÃ GỬI mới báo cho thu ngân; đơn nháp chưa có gì để ai xử lý.
+    if (!dto.isDraft) await this.publishSent(saved, actor);
     return this.getById(saved.id, actor);
   }
 
@@ -542,6 +552,9 @@ export class SalesOrderService {
       this.logger.log(
         `Partner sales order ${order.documentNumber} created (org=${actor.organizationId}, channel=${channel.code}, external=${dto.externalOrderId})`,
       );
+      // Đơn đối tác luôn vào thẳng `SENT`. Nhánh replay ở `catch` KHÔNG phát:
+      // đó là cùng một đơn tới lần thứ hai, và thu ngân đã được báo rồi.
+      await this.publishSent(order, actor);
       return this.toPartnerResult(order, lines, false);
     } catch (error) {
       // Chống trùng ở tầng DB, không check-then-insert: hai request song song
@@ -709,6 +722,11 @@ export class SalesOrderService {
     const prepared = await this.prepareLines(dto.lines, actor);
     const customer = await this.customerSnapshotOf(dto.customerId, actor);
 
+    // Chỉ CHUYỂN TIẾP DRAFT -> SENT mới là một lượt gửi mới. Sửa một đơn đã
+    // `SENT` rồi lưu lại vẫn là `SENT`, và báo lần nữa cho cùng một đơn là làm
+    // hộp thư thu ngân đầy những dòng nói về một việc họ đã thấy.
+    let becameSent = false;
+
     await this.dataSource.transaction(async (manager) => {
       const current = await this.lockedOrder(manager, id, actor);
       if (!this.isOwn(current, me.id, actor)) {
@@ -745,9 +763,66 @@ export class SalesOrderService {
         excludedProgramIds: dto.excludedProgramIds ?? [],
         ...prepared.totals,
       });
+
+      becameSent = current.status === SalesOrderStatus.DRAFT && !dto.isDraft;
     });
 
-    return this.getById(id, actor);
+    const view = await this.getById(id, actor);
+    if (becameSent) {
+      const order = await this.orders.findOne({ where: { id, organizationId: actor.organizationId } });
+      if (order) await this.publishSent(order, actor);
+    }
+    return view;
+  }
+
+  /**
+   * Báo cho thu ngân rằng một đơn tư vấn vừa được gửi.
+   *
+   * **Gọi SAU khi transaction đã commit, không bao giờ ở trong nó.** Publish rồi
+   * rollback là báo về một đơn không tồn tại, và không có đường nào thu lại một
+   * message đã rời khỏi tiến trình.
+   *
+   * Ai NHẬN được thì do `sales-order.definition.ts` quyết theo quyền
+   * `pos.sales-order.approve` và chi nhánh của sự kiện — service này không biết
+   * và không cần biết.
+   *
+   * Lỗi được NUỐT (chỉ ghi log): Kafka sập không được quyền làm hỏng lượt gửi
+   * đơn mà người dùng vừa thực hiện thành công. Đánh đổi đã biết — mất thông
+   * báo thì thu ngân vẫn thấy đơn ở màn *Đơn nhận từ tư vấn*, đường polling cũ
+   * vẫn còn nguyên.
+   */
+  private async publishSent(order: SalesOrderEntity, actor: ActorContext): Promise<void> {
+    if (!this.events) return;
+
+    try {
+      await this.events.publish(
+        ERP_TOPICS.SALES_ORDER_SENT,
+        {
+          eventId: randomUUID(),
+          eventType: DomainEventType.SALES_ORDER_SENT,
+          timestamp: new Date().toISOString(),
+          organizationId: actor.organizationId,
+          branchId: order.branchId,
+          correlationId: order.id,
+          payload: {
+            salesOrderId: order.id,
+            documentNumber: order.documentNumber,
+            totalAmount: Number(order.amountDue ?? 0),
+            actorId: actor.userId,
+            // Nhãn kênh ĐÃ CHỐT trên chứng từ, không phải hằng: đơn của app tư
+            // vấn và đơn của đối tác đi chung đường này và mang hai nhãn khác
+            // nhau.
+            channel: order.salesChannel,
+          },
+        },
+        order.id,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to publish SALES_ORDER_SENT for ${order.documentNumber} (order=${order.id})`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
   }
 
   /**

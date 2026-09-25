@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { DocumentType } from '@erp/shared-interfaces';
+import { DocumentType, DomainEventType } from '@erp/shared-interfaces';
+import { ERP_TOPICS } from '@erp/shared-kafka-client';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
@@ -295,6 +296,13 @@ describe('SalesOrderService', () => {
     const cancelInvoiceService = {
       cancel: jest.fn(async (..._args: unknown[]) => ({ id: 'inv-1' })),
     };
+    // Bắt mọi lượt publish để kiểm ĐƯỜNG BÁO CHO THU NGÂN (T-01-02).
+    const published: Array<{ topic: string; event: Record<string, any>; key?: string }> = [];
+    const events = {
+      publish: jest.fn(async (topic: string, event: Record<string, any>, key?: string) => {
+        published.push({ topic, event, key });
+      }),
+    };
     const service = new SalesOrderService(
       orders as never,
       lines as never,
@@ -310,8 +318,9 @@ describe('SalesOrderService', () => {
       points as never,
       cancelInvoiceService as never,
       { forItems: jest.fn(async () => new Map()) } as never,
+      events as never,
     );
-    return { service, saved, updates, dispatchEvents, manager, lockQb, listQb, numbering, invoiceService, posSessions, points, orders, lines, rbac, branchRepo, dataSource, cancelInvoiceService, invoices };
+    return { service, saved, updates, dispatchEvents, manager, lockQb, listQb, numbering, invoiceService, posSessions, points, orders, lines, rbac, branchRepo, dataSource, cancelInvoiceService, invoices, events, published };
   }
 
   const lineA = { itemId: 'i-1', itemCode: 'A', itemName: 'A', unit: 'Cái', quantity: 2, unitPrice: 800000, manualDiscount: 160000, promotionDiscount: 432000, promotionName: 'Giảm giá 30%' };
@@ -673,6 +682,64 @@ describe('SalesOrderService', () => {
     const sent = build({ current: { status: SalesOrderStatus.DRAFT, salespersonId: 'sp-1', createdBy: 'u-1' } });
     await sent.service.update('so-1', { lines: [lineB] }, actor);
     expect(sent.updates[0]).toMatchObject({ status: SalesOrderStatus.SENT });
+  });
+
+  describe('SALES_ORDER_SENT — đường báo cho thu ngân (T-01-02)', () => {
+    it('create đã gửi → đúng MỘT lượt publish, payload đủ năm khoá và totalAmount là SỐ', async () => {
+      const { service, published } = build();
+
+      await service.create({ lines: [lineB] }, actor);
+
+      expect(published).toHaveLength(1);
+      expect(published[0].topic).toBe(ERP_TOPICS.SALES_ORDER_SENT);
+      expect(published[0].event.eventType).toBe(DomainEventType.SALES_ORDER_SENT);
+      // Khoá phân vùng là id đơn: mọi sự kiện của cùng một đơn giữ đúng thứ tự.
+      expect(published[0].key).toBe(published[0].event.payload.salesOrderId);
+
+      const payload = published[0].event.payload;
+      expect(Object.keys(payload).sort()).toEqual(
+        ['actorId', 'channel', 'documentNumber', 'salesOrderId', 'totalAmount'].sort(),
+      );
+      // `amountDue` là cột numeric nên TypeORM trả chuỗi — nếu không ép thì app
+      // nhận '1463000.00' và `NumberFormat` cho ra NaN.
+      expect(typeof payload.totalAmount).toBe('number');
+      expect(payload.actorId).toBe('u-1');
+      expect(payload.channel).toBe('Ứng dụng Tư Vấn');
+    });
+
+    it('create LƯU TẠM → KHÔNG publish; chuyển nó sang gửi thì mới publish', async () => {
+      const draft = build();
+      await draft.service.create({ lines: [lineB], isDraft: true }, actor);
+      expect(draft.published).toHaveLength(0);
+
+      const sent = build({ current: { status: SalesOrderStatus.DRAFT, salespersonId: 'sp-1', createdBy: 'u-1' } });
+      await sent.service.update('so-1', { lines: [lineB] }, actor);
+      expect(sent.published).toHaveLength(1);
+    });
+
+    it('sửa một đơn ĐÃ GỬI → KHÔNG publish lần nữa', async () => {
+      const { service, published } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', createdBy: 'u-1' } });
+
+      await service.update('so-1', { lines: [lineB] }, actor);
+
+      expect(published).toHaveLength(0);
+    });
+
+    it('publish nằm NGOÀI transaction: ghi hỏng thì không sự kiện nào bay đi', async () => {
+      const { service, published, manager } = build();
+      jest.spyOn(manager, 'save').mockRejectedValueOnce(new Error('db down'));
+
+      await expect(service.create({ lines: [lineB] }, actor)).rejects.toThrow('db down');
+
+      expect(published).toHaveLength(0);
+    });
+
+    it('Kafka sập KHÔNG làm hỏng lượt gửi đơn', async () => {
+      const { service, events } = build();
+      events.publish.mockRejectedValueOnce(new Error('kafka down'));
+
+      await expect(service.create({ lines: [lineB] }, actor)).resolves.toBeDefined();
+    });
   });
 
   it('update SENT với isDraft → 400: đơn đã tới thu ngân không rút về lưu tạm', async () => {
@@ -1947,6 +2014,13 @@ describe('SalesOrderService.createFromPartner', () => {
       }),
     };
 
+    const published: Array<{ topic: string; event: Record<string, any>; key?: string }> = [];
+    const events = {
+      publish: jest.fn(async (topic: string, event: Record<string, any>, key?: string) => {
+        published.push({ topic, event, key });
+      }),
+    };
+
     const service = new SalesOrderService(
       orders as never,
       lines as never,
@@ -1962,9 +2036,10 @@ describe('SalesOrderService.createFromPartner', () => {
       { applyRedemptionIn: jest.fn() } as never,
       { cancel: jest.fn() } as never,
       stockAvailability as never,
+      events as never,
     );
 
-    return { service, orderRows, lineRows, customerRows, catalog, numbering, stockAvailability, manager, balances };
+    return { service, orderRows, lineRows, customerRows, catalog, numbering, stockAvailability, manager, balances, events, published };
   }
 
   it('đơn web rơi vào POOL: branch_id và salesperson_id NULL, status SENT', async () => {

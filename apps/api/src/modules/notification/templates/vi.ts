@@ -6,6 +6,10 @@ import type { PushTemplateTable } from '../core/templates/template.types';
  * same facts, same variables — the tray and the in-app list must say the same thing.
  */
 export const vi: PushTemplateTable = {
+  sales_order: {
+    title: 'Đơn hàng mới {{code}}',
+    body: 'Bạn vừa nhận được đơn hàng {{code}} có giá trị {{amount}} gửi từ {{channel}}.',
+  },
   invoice: {
     title: 'Hoá đơn mới {{code}}',
     body: '{{actor}} đã lập hoá đơn {{code}} trị giá {{amount}} tại {{store}}.',
