@@ -34,6 +34,7 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "Đơn hàng",
     iconBgColor: "#A78BFA",
     Icon: TruckIcon,
+    route: "/orders",
   },
   {
     id: "ds-hoa-don",
@@ -48,6 +49,7 @@ export const APP_MENU_ITEMS: PosMenuItem[] = [
     label: "Đơn hàng online",
     iconBgColor: "#22C55E",
     Icon: GlobeIcon,
+    route: "/online-orders",
   },
   {
     id: "doi-tra-hang",

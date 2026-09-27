@@ -7,8 +7,13 @@ import {
   SalesOrderDispatchAction,
   SalesOrderDispatchEventEntity,
 } from './entities/sales-order-dispatch-event.entity';
-import { SalesOrderEntity, SalesOrderStatus } from './entities/sales-order.entity';
-import { SalesOrderHistoryKind, SalesOrderHistoryService } from './sales-order-history.service';
+import { DeliveryStatus, SalesOrderEntity, SalesOrderStatus } from './entities/sales-order.entity';
+import {
+  decodeDeliveryStatusReason,
+  encodeDeliveryStatusReason,
+  SalesOrderHistoryKind,
+  SalesOrderHistoryService,
+} from './sales-order-history.service';
 import { ORDER_NOT_HELD_BY_BRANCH } from './sales-order.service';
 
 const ORG = 'org-1';
@@ -152,15 +157,16 @@ describe('SalesOrderHistoryService.timeline', () => {
 
     expect(history).toMatchObject({ orderId: 'so-1', orderCode: 'DT000001', currentStatus: SalesOrderStatus.PROCESSED });
     expect(history.entries).toEqual([
-      { at: t(0).toISOString(), kind: SalesOrderHistoryKind.RECEIVED, actorName: 'Website công ty', statusAfter: 'Chờ phân' },
-      { at: t(10).toISOString(), kind: SalesOrderHistoryKind.DISPATCHED, actorName: 'Lan Admin', branchName: 'Cà Mau', statusAfter: 'Chờ duyệt' },
-      { at: t(20).toISOString(), kind: SalesOrderHistoryKind.CONFIRMED, actorName: 'Minh CàMau', branchName: 'Cà Mau', statusAfter: 'Đã duyệt' },
-      { at: t(30).toISOString(), kind: SalesOrderHistoryKind.RETURNED, actorName: 'Minh CàMau', branchName: 'Cà Mau', reason: 'hết hàng', statusAfter: 'Chờ phân' },
-      { at: t(40).toISOString(), kind: SalesOrderHistoryKind.DISPATCHED, actorName: 'Lan Admin', branchName: 'Main Branch', statusAfter: 'Chờ duyệt' },
-      { at: t(50).toISOString(), kind: SalesOrderHistoryKind.CONFIRMED, actorName: 'Hoa Main', branchName: 'Main Branch', statusAfter: 'Đã duyệt' },
+      { at: t(0).toISOString(), kind: SalesOrderHistoryKind.RECEIVED, label: 'Nhận đơn', actorName: 'Website công ty', statusAfter: 'Chờ phân' },
+      { at: t(10).toISOString(), kind: SalesOrderHistoryKind.DISPATCHED, label: 'Phân đơn', actorName: 'Lan Admin', branchName: 'Cà Mau', statusAfter: 'Chờ duyệt' },
+      { at: t(20).toISOString(), kind: SalesOrderHistoryKind.CONFIRMED, label: 'Chi nhánh duyệt', actorName: 'Minh CàMau', branchName: 'Cà Mau', statusAfter: 'Đã duyệt' },
+      { at: t(30).toISOString(), kind: SalesOrderHistoryKind.RETURNED, label: 'Trả về pool', actorName: 'Minh CàMau', branchName: 'Cà Mau', reason: 'hết hàng', statusAfter: 'Chờ phân' },
+      { at: t(40).toISOString(), kind: SalesOrderHistoryKind.DISPATCHED, label: 'Phân đơn', actorName: 'Lan Admin', branchName: 'Main Branch', statusAfter: 'Chờ duyệt' },
+      { at: t(50).toISOString(), kind: SalesOrderHistoryKind.CONFIRMED, label: 'Chi nhánh duyệt', actorName: 'Hoa Main', branchName: 'Main Branch', statusAfter: 'Đã duyệt' },
       {
         at: t(60).toISOString(),
         kind: SalesOrderHistoryKind.PROCESSED,
+        label: 'Thu ngân xử lý',
         actorName: 'Thu Ngân',
         branchName: 'Main Branch',
         invoiceCode: 'HD000123',
@@ -210,6 +216,7 @@ describe('SalesOrderHistoryService.timeline', () => {
     expect(history.entries.at(-1)).toEqual({
       at: t(30).toISOString(),
       kind: SalesOrderHistoryKind.CANCELLED,
+      label: 'Huỷ đơn',
       actorName: 'Lan Admin',
       branchName: 'Cà Mau',
       reason: 'khách đổi ý',
@@ -279,10 +286,11 @@ describe('SalesOrderHistoryService.timeline', () => {
     const history = await service.timeline('so-1', ORG);
 
     expect(history.entries).toEqual([
-      { at: t(0).toISOString(), kind: SalesOrderHistoryKind.RECEIVED, actorName: 'Tư Vấn', branchName: 'Main Branch', statusAfter: 'Chờ xử lý' },
+      { at: t(0).toISOString(), kind: SalesOrderHistoryKind.RECEIVED, label: 'Nhận đơn', actorName: 'Tư Vấn', branchName: 'Main Branch', statusAfter: 'Chờ xử lý' },
       {
         at: t(20).toISOString(),
         kind: SalesOrderHistoryKind.PROCESSED,
+        label: 'Thu ngân xử lý',
         actorName: 'Thu Ngân',
         branchName: 'Main Branch',
         invoiceCode: 'HD000123',
@@ -383,4 +391,185 @@ describe('SalesOrderHistoryService.timeline', () => {
 
     await expect(service.timeline('so-1', ORG)).rejects.toBeInstanceOf(NotFoundException);
   });
+});
+
+describe('SalesOrderHistoryService.timeline — vòng đời giao (ADR-06, AC-27)', () => {
+  /** SO-1: duyệt + nhận xử lý (cùng transaction) → giao → hoàn thành. */
+  function deliveredCycle() {
+    return setup(
+      [
+        order({
+          status: SalesOrderStatus.PROCESSED,
+          branchId: MAIN,
+          confirmedAt: t(10),
+          approvedAt: t(10),
+          approvedBy: 'u-cashier',
+          invoiceId: 'inv-1',
+          deliveryStatus: DeliveryStatus.COMPLETED,
+        }),
+      ],
+      [
+        event(30, SalesOrderDispatchAction.DELIVERY_STATUS, 'u-main', {
+          reason: encodeDeliveryStatusReason(DeliveryStatus.IN_TRANSIT, DeliveryStatus.COMPLETED),
+        }),
+        event(20, SalesOrderDispatchAction.DELIVER, 'u-main'),
+        // PROCESS nạp trước CONFIRM, cùng giây: thứ tự vòng đời quyết định.
+        event(10, SalesOrderDispatchAction.PROCESS, 'u-cashier'),
+        event(10, SalesOrderDispatchAction.CONFIRM, 'u-cashier'),
+      ],
+    );
+  }
+
+  it('đủ các bước theo thời gian, mỗi bước có người làm và nhãn tiếng Việt (AC-27)', async () => {
+    const { service } = deliveredCycle();
+
+    const history = await service.timeline('so-1', ORG);
+
+    expect(history.entries).toEqual([
+      { at: t(0).toISOString(), kind: SalesOrderHistoryKind.RECEIVED, label: 'Nhận đơn', actorName: 'Website công ty', statusAfter: 'Chờ phân' },
+      { at: t(10).toISOString(), kind: SalesOrderHistoryKind.CONFIRMED, label: 'Chi nhánh duyệt', actorName: 'Thu Ngân', statusAfter: 'Đã duyệt' },
+      {
+        at: t(10).toISOString(),
+        kind: SalesOrderHistoryKind.PROCESSED,
+        label: 'Thu ngân xử lý',
+        actorName: 'Thu Ngân',
+        branchName: 'Main Branch',
+        invoiceCode: 'HD000123',
+        statusAfter: 'Đã xử lý',
+      },
+      { at: t(20).toISOString(), kind: SalesOrderHistoryKind.DELIVERED, label: 'Giao hàng', actorName: 'Hoa Main', statusAfter: 'Đang giao hàng' },
+      {
+        at: t(30).toISOString(),
+        kind: SalesOrderHistoryKind.DELIVERY_STATUS_UPDATED,
+        label: 'Cập nhật giao hàng: Đang giao hàng → Hoàn thành',
+        actorName: 'Hoa Main',
+        statusAfter: 'Hoàn thành',
+      },
+    ]);
+  });
+
+  it('có event PROCESS thì KHÔNG ghép thêm mốc xử lý từ `approved_at` — một mốc, của event', async () => {
+    const { service } = setup(
+      [order({ status: SalesOrderStatus.PROCESSED, branchId: MAIN, approvedAt: t(15), approvedBy: 'u-cashier', invoiceId: 'inv-1' })],
+      // Event lệch giờ và người so với cột: mốc duy nhất phải là của event.
+      [event(16, SalesOrderDispatchAction.PROCESS, 'u-main')],
+    );
+
+    const history = await service.timeline('so-1', ORG);
+
+    const processed = history.entries.filter((e) => e.kind === SalesOrderHistoryKind.PROCESSED);
+    expect(processed).toEqual([
+      {
+        at: t(16).toISOString(),
+        kind: SalesOrderHistoryKind.PROCESSED,
+        label: 'Thu ngân xử lý',
+        actorName: 'Hoa Main',
+        branchName: 'Main Branch',
+        invoiceCode: 'HD000123',
+        statusAfter: 'Đã xử lý',
+      },
+    ]);
+  });
+
+  it('cập nhật trạng thái giao kèm lý do có ": " → lý do giữ nguyên, nhãn theo from/to', async () => {
+    const { service } = setup(
+      [order({ status: SalesOrderStatus.PROCESSED, branchId: MAIN, deliveryStatus: DeliveryStatus.FAILED })],
+      [
+        event(40, SalesOrderDispatchAction.DELIVERY_STATUS, 'u-main', {
+          reason: encodeDeliveryStatusReason(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED, 'khách hẹn: gọi lại sau 17h'),
+        }),
+      ],
+    );
+
+    const history = await service.timeline('so-1', ORG);
+
+    expect(history.entries.at(-1)).toEqual({
+      at: t(40).toISOString(),
+      kind: SalesOrderHistoryKind.DELIVERY_STATUS_UPDATED,
+      label: 'Cập nhật giao hàng: Đang giao hàng → Thất bại',
+      actorName: 'Hoa Main',
+      reason: 'khách hẹn: gọi lại sau 17h',
+      statusAfter: 'Thất bại',
+    });
+  });
+
+  it('`reason` của DELIVERY_STATUS sai khuôn → nhãn chung, chuỗi thô hiện ở lý do', async () => {
+    const { service } = setup(
+      [order({ status: SalesOrderStatus.PROCESSED, branchId: MAIN })],
+      [event(40, SalesOrderDispatchAction.DELIVERY_STATUS, 'u-main', { reason: 'ghi tay' })],
+    );
+
+    const history = await service.timeline('so-1', ORG);
+
+    expect(history.entries.at(-1)).toMatchObject({
+      kind: SalesOrderHistoryKind.DELIVERY_STATUS_UPDATED,
+      label: 'Cập nhật giao hàng',
+      reason: 'ghi tay',
+      statusAfter: 'Cập nhật giao hàng',
+    });
+  });
+
+  it('chuyển hoàn và huỷ cùng giây: cập nhật giao đứng trước huỷ', async () => {
+    const { service } = setup(
+      [
+        order({
+          status: SalesOrderStatus.CANCELLED,
+          branchId: MAIN,
+          cancelledAt: t(50),
+          cancelledBy: 'u-main',
+          deliveryStatus: DeliveryStatus.RETURNED,
+        }),
+      ],
+      [
+        event(50, SalesOrderDispatchAction.DELIVERY_STATUS, 'u-main', {
+          reason: encodeDeliveryStatusReason(DeliveryStatus.FAILED, DeliveryStatus.RETURNED),
+        }),
+      ],
+    );
+
+    const history = await service.timeline('so-1', ORG);
+
+    expect(history.entries.map((e) => [e.kind, e.statusAfter])).toEqual([
+      [SalesOrderHistoryKind.RECEIVED, 'Chờ phân'],
+      [SalesOrderHistoryKind.DELIVERY_STATUS_UPDATED, 'Đã chuyển hoàn'],
+      [SalesOrderHistoryKind.CANCELLED, 'Đã huỷ'],
+    ]);
+  });
+});
+
+describe('encodeDeliveryStatusReason / decodeDeliveryStatusReason', () => {
+  it('không lý do: `FROM->TO`, giải ngược đủ from/to, reason null', () => {
+    const raw = encodeDeliveryStatusReason(DeliveryStatus.AWAITING_PICKUP, DeliveryStatus.IN_TRANSIT);
+
+    expect(raw).toBe('AWAITING_PICKUP->IN_TRANSIT');
+    expect(decodeDeliveryStatusReason(raw)).toEqual({
+      from: DeliveryStatus.AWAITING_PICKUP,
+      to: DeliveryStatus.IN_TRANSIT,
+      reason: null,
+    });
+  });
+
+  it('lý do chứa ": " vẫn giải ngược nguyên vẹn (chỉ cắt ở lần đầu)', () => {
+    const note = 'shipper báo: sai địa chỉ: phường 5';
+    const raw = encodeDeliveryStatusReason(DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED, note);
+
+    expect(raw).toBe(`IN_TRANSIT->FAILED: ${note}`);
+    expect(decodeDeliveryStatusReason(raw)).toEqual({
+      from: DeliveryStatus.IN_TRANSIT,
+      to: DeliveryStatus.FAILED,
+      reason: note,
+    });
+  });
+
+  it('lý do rỗng / toàn khoảng trắng coi như không có', () => {
+    expect(encodeDeliveryStatusReason(DeliveryStatus.FAILED, DeliveryStatus.IN_TRANSIT, '   ')).toBe('FAILED->IN_TRANSIT');
+    expect(encodeDeliveryStatusReason(DeliveryStatus.FAILED, DeliveryStatus.IN_TRANSIT, null)).toBe('FAILED->IN_TRANSIT');
+  });
+
+  it.each([null, undefined, '', 'ghi tay', 'IN_TRANSIT', 'IN_TRANSIT->NOPE', 'A->B->C', 'IN_TRANSIT->COMPLETED->FAILED'])(
+    'chuỗi sai khuôn %p → null',
+    (raw) => {
+      expect(decodeDeliveryStatusReason(raw)).toBeNull();
+    },
+  );
 });

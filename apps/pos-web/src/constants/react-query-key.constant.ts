@@ -80,6 +80,21 @@ export const SALES_HIERARCHY_KEYS = {
     ["sales-hierarchy", "salesmen", branchId] as const,
 } as const;
 
+export const SALES_ORDER_KEYS = {
+  ALL: ["sales-orders"] as const,
+  /** `POST /v2/mobile/sales-orders/search` — lưới đơn online (`ONLINE`) / giao hàng (`DELIVERY`). */
+  SEARCH: (view: string, body: Record<string, unknown>) =>
+    ["sales-orders", view, body] as const,
+} as const;
+
+export const SALES_CHANNEL_KEYS = {
+  ALL: ["sales-channels"] as const,
+} as const;
+
+export const DELIVERY_PARTNER_KEYS = {
+  ALL: ["delivery-partners"] as const,
+} as const;
+
 export const CATALOG_KEYS = {
   ALL: ["catalog"] as const,
   LIST: (branchId: string) => ["catalog", branchId] as const,

@@ -9,7 +9,7 @@ import {
 } from 'typeorm';
 import { SalesOrderEntity } from './sales-order.entity';
 
-/** Các việc được ghi vết trên một đơn: phân, trả về, duyệt. */
+/** Các việc được ghi vết trên một đơn: phân, trả về, duyệt, xử lý, giao. */
 export enum SalesOrderDispatchAction {
   /** Phân đơn cho một chi nhánh: `sales_orders.branch_id := toBranchId`. */
   DISPATCH = 'DISPATCH',
@@ -20,6 +20,18 @@ export enum SalesOrderDispatchAction {
    * — `from_branch_id` và `to_branch_id` đều NULL.
    */
   CONFIRM = 'CONFIRM',
+  /**
+   * Nhận xử lý (`approve`): đơn thành `PROCESSED` + `AWAITING_PICKUP`
+   * (ADR-06). Không đổi chi nhánh — hai cột chi nhánh NULL.
+   */
+  PROCESS = 'PROCESS',
+  /** Giao cho đối tác: `AWAITING_PICKUP`/`FAILED` → `IN_TRANSIT`. Chi nhánh NULL. */
+  DELIVER = 'DELIVER',
+  /**
+   * Đổi trạng thái giao theo `DELIVERY_TRANSITIONS`; from/to ghi trong
+   * `reason` (ADR-06). Chi nhánh NULL.
+   */
+  DELIVERY_STATUS = 'DELIVERY_STATUS',
 }
 
 /**
@@ -43,7 +55,9 @@ export enum SalesOrderDispatchAction {
  * - `DISPATCH` → `to_branch_id` bắt buộc; `from_branch_id` NULL ở lần phân đầu,
  *   có giá trị khi phân lại từ chi nhánh khác;
  * - `RETURN`  → `from_branch_id` và `reason` bắt buộc, `to_branch_id` NULL;
- * - `CONFIRM` → `from_branch_id` và `to_branch_id` đều NULL (migration `1790100600000`).
+ * - `CONFIRM` → `from_branch_id` và `to_branch_id` đều NULL (migration `1790100600000`);
+ * - `PROCESS` / `DELIVER` / `DELIVERY_STATUS` → như `CONFIRM`, hai cột chi
+ *   nhánh đều NULL (migration `1790100700000`).
  */
 @Entity('sales_order_dispatch_events')
 @Index('IDX_sales_order_dispatch_events_org_order_created', [

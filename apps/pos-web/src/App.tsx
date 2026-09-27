@@ -13,6 +13,8 @@ import { CheckoutPage } from "./pages/CheckoutPage";
 import { DailyReportPage } from "./pages/DailyReportPage";
 import { FastStockTransferPage } from "./pages/FastStockTransferPage";
 import { InvoiceListPage } from "./pages/InvoiceListPage";
+import { OnlineOrderListPage } from "./pages/OnlineOrderListPage";
+import { OrderListPage } from "./pages/OrderListPage";
 import { PosLoginPage } from "./pages/PosLoginPage";
 import { PrintSettingsPage } from "./pages/PrintSettingsPage";
 import { ReturnGoodsPage } from "./pages/ReturnGoodsPage";
@@ -60,6 +62,11 @@ export function App() {
                     />
                     <Route path="/return-goods" element={<ReturnGoodsPage />} />
                     <Route path="/invoices" element={<InvoiceListPage />} />
+                    <Route path="/orders" element={<OrderListPage />} />
+                    <Route
+                      path="/online-orders"
+                      element={<OnlineOrderListPage />}
+                    />
                     <Route path="/daily-report" element={<DailyReportPage />} />
                   </Route>
                 </Route>

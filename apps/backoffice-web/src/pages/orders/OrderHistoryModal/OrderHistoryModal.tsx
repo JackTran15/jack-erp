@@ -6,8 +6,10 @@ import {
   CheckCheck,
   Inbox,
   Loader2,
+  PackageCheck,
   Receipt,
   Store,
+  Truck,
   Undo2,
   XCircle,
   type LucideIcon,
@@ -40,6 +42,8 @@ const KIND_META: Record<OrderHistoryKind, KindMeta> = {
   CONFIRMED: { icon: CheckCheck, tone: "bg-success-subtle text-success" },
   RETURNED: { icon: Undo2, tone: "bg-muted text-muted-foreground" },
   PROCESSED: { icon: Receipt, tone: "bg-success-subtle text-success" },
+  DELIVERED: { icon: Truck, tone: "bg-info-subtle text-info" },
+  DELIVERY_STATUS_UPDATED: { icon: PackageCheck, tone: "bg-info-subtle text-info" },
   REJECTED: { icon: XCircle, tone: "bg-destructive-subtle text-destructive" },
   CANCELLED: { icon: Ban, tone: "bg-destructive-subtle text-destructive" },
 };
@@ -69,8 +73,11 @@ function kindLabel(entry: OrderHistoryEntry): string {
       return "Từ chối";
     case "CANCELLED":
       return "Huỷ đơn";
+    // Nhãn giao hàng mang from/to do server ghép; kind lạ cũng dùng nhãn server thay vì mã thô.
+    case "DELIVERED":
+    case "DELIVERY_STATUS_UPDATED":
     default:
-      return String(entry.kind);
+      return entry.label || String(entry.kind);
   }
 }
 
@@ -183,7 +190,8 @@ function HistoryEntryItem({ entry, last }: EntryProps) {
 
 /**
  * Lịch sử điều phối của MỘT đơn (US-12, AC-49, AC-50): các mốc nhận → phân →
- * duyệt → trả về → xử lý / từ chối / huỷ, xếp dọc theo thời gian như server trả.
+ * duyệt → trả về → xử lý → giao → cập nhật giao / từ chối / huỷ, xếp dọc theo
+ * thời gian như server trả.
  * Chỉ đọc — không có nút lưu.
  */
 export function OrderHistoryModal({ open, onOpenChange, orderId, scope }: Props) {

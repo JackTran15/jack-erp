@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
   Injectable,
   Logger,
   Optional,
@@ -19,6 +20,7 @@ import { ItemEntity } from '../inventory/location/item.entity';
 import { MediaQueryService } from '../media/media-query.service';
 import type { CreateInvoiceDto } from '../pos/dto/create-invoice.dto';
 import { InvoiceEntity } from '../pos/entities/invoice.entity';
+import { InvoiceDebtEntity } from '../pos/entities/invoice-debt.entity';
 import { LineDiscountType } from '../pos/entities/invoice-item.entity';
 import { InvoiceService } from '../pos/services/invoice.service';
 import { PosSessionService } from '../pos/services/pos-session.service';
@@ -26,16 +28,25 @@ import { EmployeeProfileEntity } from '../rbac/employee/employee-profile.entity'
 import { RbacService } from '../rbac/rbac.service';
 import { PointsRedemptionService } from '../pos/services/points-redemption.service';
 import { CancelInvoiceService } from '../pos/services/cancel-invoice.service';
+import type { SalesOrderBatchResponseDto, SalesOrderBatchResultDto } from './dto/batch-sales-order.dto';
 import { CreateSalesOrderDto, SalesOrderLineDto } from './dto/create-sales-order.dto';
+import type { DeliverSalesOrdersDto } from './dto/deliver-sales-orders.dto';
 import type { PartnerCreateOrderDto, PartnerOrderLineDto } from './dto/partner-create-order.dto';
 import { SalesOrderListQueryDto, UNASSIGNED_BRANCH_FILTER } from './dto/sales-order-list.query.dto';
+import type { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
+import { DeliveryPartnerEntity } from './entities/delivery-partner.entity';
 import type { SalesChannelEntity } from './entities/sales-channel.entity';
 import {
   SalesOrderDispatchAction,
   SalesOrderDispatchEventEntity,
 } from './entities/sales-order-dispatch-event.entity';
 import { SalesOrderLineEntity } from './entities/sales-order-line.entity';
-import { SalesOrderEntity, SalesOrderStatus } from './entities/sales-order.entity';
+import { DeliveryStatus, SalesOrderEntity, SalesOrderStatus } from './entities/sales-order.entity';
+// Vòng import: `sales-order-history.service` cũng import `ORDER_NOT_HELD_BY_BRANCH`
+// từ file này. Chạy được vì cả hai phía chỉ dùng tên import BÊN TRONG hàm, không
+// ở cấp module; bộ mã hoá `reason` nên dời về `sales-order.constants.ts`.
+import { DELIVERY_STATUS_LABELS, encodeDeliveryStatusReason } from './sales-order-history.service';
+import { DELIVERY_TRANSITIONS, SALES_ORDER_DELIVER_PERMISSION } from './sales-order.constants';
 import { StockAvailabilityService } from './stock-availability.service';
 
 export const SALES_ORDER_PERMISSIONS = {
@@ -55,6 +66,8 @@ export const SALES_ORDER_PERMISSIONS = {
    * `read` vì `read` là phạm vi chi nhánh của app tư vấn viên.
    */
   readAll: 'pos.sales-order.read-all',
+  /** Giao hàng + đổi trạng thái giao — chuỗi khai ở `sales-order.constants.ts`. */
+  deliver: SALES_ORDER_DELIVER_PERMISSION,
 } as const;
 
 /** Kênh bán ghi trên mọi đơn từ app tư vấn — chuỗi hiển thị, chốt vào chứng từ. */
@@ -149,6 +162,43 @@ export const ORDER_NOT_CONFIRMED = 'ORDER_NOT_CONFIRMED';
 export const ORDER_NOT_CONFIRMABLE = 'ORDER_NOT_CONFIRMABLE';
 
 /**
+ * Mã lỗi 409 (trong `results[i].code` của batch) khi *Nhận xử lý* một đơn không
+ * còn `SENT` hoặc không thuộc chi nhánh đang thao tác (taxonomy
+ * 03-logical-design). Gộp cả mã của `confirm` ({@link ORDER_NOT_CONFIRMABLE},
+ * {@link ORDER_NOT_HELD_BY_BRANCH}): với người bấm *Nhận xử lý* đó là cùng một
+ * câu trả lời — đơn này không còn là việc của mình.
+ */
+export const ORDER_NOT_PROCESSABLE = 'ORDER_NOT_PROCESSABLE';
+const ORDER_NOT_PROCESSABLE_MESSAGE = 'Đơn không còn ở trạng thái chưa xử lý';
+
+/**
+ * Mã lỗi 409 (trong `results[i].code`) khi *Giao hàng* một đơn mà hoá đơn chưa
+ * có hoặc còn NHÁP (A-05, AC-19): chưa thu ngân hoàn tất thì chưa có công nợ để
+ * thu COD và tồn chưa trừ.
+ */
+export const INVOICE_NOT_FINALIZED = 'INVOICE_NOT_FINALIZED';
+
+/**
+ * Mã lỗi 409 (trong `results[i].code`) khi bước chuyển trạng thái giao không có
+ * trong `DELIVERY_TRANSITIONS` (A-09, AC-20) — gồm cả đơn chưa vào vòng đời giao
+ * (`delivery_status IS NULL`) hoặc không còn `PROCESSED` (vd đã huỷ).
+ */
+export const INVALID_DELIVERY_TRANSITION = 'INVALID_DELIVERY_TRANSITION';
+
+/**
+ * Mã lỗi 409 (trong `results[i].code`) khi *Hoàn thành* một đơn mà
+ * `invoice_debts.remaining_amount > 0` (A-08, AC-22). Thông điệp mang số tiền.
+ */
+export const DEBT_OUTSTANDING = 'DEBT_OUTSTANDING';
+
+/**
+ * Mã lỗi 400 cho CẢ request *Giao hàng* khi có gửi `deliveryPartnerId` mà đối
+ * tác không tồn tại, đã xoá, ngừng hoạt động hoặc thuộc tổ chức khác (A-04).
+ * Một mã cho cả bốn — không cho dò id đối tác của tổ chức khác.
+ */
+export const DELIVERY_PARTNER_INACTIVE = 'DELIVERY_PARTNER_INACTIVE';
+
+/**
  * Số điện thoại về MỘT dạng duy nhất trước khi khớp khách (A-01, AC-08).
  *
  * Quy tắc, viết một lần ở đây vì nó quyết định hai khách có phải một người hay
@@ -172,6 +222,14 @@ export function normalizePartnerPhone(raw: string): string {
 function isUniqueViolation(error: unknown): boolean {
   const e = error as { code?: string; driverError?: { code?: string } } | null;
   return e?.code === '23505' || e?.driverError?.code === '23505';
+}
+
+/** `code` máy đọc trong body của một `HttpException`, nếu có. */
+function errorCodeOf(error: HttpException): string | undefined {
+  const body = error.getResponse();
+  return typeof body === 'object' && body !== null && typeof (body as { code?: unknown }).code === 'string'
+    ? (body as { code: string }).code
+    : undefined;
 }
 
 /** Một dòng trả cho đối tác — đơn giá là giá SERVER đã chốt, không phải giá họ gửi. */
@@ -1364,9 +1422,26 @@ export class SalesOrderService {
     return this.getById(id, actor);
   }
 
-  async approve(id: string, actor: ActorContext): Promise<SalesOrderView> {
+  /**
+   * `options.heldByBranchId`: chỉ nhận đơn chi nhánh ấy đang giữ, kiểm DƯỚI khoá
+   * hàng, TRƯỚC mọi kiểm trạng thái. Khác → 403 {@link ORDER_NOT_HELD_BY_BRANCH}
+   * (như `confirm`); batch ({@link processBatch}) gộp mã ấy về
+   * `ORDER_NOT_PROCESSABLE`. Cả route đơn `POST :id/approve` lẫn batch đều truyền
+   * (AC-28).
+   */
+  async approve(
+    id: string,
+    actor: ActorContext,
+    options: { heldByBranchId?: string } = {},
+  ): Promise<SalesOrderView> {
     await this.dataSource.transaction(async (manager) => {
       const current = await this.lockedOrder(manager, id, actor);
+      if (options.heldByBranchId && current.branchId !== options.heldByBranchId) {
+        throw new ForbiddenException({
+          code: ORDER_NOT_HELD_BY_BRANCH,
+          message: 'Đơn hàng không thuộc chi nhánh đang thao tác',
+        });
+      }
       if (!VALID_TRANSITIONS[current.status].includes(SalesOrderStatus.PROCESSED)) {
         throw new ConflictException(`Đơn hàng đã được xử lý (${current.status})`);
       }
@@ -1449,11 +1524,312 @@ export class SalesOrderService {
         approvedBy: actor.userId,
         approvedAt: new Date(),
         invoiceId: draft.id,
+        // Đơn vào vòng đời giao ngay lúc nhận xử lý (ADR-01) — cùng câu update.
+        deliveryStatus: DeliveryStatus.AWAITING_PICKUP,
+      });
+      // Vết *Nhận xử lý* (ADR-06), CÙNG transaction. `PROCESS` không đổi chi
+      // nhánh — `CHK_sales_order_dispatch_events_shape` đòi from/to đều NULL.
+      await manager.insert(SalesOrderDispatchEventEntity, {
+        organizationId: actor.organizationId,
+        salesOrderId: id,
+        action: SalesOrderDispatchAction.PROCESS,
+        fromBranchId: null,
+        toBranchId: null,
+        actorUserId: actor.userId,
+        reason: null,
       });
       this.logger.log(`Sales order ${id} approved → draft invoice ${draft.id} (session=${session.id}, org=${actor.organizationId})`);
     });
 
     return this.getById(id, actor);
+  }
+
+  /**
+   * *Nhận xử lý* nhiều đơn (A-01, ADR-07): mỗi id, TUẦN TỰ, duyệt nếu còn cần
+   * ({@link confirm}) rồi {@link approve}. Lỗi của một đơn nằm trong kết quả của
+   * đơn đó và KHÔNG chặn đơn sau (AC-07); `NO_OPEN_SESSION` đi nguyên mã (AC-08).
+   *
+   * `confirm` và `approve` là HAI transaction. Chấp nhận được: `confirm` là
+   * no-op khi đã duyệt, nên nếu `approve` hỏng sau đó (vd chưa mở ca) đơn ở lại
+   * `SENT` + đã duyệt — một trạng thái hợp lệ, bấm lại là đi tiếp từ đó.
+   */
+  async processBatch(ids: string[], actor: ActorContext): Promise<SalesOrderBatchResponseDto> {
+    const branchId = this.branchOf(actor);
+    const results: SalesOrderBatchResultDto[] = [];
+    for (const id of ids) {
+      try {
+        // Đọc trước (không khoá) chỉ để quyết định có cần duyệt không và trả lý
+        // do sớm; `confirm`/`approve` kiểm lại tất cả dưới khoá hàng.
+        const order = await this.orders.findOne({ where: { id, organizationId: actor.organizationId } });
+        if (!order || order.branchId !== branchId) {
+          results.push({ id, ok: false, code: ORDER_NOT_PROCESSABLE, message: 'Đơn hàng không thuộc chi nhánh đang thao tác' });
+          continue;
+        }
+        if (order.status !== SalesOrderStatus.SENT) {
+          results.push({ id, ok: false, code: ORDER_NOT_PROCESSABLE, message: ORDER_NOT_PROCESSABLE_MESSAGE });
+          continue;
+        }
+        // Cùng luật với `needsConfirmation` của view: đơn web chưa duyệt.
+        if (order.salespersonId == null && order.confirmedAt == null) {
+          await this.confirm(id, actor);
+        }
+        await this.approve(id, actor, { heldByBranchId: branchId });
+        results.push({ id, ok: true });
+      } catch (error) {
+        results.push(this.batchFailure(id, error));
+      }
+    }
+    return { results };
+  }
+
+  /** Lỗi của một đơn → một dòng kết quả; mã lấy từ body của `HttpException`. */
+  private batchFailure(id: string, error: unknown): SalesOrderBatchResultDto {
+    if (!(error instanceof HttpException)) {
+      this.logger.error(`Batch process of sales order ${id} failed`, error instanceof Error ? error.stack : String(error));
+      return { id, ok: false, message: 'Lỗi hệ thống khi xử lý đơn' };
+    }
+    const code = errorCodeOf(error);
+    // Đơn đã rời trạng thái chờ / rời chi nhánh giữa lượt đọc và lượt khoá:
+    // `confirm` ném mã riêng của nó, `approve` ném 409/404 không mã.
+    const notProcessable =
+      code === ORDER_NOT_CONFIRMABLE ||
+      code === ORDER_NOT_HELD_BY_BRANCH ||
+      (!code && (error instanceof ConflictException || error instanceof NotFoundException));
+    if (notProcessable) return { id, ok: false, code: ORDER_NOT_PROCESSABLE, message: ORDER_NOT_PROCESSABLE_MESSAGE };
+    return { id, ok: false, ...(code ? { code } : {}), message: error.message };
+  }
+
+  /**
+   * *Giao hàng* nhiều đơn (A-04, A-05, ADR-07, AC-18, AC-19):
+   * `AWAITING_PICKUP | FAILED → IN_TRANSIT`, mỗi đơn một transaction dưới khoá
+   * hàng, lỗi từng đơn nằm trong `results[i]`.
+   *
+   * Cùng một bộ thông tin giao áp cho mọi đơn đã tick. Đối tác / phí trả ĐT bỏ
+   * trống ghi NULL — kể cả khi giao LẠI từ `FAILED`: mỗi lần giao là một lần
+   * nhập mới, không giữ đối tác của lần hỏng trước. `delivered_at` ("Ngày GH")
+   * thì chỉ ghi LẦN ĐẦU (A-11).
+   */
+  async deliverBatch(dto: DeliverSalesOrdersDto, actor: ActorContext): Promise<SalesOrderBatchResponseDto> {
+    const branchId = this.branchOf(actor);
+    // Kiểm MỘT lần, trước vòng lặp: đối tác sai là lỗi của cả request (400),
+    // không phải của từng đơn.
+    const partner = dto.deliveryPartnerId ? await this.activeDeliveryPartner(dto.deliveryPartnerId, actor) : null;
+    const trackingCode = dto.trackingCode?.trim() || null;
+    const packageInfo = dto.packageInfo?.trim() || null;
+    // `numeric` ghi dạng CHUỖI như mọi cột tiền; vắng = NULL, KHÔNG phải 0 (A-04).
+    const partnerShippingFee = dto.partnerShippingFee == null ? null : String(dto.partnerShippingFee);
+
+    return this.runDeliveryBatch(dto.ids, (id) =>
+      this.dataSource.transaction(async (manager) => {
+        const current = await this.heldOrder(manager, id, branchId, actor);
+        this.assertDeliveryTransition(current, DeliveryStatus.IN_TRANSIT);
+        await this.assertInvoiceFinalized(manager, current, actor);
+
+        await manager.update(SalesOrderEntity, id, {
+          deliveryStatus: DeliveryStatus.IN_TRANSIT,
+          deliveryPartnerId: partner?.id ?? null,
+          deliveryPartnerName: partner?.name ?? null,
+          trackingCode,
+          partnerShippingFee,
+          packageInfo,
+          ...(current.deliveredAt ? {} : { deliveredAt: new Date() }),
+        });
+        // Vết giao (ADR-06), CÙNG transaction. `DELIVER` không đổi chi nhánh —
+        // `CHK_sales_order_dispatch_events_shape` đòi from/to đều NULL.
+        await manager.insert(SalesOrderDispatchEventEntity, {
+          organizationId: actor.organizationId,
+          salesOrderId: id,
+          action: SalesOrderDispatchAction.DELIVER,
+          fromBranchId: null,
+          toBranchId: null,
+          actorUserId: actor.userId,
+          reason: null,
+        });
+        this.logger.log(`Sales order ${id} delivered (partner=${partner?.id ?? '-'}, org=${actor.organizationId}, by=${actor.userId})`);
+      }),
+    );
+  }
+
+  /**
+   * *Cập nhật TT* / *Hoàn thành* nhiều đơn (A-08, A-09, AC-20, AC-22): bước chuyển
+   * phải có trong `DELIVERY_TRANSITIONS`; `→ COMPLETED` đòi hết nợ.
+   *
+   * `→ RETURNED` (chỉ từ `FAILED`) là *Chuyển hoàn* (A-03, ADR-04, AC-21): huỷ
+   * đơn + hoá đơn qua {@link cancelIn} trong CÙNG transaction với
+   * `delivery_status = RETURNED` và dòng lịch sử. `CancelInvoiceService` từ chối
+   * ⇒ ném ⇒ rollback cả ba ⇒ lỗi đi nguyên mã/lời vào `results[i]`.
+   *
+   * `→ IN_TRANSIT` qua đường này (giao lại từ `FAILED`) giữ nguyên chặn hoá đơn
+   * của {@link deliverBatch}: AC-19 không được lách bằng *Cập nhật TT*.
+   */
+  async deliveryStatusBatch(dto: UpdateDeliveryStatusDto, actor: ActorContext): Promise<SalesOrderBatchResponseDto> {
+    const branchId = this.branchOf(actor);
+    const to = dto.to;
+    const reason = dto.reason?.trim() || null;
+
+    return this.runDeliveryBatch(dto.ids, (id) =>
+      this.dataSource.transaction(async (manager) => {
+        const current = await this.heldOrder(manager, id, branchId, actor);
+        const from = this.assertDeliveryTransition(current, to);
+        if (to === DeliveryStatus.IN_TRANSIT) await this.assertInvoiceFinalized(manager, current, actor);
+        if (to === DeliveryStatus.COMPLETED) await this.assertNoOutstandingDebt(manager, current, actor);
+
+        await manager.update(SalesOrderEntity, id, {
+          deliveryStatus: to,
+          ...(to === DeliveryStatus.IN_TRANSIT && !current.deliveredAt ? { deliveredAt: new Date() } : {}),
+        });
+        // from→to nằm trong `reason` (ADR-06) — lịch sử giải ngược bằng
+        // `decodeDeliveryStatusReason`. Chi nhánh NULL như mọi action giao.
+        await manager.insert(SalesOrderDispatchEventEntity, {
+          organizationId: actor.organizationId,
+          salesOrderId: id,
+          action: SalesOrderDispatchAction.DELIVERY_STATUS,
+          fromBranchId: null,
+          toBranchId: null,
+          actorUserId: actor.userId,
+          reason: encodeDeliveryStatusReason(from, to, reason),
+        });
+        // Chuyển hoàn: huỷ đơn + hoá đơn SAU CÙNG. Ghi `delivery_status` và vết
+        // TRƯỚC, vì `CancelInvoiceService` bắn publisher (`invoice.cancelled` →
+        // đảo kho, claw back điểm) ngay sau thân của nó, trước khi transaction
+        // này commit — sau lời gọi ấy không được còn lệnh ghi nào có thể hỏng.
+        if (to === DeliveryStatus.RETURNED) {
+          await this.cancelIn(manager, id, { reason: reason ?? 'Chuyển hoàn' }, actor);
+        }
+        this.logger.log(`Sales order ${id} delivery ${from} → ${to} (org=${actor.organizationId}, by=${actor.userId})`);
+      }),
+    );
+  }
+
+  /** Vòng lặp chung của hai action giao: TUẦN TỰ, một đơn lỗi không chặn đơn sau. */
+  private async runDeliveryBatch(
+    ids: string[],
+    action: (id: string) => Promise<void>,
+  ): Promise<SalesOrderBatchResponseDto> {
+    const results: SalesOrderBatchResultDto[] = [];
+    for (const id of ids) {
+      try {
+        await action(id);
+        results.push({ id, ok: true });
+      } catch (error) {
+        results.push(this.deliveryFailure(id, error));
+      }
+    }
+    return { results };
+  }
+
+  /**
+   * Lỗi của một đơn giao → một dòng kết quả, GIỮ NGUYÊN mã (khác
+   * {@link batchFailure}, thứ gộp mã về `ORDER_NOT_PROCESSABLE`). 404 không mã
+   * của {@link lockedOrder} (id không thuộc tổ chức) trả như đơn chi nhánh khác:
+   * không xác nhận đơn có tồn tại.
+   */
+  private deliveryFailure(id: string, error: unknown): SalesOrderBatchResultDto {
+    if (!(error instanceof HttpException)) {
+      this.logger.error(`Batch delivery of sales order ${id} failed`, error instanceof Error ? error.stack : String(error));
+      return { id, ok: false, message: 'Lỗi hệ thống khi xử lý đơn' };
+    }
+    const code = errorCodeOf(error);
+    if (!code && error instanceof NotFoundException) {
+      return { id, ok: false, code: ORDER_NOT_HELD_BY_BRANCH, message: 'Đơn hàng không thuộc chi nhánh đang thao tác' };
+    }
+    return { id, ok: false, ...(code ? { code } : {}), message: error.message };
+  }
+
+  /** Đọc có khoá một đơn mà chi nhánh `branchId` đang giữ; khác → 403 {@link ORDER_NOT_HELD_BY_BRANCH}. */
+  private async heldOrder(
+    manager: EntityManager,
+    id: string,
+    branchId: string,
+    actor: ActorContext,
+  ): Promise<SalesOrderEntity> {
+    const current = await this.lockedOrder(manager, id, actor);
+    if (current.branchId !== branchId) {
+      throw new ForbiddenException({
+        code: ORDER_NOT_HELD_BY_BRANCH,
+        message: 'Đơn hàng không thuộc chi nhánh đang thao tác',
+      });
+    }
+    return current;
+  }
+
+  /**
+   * `current.deliveryStatus → to` phải có trong `DELIVERY_TRANSITIONS`, và đơn
+   * phải còn `PROCESSED`: huỷ đơn không xoá `delivery_status`, nên một đơn đã
+   * `CANCELLED` vẫn mang `AWAITING_PICKUP` và KHÔNG được giao. Trả trạng thái gốc.
+   */
+  private assertDeliveryTransition(current: SalesOrderEntity, to: DeliveryStatus): DeliveryStatus {
+    const from = current.deliveryStatus;
+    if (current.status !== SalesOrderStatus.PROCESSED || !from) {
+      throw new ConflictException({
+        code: INVALID_DELIVERY_TRANSITION,
+        message:
+          current.status !== SalesOrderStatus.PROCESSED
+            ? `Đơn hàng không ở trạng thái đã xử lý (${current.status})`
+            : 'Đơn hàng chưa vào vòng đời giao hàng',
+      });
+    }
+    if (!DELIVERY_TRANSITIONS[from].includes(to)) {
+      throw new ConflictException({
+        code: INVALID_DELIVERY_TRANSITION,
+        message: `Không thể chuyển từ ${DELIVERY_STATUS_LABELS[from]} sang ${DELIVERY_STATUS_LABELS[to]}`,
+      });
+    }
+    return from;
+  }
+
+  /** Hoá đơn của đơn phải có và KHÔNG còn nháp (A-05) — không thì {@link INVOICE_NOT_FINALIZED}. */
+  private async assertInvoiceFinalized(
+    manager: EntityManager,
+    current: SalesOrderEntity,
+    actor: ActorContext,
+  ): Promise<void> {
+    const invoice = current.invoiceId
+      ? await manager.findOne(InvoiceEntity, {
+          where: { id: current.invoiceId, organizationId: actor.organizationId },
+          select: ['id', 'isDraft'],
+        })
+      : null;
+    if (!invoice || invoice.isDraft) {
+      throw new ConflictException({
+        code: INVOICE_NOT_FINALIZED,
+        message: 'Hoá đơn chưa hoàn tất — mở hoá đơn để thanh toán trước',
+      });
+    }
+  }
+
+  /** `→ COMPLETED` cần `remaining_amount = 0` hoặc không có công nợ (A-08) — không thì {@link DEBT_OUTSTANDING}. */
+  private async assertNoOutstandingDebt(
+    manager: EntityManager,
+    current: SalesOrderEntity,
+    actor: ActorContext,
+  ): Promise<void> {
+    if (!current.invoiceId) return;
+    const debt = await manager.findOne(InvoiceDebtEntity, {
+      where: { invoiceId: current.invoiceId, organizationId: actor.organizationId },
+      select: ['id', 'remainingAmount'],
+    });
+    // `numeric` về dạng CHUỖI — ép số trước khi so.
+    const remaining = Number(debt?.remainingAmount ?? 0);
+    if (remaining > 0) {
+      throw new ConflictException({
+        code: DEBT_OUTSTANDING,
+        message: `Đơn còn ${new Intl.NumberFormat('vi-VN').format(remaining)} đ chưa thu`,
+      });
+    }
+  }
+
+  /** Đối tác giao hàng đang hoạt động của tổ chức; không có → 400 {@link DELIVERY_PARTNER_INACTIVE}. */
+  private async activeDeliveryPartner(id: string, actor: ActorContext): Promise<DeliveryPartnerEntity> {
+    // `findOne` tự loại hàng đã soft-delete (`@DeleteDateColumn`).
+    const partner = await this.dataSource.getRepository(DeliveryPartnerEntity).findOne({
+      where: { id, organizationId: actor.organizationId, isActive: true },
+      select: ['id', 'name'],
+    });
+    if (!partner) {
+      throw new BadRequestException({ code: DELIVERY_PARTNER_INACTIVE, message: 'Đối tác giao hàng không hợp lệ' });
+    }
+    return partner;
   }
 
   reject(id: string, reason: string, actor: ActorContext): Promise<SalesOrderView> {
@@ -1494,37 +1870,61 @@ export class SalesOrderService {
     // giữ quyền duyệt nhận `{}` và bỏ qua vòng thu hẹp; tư vấn viên vẫn chỉ huỷ
     // được đơn của mình.
     const scope = await this.scopeOf(actor);
-    const trimmed = reason?.trim() || null;
 
-    await this.dataSource.transaction(async (manager) => {
-      const current = await this.lockedOrder(manager, id, actor);
-
-      if (scope.salespersonId && !this.isOwn(current, scope.salespersonId, actor)) {
-        throw new NotFoundException(`Sales order ${id} not found`);
-      }
-      if (!VALID_TRANSITIONS[current.status].includes(SalesOrderStatus.CANCELLED)) {
-        throw new ConflictException(`Đơn hàng đã được xử lý (${current.status})`);
-      }
-
-      await manager.update(SalesOrderEntity, id, {
-        status: SalesOrderStatus.CANCELLED,
-        cancelledBy: actor.userId,
-        cancelledAt: new Date(),
-        cancelReason: trimmed,
-      });
-
-      // Đơn chưa tới thu ngân thì không có gì để đảo.
-      if (current.invoiceId) {
-        await this.cancelInvoiceService.cancel(
-          current.invoiceId,
-          { reason: trimmed ?? 'Huỷ đơn hàng' },
-          actor,
-          manager,
-        );
-      }
-    });
+    await this.dataSource.transaction((manager) =>
+      this.cancelIn(manager, id, { reason }, actor, { ownerSalespersonId: scope.salespersonId }),
+    );
 
     return this.getById(id, actor);
+  }
+
+  /**
+   * Thân của {@link cancel}, chạy trong transaction của NGƯỜI GỌI — để *Chuyển
+   * hoàn* (ADR-04) huỷ đơn + hoá đơn và đặt `delivery_status = RETURNED` trong
+   * CÙNG một transaction.
+   *
+   * `options.ownerSalespersonId`: thu hẹp về đơn "của mình" (phạm vi tư vấn viên
+   * của {@link cancel}); vắng = không thu hẹp — đường giao đã tự kiểm chi nhánh
+   * giữ đơn và quyền `deliver`.
+   *
+   * KHÔNG đụng `delivery_status`: tab "Đã huỷ" của lưới khoá theo `status`.
+   *
+   * Huỷ hoá đơn là bước CUỐI (xem {@link cancel}): người gọi muốn ghi thêm gì
+   * vào đơn thì ghi TRƯỚC lời gọi này, không ghi sau.
+   */
+  async cancelIn(
+    manager: EntityManager,
+    id: string,
+    dto: { reason?: string | null },
+    actor: ActorContext,
+    options: { ownerSalespersonId?: string } = {},
+  ): Promise<void> {
+    const trimmed = dto.reason?.trim() || null;
+    const current = await this.lockedOrder(manager, id, actor);
+
+    if (options.ownerSalespersonId && !this.isOwn(current, options.ownerSalespersonId, actor)) {
+      throw new NotFoundException(`Sales order ${id} not found`);
+    }
+    if (!VALID_TRANSITIONS[current.status].includes(SalesOrderStatus.CANCELLED)) {
+      throw new ConflictException(`Đơn hàng đã được xử lý (${current.status})`);
+    }
+
+    await manager.update(SalesOrderEntity, id, {
+      status: SalesOrderStatus.CANCELLED,
+      cancelledBy: actor.userId,
+      cancelledAt: new Date(),
+      cancelReason: trimmed,
+    });
+
+    // Đơn chưa tới thu ngân thì không có gì để đảo.
+    if (current.invoiceId) {
+      await this.cancelInvoiceService.cancel(
+        current.invoiceId,
+        { reason: trimmed ?? 'Huỷ đơn hàng' },
+        actor,
+        manager,
+      );
+    }
   }
 
   private async transition(

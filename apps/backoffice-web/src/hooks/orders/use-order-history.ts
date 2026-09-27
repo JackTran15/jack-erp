@@ -8,6 +8,8 @@ export type OrderHistoryKind =
   | "CONFIRMED"
   | "RETURNED"
   | "PROCESSED"
+  | "DELIVERED"
+  | "DELIVERY_STATUS_UPDATED"
   | "REJECTED"
   | "CANCELLED";
 
@@ -16,6 +18,8 @@ export interface OrderHistoryEntry {
   /** ISO 8601 (UTC). */
   at: string;
   kind: OrderHistoryKind;
+  /** Nhãn tiếng Việt của mốc do server đặt — dùng cho kind client chưa biết. */
+  label: string;
   /** `null` khi server không tra được người làm. */
   actorName: string | null;
   branchName?: string;

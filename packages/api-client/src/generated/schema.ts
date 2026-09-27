@@ -9578,6 +9578,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/mobile/sales-orders/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * *Nhận xử lý* nhiều đơn (A-01, ADR-07): mỗi id duyệt nếu cần rồi approve,
+         *     từng đơn độc lập. 200 kể cả khi có đơn lỗi — lý do nằm ở `results[i]`.
+         */
+        post: operations["SalesOrderController_process"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/deliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * *Giao hàng* nhiều đơn (ADR-07, AC-18, AC-19): `AWAITING_PICKUP | FAILED →
+         *     IN_TRANSIT`. 200 kể cả khi có đơn lỗi; đối tác không hợp lệ → 400 cả request.
+         *     Khai TRƯỚC các route `:id` POST.
+         */
+        post: operations["SalesOrderController_deliver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-orders/delivery-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * *Cập nhật TT* / *Hoàn thành* nhiều đơn theo `DELIVERY_TRANSITIONS` (AC-20,
+         *     AC-22). `to = RETURNED` chưa hỗ trợ → 400.
+         */
+        post: operations["SalesOrderController_deliveryStatus"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/mobile/sales-orders/{id}/confirm": {
         parameters: {
             query?: never;
@@ -9608,6 +9669,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * *Nhận xử lý* một đơn chi nhánh đang giữ; đơn chi nhánh khác → 403
+         *     `ORDER_NOT_HELD_BY_BRANCH`, đơn không đổi (AC-28).
+         */
         post: operations["SalesOrderController_approve"];
         delete?: never;
         options?: never;
@@ -9758,6 +9823,54 @@ export interface paths {
          * @description Kênh bán lấy từ cấu hình của API key, KHÔNG từ payload. Đơn giá do server chốt từ `items.selling_price` lúc nhận đơn — payload không có chỗ cho `unitPrice` và gửi kèm là 400 (`forbidNonWhitelisted`).
          */
         post: operations["PartnerOrderV2Controller_create_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/sales-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MobileSalesChannelController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mobile/delivery-partners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MobileDeliveryPartnerController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/mobile/sales-orders/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["BranchSalesOrderV2Controller_search_v2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -19417,7 +19530,7 @@ export interface components {
             rows: components["schemas"]["OverviewSubjectRowDto"][];
         };
         /** @enum {string} */
-        SalesOrderHistoryKind: "RECEIVED" | "DISPATCHED" | "CONFIRMED" | "RETURNED" | "PROCESSED" | "REJECTED" | "CANCELLED";
+        SalesOrderHistoryKind: "RECEIVED" | "DISPATCHED" | "CONFIRMED" | "RETURNED" | "PROCESSED" | "DELIVERED" | "DELIVERY_STATUS_UPDATED" | "REJECTED" | "CANCELLED";
         SalesOrderHistoryEntryResponseDto: {
             /**
              * Format: date-time
@@ -19425,6 +19538,8 @@ export interface components {
              */
             at: string;
             kind: components["schemas"]["SalesOrderHistoryKind"];
+            /** @description Nhãn tiếng Việt của mốc; "Cập nhật giao hàng" kèm chuyển trạng thái (vd. "Cập nhật giao hàng: Đang giao hàng → Hoàn thành") */
+            label: string;
             /** @description Tên người làm; với "Nhận đơn" của đơn web là tên kênh. `null` khi không tra được. */
             actorName: string | null;
             /** @description Chi nhánh liên quan tới mốc này */
@@ -19524,6 +19639,45 @@ export interface components {
         StockCheckResponseDto: {
             /** @description Đã xếp: `shortLineCount` tăng dần, rồi mã đơn (A-39). Đơn ngoài tổ chức bị bỏ qua. */
             orders: components["schemas"]["StockCheckOrderResponseDto"][];
+        };
+        BatchSalesOrderDto: {
+            ids: string[];
+        };
+        SalesOrderBatchResultDto: {
+            /** Format: uuid */
+            id: string;
+            ok: boolean;
+            /**
+             * @description Mã lỗi máy đọc (vd `NO_OPEN_SESSION`, `ORDER_NOT_PROCESSABLE`); vắng khi `ok` hoặc lỗi không mang mã.
+             * @example ORDER_NOT_PROCESSABLE
+             */
+            code?: string;
+            /** @description Lý do hiển thị (tiếng Việt); vắng khi `ok`. */
+            message?: string;
+        };
+        SalesOrderBatchResponseDto: {
+            results: components["schemas"]["SalesOrderBatchResultDto"][];
+        };
+        DeliverSalesOrdersDto: {
+            ids: string[];
+            /**
+             * Format: uuid
+             * @description `delivery_partners.id` — phải đang hoạt động và cùng tổ chức, không thì cả request 400.
+             */
+            deliveryPartnerId?: string;
+            /** @description Mã vận đơn */
+            trackingCode?: string;
+            /** @description Phí giao hàng trả đối tác; bỏ trống = NULL */
+            partnerShippingFee?: number;
+            /** @description Thông tin gói hàng */
+            packageInfo?: string;
+        };
+        /** @enum {string} */
+        DeliveryStatus: "AWAITING_PICKUP" | "IN_TRANSIT" | "AWAITING_COD" | "COMPLETED" | "FAILED" | "RETURNED";
+        UpdateDeliveryStatusDto: {
+            ids: string[];
+            to: components["schemas"]["DeliveryStatus"];
+            reason?: string;
         };
         RejectSalesOrderDto: {
             /** @description Cùng ngưỡng 5 ký tự với `CancelInvoiceDto.reason`. */
@@ -19744,6 +19898,85 @@ export interface components {
             /** @description Phí giao hàng thu khách */
             shippingFee: number;
             lines: components["schemas"]["PartnerOrderLineResponseDto"][];
+        };
+        BranchSalesOrderColumnFiltersDto: {
+            /** @description Mã đơn hàng (OCM) → `external_order_id`. */
+            externalOrderId?: components["schemas"]["StringFilterDto"];
+            /** @description Ngày đơn hàng → `created_at`. */
+            orderDate?: components["schemas"]["DateRangeFilterDto"];
+            /**
+             * @description Thông tin giao hàng — the grid shows a composed string, so the filter is
+             *     matched against each source column (recipient name/phone, address line,
+             *     ward, province) with OR.
+             */
+            deliveryInfo?: components["schemas"]["StringFilterDto"];
+            /** @description Tổng thanh toán → `amount_due`. */
+            amountDue?: components["schemas"]["CompareFilterDto"];
+            /** @description Trạng thái → `status`. */
+            status?: components["schemas"]["EnumFilterDto"];
+            /** @description ĐT giao vận → `delivery_partner_name` (snapshot). */
+            deliveryPartnerName?: components["schemas"]["StringFilterDto"];
+            /** @description NV bán hàng → `salesperson_name` (snapshot). */
+            salespersonName?: components["schemas"]["StringFilterDto"];
+            /** @description Số hoá đơn → `invoices.code`. */
+            invoiceCode?: components["schemas"]["StringFilterDto"];
+            /** @description Ghi chú → `note`. */
+            note?: components["schemas"]["StringFilterDto"];
+            deliveredAt?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Ngày HĐ → `invoices.issued_at`. */
+            invoiceDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Khách hàng → `customer_name` (snapshot). */
+            customerName?: components["schemas"]["StringFilterDto"];
+            /** @description Mã vận đơn → `tracking_code`. */
+            trackingCode?: components["schemas"]["StringFilterDto"];
+            /** @description Thông tin gói hàng → `package_info`. */
+            packageInfo?: components["schemas"]["StringFilterDto"];
+            /** @description Kênh bán hàng → `sales_channel` (snapshot label). */
+            salesChannel?: components["schemas"]["StringFilterDto"];
+            /** @description Trạng thái giao → `delivery_status`. */
+            deliveryStatus?: components["schemas"]["EnumFilterDto"];
+            /** @description Phí GH thu khách → `invoices.shipping_fee_amount`. */
+            shippingFeeCustomer?: components["schemas"]["CompareFilterDto"];
+            /** @description Đặt cọc → `invoices.deposit_amount`. */
+            deposit?: components["schemas"]["CompareFilterDto"];
+            /** @description Khách nợ / Còn phải thu → `invoice_debts.remaining_amount`, 0 without a debt. */
+            remainingReceivable?: components["schemas"]["CompareFilterDto"];
+            /** @description Phí GH trả ĐT → `partner_shipping_fee`; NULL (unknown) never matches. */
+            partnerShippingFee?: components["schemas"]["CompareFilterDto"];
+        };
+        SearchBranchSalesOrdersDto: {
+            /** @enum {string} */
+            view: "ONLINE" | "DELIVERY";
+            /**
+             * Format: uuid
+             * @description `sales_channels.id` — required for the ONLINE view (the sidebar selection), optional for DELIVERY.
+             */
+            channelId?: string;
+            /**
+             * @description Status tab (A-13). Absent = "Tất cả". DRAFT never matches.
+             * @enum {string}
+             */
+            status?: "DRAFT" | "SENT" | "PROCESSED" | "REJECTED" | "CANCELLED";
+            /**
+             * @description DELIVERY view tab. Absent = "Tất cả" (every order in the delivery lifecycle).
+             * @enum {string}
+             */
+            deliveryTab?: "AWAITING_PICKUP" | "IN_TRANSIT" | "AWAITING_COD" | "COMPLETED" | "FAILED" | "RETURNED" | "CANCELLED" | "PAID" | "UNPAID";
+            /**
+             * @default CREATED
+             * @enum {string}
+             */
+            dateField: "CREATED" | "DELIVERED" | "INVOICED";
+            /** @description `YYYY-MM-DD` = a business-local (Asia/Ho_Chi_Minh) day; a full timestamp is an exact instant. */
+            from?: string;
+            to?: string;
+            /** @description Nhãn "Thiếu hàng" (A-10). Absent = no label filter. */
+            stockShort?: boolean;
+            columnFilters?: components["schemas"]["BranchSalesOrderColumnFiltersDto"];
+            /** @default 1 */
+            page: number;
+            /** @default 20 */
+            limit: number;
         };
         ProvinceMergedFromDto: {
             /** @description Mã tỉnh thời kỳ trước (1995_xx) đã gộp vào tỉnh này */
@@ -35598,6 +35831,19 @@ export interface operations {
                 search?: string;
                 page?: number;
                 limit?: number;
+                /**
+                 * @description Cửa hàng cần xem, thay cho cửa hàng đang làm việc của người gọi.
+                 *
+                 *     Màn Đổi trả cho thu ngân tra hoá đơn của một cửa hàng KHÁC (A-63). Bản
+                 *     trước app gửi ý định đó bằng header `X-Branch-Id`, và nó KHÔNG BAO GIỜ có
+                 *     tác dụng: `@Actor` giải chi nhánh theo `jwt > header > jwtList` còn token
+                 *     thì luôn mang `branchId`. Đo 2026-09-24 trên dữ liệu dev — hai cửa hàng
+                 *     khác nhau trả về cùng 204 hoá đơn, cùng mã.
+                 *
+                 *     **KHÔNG nới quyền:** `withBranch` vẫn đòi id nằm trong tập chi nhánh được
+                 *     phân công; gửi cửa hàng lạ vẫn là 403. Vắng thì lấy cửa hàng của người gọi.
+                 */
+                branchId?: string;
             };
             header?: never;
             path?: never;
@@ -36756,6 +37002,75 @@ export interface operations {
             };
         };
     };
+    SalesOrderController_process: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BatchSalesOrderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderBatchResponseDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_deliver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeliverSalesOrdersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderBatchResponseDto"];
+                };
+            };
+        };
+    };
+    SalesOrderController_deliveryStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDeliveryStatusDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesOrderBatchResponseDto"];
+                };
+            };
+        };
+    };
     SalesOrderController_confirm: {
         parameters: {
             query?: never;
@@ -37038,6 +37353,67 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    MobileSalesChannelController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    MobileDeliveryPartnerController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>[];
+                };
+            };
+        };
+    };
+    BranchSalesOrderV2Controller_search_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchBranchSalesOrdersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
