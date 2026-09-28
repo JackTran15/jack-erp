@@ -1,3 +1,4 @@
+import { PromotionTargetType } from "@erp/shared-interfaces";
 import type {
   ApplicableGood,
   ApplicableGroup,
@@ -106,6 +107,7 @@ export function blankGoodsDiscountRow(): GoodsDiscountRow {
   return {
     id: crypto.randomUUID(),
     targetId: "",
+    targetType: PromotionTargetType.ITEM,
     code: "",
     name: "",
     value: "",

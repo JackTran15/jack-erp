@@ -552,14 +552,16 @@ function invoiceDiscountFromDetail(base: ProgramFormState, detail: PromotionProg
 
 function itemDiscountToDto(form: ProgramFormState): Partial<CreatePromotionRequest> {
   const { condition, conditionLines } = buildCondition(form);
-  const targetType = form.goodsDiscountScope === GoodsDiscountScope.GROUP ? PromotionTargetType.CATEGORY : PromotionTargetType.PRODUCT;
+  // Phạm vi nhóm luôn là CATEGORY; phạm vi hàng hóa lấy loại của từng dòng
+  // (ITEM hoặc PRODUCT) — id từ ô tra cứu là inventory item, không phải product.
+  const isGroup = form.goodsDiscountScope === GoodsDiscountScope.GROUP;
   const isFixedPrice = form.goodsDiscountMethod === GoodsDiscountMethod.FIXED_PRICE;
 
   const rewardLines: PromotionLineInput[] = form.goodsDiscountRows
     .filter((r) => r.targetId)
     .map((r, i) => ({
       role: PromotionLineRole.REWARD,
-      targetType,
+      targetType: isGroup ? PromotionTargetType.CATEGORY : r.targetType,
       targetId: r.targetId,
       discountMode: goodsDiscountMethodToApi(form.goodsDiscountMethod),
       discountValue: isFixedPrice ? numOrUndefined(form.goodsFixedPrice) : numOrUndefined(r.value),
@@ -585,6 +587,7 @@ function itemDiscountFromDetail(base: ProgramFormState, detail: PromotionProgram
   const rows: GoodsDiscountRow[] = rewardLines.map((l) => ({
     id: crypto.randomUUID(),
     targetId: l.targetId,
+    targetType: l.targetType,
     code: l.targetCode ?? "",
     name: l.targetName ?? "",
     value: isFixedPrice ? "" : (l.discountValue ?? ""),

@@ -354,6 +354,16 @@
       "post": {
         "operationId": "AuthController_login",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -375,6 +385,16 @@
       "post": {
         "operationId": "AuthController_refresh",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -17362,6 +17382,89 @@
         ]
       }
     },
+    "/v2/promotions/item-discount-lines/export": {
+      "post": {
+        "operationId": "PromotionV2Controller_exportItemDiscountLines_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportItemDiscountLinesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File GiamGiaHangHoa.xlsx",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Xuất các dòng đang có trên lưới \"Giảm giá hàng hóa\" ra `.xlsx`. Các dòng chỉ\ntồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên/ĐVT/giá bán đọc lại\ntừ DB theo tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).",
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
+    "/v2/promotions/item-discount-lines/import": {
+      "post": {
+        "operationId": "PromotionV2Controller_importItemDiscountLines_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "method"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "File .xlsx, tối đa 5 MB, 2.000 dòng"
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "PERCENT",
+                      "AMOUNT"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportItemDiscountLinesResult"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Đọc file `.xlsx` và trả `{rows, errors}` để nạp vào lưới \"Giảm giá hàng hóa\".\nKhông ghi DB (ADR-01); lỗi mức file trả 400, lỗi mức dòng nằm trong `errors`.",
+        "tags": [
+          "promotions-v2"
+        ]
+      }
+    },
     "/v2/promotions/{id}": {
       "get": {
         "operationId": "PromotionV2Controller_getById_v2",
@@ -26282,6 +26385,16 @@
               "maximum": 100,
               "type": "number"
             }
+          },
+          {
+            "name": "branchId",
+            "required": false,
+            "in": "query",
+            "description": "Cửa hàng cần xem, thay cho cửa hàng đang làm việc của người gọi.\n\nMàn Đổi trả cho thu ngân tra hoá đơn của một cửa hàng KHÁC (A-63). Bản\ntrước app gửi ý định đó bằng header `X-Branch-Id`, và nó KHÔNG BAO GIỜ có\ntác dụng: `@Actor` giải chi nhánh theo `jwt > header > jwtList` còn token\nthì luôn mang `branchId`. Đo 2026-09-24 trên dữ liệu dev — hai cửa hàng\nkhác nhau trả về cùng 204 hoá đơn, cùng mã.\n\n**KHÔNG nới quyền:** `withBranch` vẫn đòi id nằm trong tập chi nhánh được\nphân công; gửi cửa hàng lạ vẫn là 403. Vắng thì lấy cửa hàng của người gọi.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -29339,6 +29452,41 @@
       }
     },
     "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email đăng nhập"
+          },
+          "password": {
+            "type": "string",
+            "description": "Mật khẩu"
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Id tổ chức (tenant)",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "organizationId"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token đã cấp ở lần đăng nhập trước"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
       "SwitchBranchDto": {
         "type": "object",
         "properties": {
@@ -46086,6 +46234,132 @@
             "$ref": "#/components/schemas/DateRangeFilterDto"
           }
         }
+      },
+      "ExportItemDiscountLineDto": {
+        "type": "object",
+        "properties": {
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "ITEM",
+              "PRODUCT"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {
+            "type": "number",
+            "description": "% giảm hoặc số tiền giảm, theo `method`"
+          }
+        },
+        "required": [
+          "targetType",
+          "targetId"
+        ]
+      },
+      "ExportItemDiscountLinesDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "PERCENT",
+              "AMOUNT"
+            ]
+          },
+          "lines": {
+            "maxItems": 2000,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportItemDiscountLineDto"
+            }
+          }
+        },
+        "required": [
+          "method",
+          "lines"
+        ]
+      },
+      "ImportedItemDiscountLine": {
+        "type": "object",
+        "properties": {
+          "rowNumber": {
+            "type": "number",
+            "description": "Số dòng Excel (hàng tiêu đề = 1)"
+          },
+          "targetType": {
+            "type": "string",
+            "enum": [
+              "ITEM",
+              "PRODUCT"
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number",
+            "description": "% giảm hoặc số tiền giảm, theo `method`"
+          }
+        },
+        "required": [
+          "rowNumber",
+          "targetType",
+          "targetId",
+          "code",
+          "name",
+          "value"
+        ]
+      },
+      "ImportItemDiscountRowError": {
+        "type": "object",
+        "properties": {
+          "rowNumber": {
+            "type": "number",
+            "description": "Số dòng Excel (hàng tiêu đề = 1)"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã SKU trong file (đã trim); trống khi thiếu mã"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "rowNumber",
+          "message"
+        ]
+      },
+      "ImportItemDiscountLinesResult": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportedItemDiscountLine"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportItemDiscountRowError"
+            }
+          }
+        },
+        "required": [
+          "rows",
+          "errors"
+        ]
       },
       "EvaluateCartLineInputDto": {
         "type": "object",

@@ -1,12 +1,20 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
-import { LineItemGrid, type LineColumn, Input, MoneyInput } from "@erp/ui";
+import { ArrowDownToLine, Download, Upload } from "lucide-react";
+import { toast } from "sonner";
+import { Button, LineItemGrid, type LineColumn, Input, MoneyInput } from "@erp/ui";
 import { LookupField } from "../../../../../../../../components/forms/LookupField";
 import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
 import { mergeTargetsIntoGrid } from "../../../../../../components/PromotionTargetPicker/promotion-target";
 import { useTrailingEmptyRow } from "../../../../../../../../hooks/useTrailingEmptyRow";
 import { apiClient } from "../../../../../../../../lib/api-axios";
 import { erpApi, requireErpData } from "../../../../../../../../lib/erp-api";
-import type { PaginatedResponse } from "@erp/shared-interfaces";
+import { getUserFacingApiErrorMessage } from "../../../../../../../../lib/user-facing-api-error";
+import {
+  downloadItemDiscountExcel,
+  type ImportedItemDiscountLine,
+} from "../../../../../../api/item-discount-excel.api";
+import { ItemDiscountImportDialog } from "./ItemDiscountImportDialog";
+import { PromotionDiscountMode, PromotionTargetType, type PaginatedResponse } from "@erp/shared-interfaces";
 import {
   GOODS_DISCOUNT_METHOD_OPTIONS,
   blankGoodsDiscountRow,
@@ -143,6 +151,75 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
     onChange({ goodsDiscountRows: rows.filter((row) => row.id !== id) });
   };
 
+  // Nhập/Xuất khẩu chỉ có ở phạm vi "Hàng hóa" với % hoặc Số tiền (A-02).
+  const excelEnabled = !isGroup && !isFixedPrice;
+  const excelMethod = isAmount ? PromotionDiscountMode.AMOUNT : PromotionDiscountMode.PERCENT;
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await downloadItemDiscountExcel(
+        excelMethod,
+        rows.filter((row) => row.targetId),
+      );
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err) || "Xuất khẩu thất bại");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Nhập khẩu gộp theo mã (A-01): dòng đã có → ghi đè giá trị; dòng mới → thêm
+  // trước dòng trống cuối. Không lưu chương trình.
+  const [importOpen, setImportOpen] = useState(false);
+
+  const applyImported = (imported: ImportedItemDiscountLine[]) => {
+    const valueById = new Map(imported.map((line) => [line.targetId, line.value]));
+    const updated = rows.map((row) =>
+      row.targetId && valueById.has(row.targetId)
+        ? { ...row, value: valueById.get(row.targetId) ?? row.value }
+        : row,
+    );
+    onChange({
+      goodsDiscountRows: mergeTargetsIntoGrid<GoodsDiscountRow>(
+        updated,
+        imported.map((line) => ({
+          targetType: line.targetType,
+          targetId: line.targetId,
+          code: line.code,
+          name: line.name,
+          unit: "",
+          sellingPrice: 0,
+        })),
+        {
+          targetIdOf: (row) => row.targetId,
+          isBlank: (row) => !row.targetId && !row.code.trim() && !row.name.trim(),
+          toRow: (draft) => ({
+            ...blankGoodsDiscountRow(),
+            targetId: draft.targetId,
+            targetType: draft.targetType,
+            code: draft.code,
+            name: draft.name,
+            value: valueById.get(draft.targetId) ?? "",
+          }),
+        },
+      ),
+    });
+  };
+
+  // Copy xuống — chép giá trị của dòng sang mọi dòng bên dưới đã chọn hàng (A-07).
+  const copyValueDown = (id: string) => {
+    const index = rows.findIndex((row) => row.id === id);
+    if (index < 0) return;
+    const { value } = rows[index];
+    onChange({
+      goodsDiscountRows: rows.map((row, i) =>
+        i > index && row.targetId ? { ...row, value } : row,
+      ),
+    });
+  };
+
   // FR-031 — phạm vi "Nhóm hàng hóa" chọn nhóm; còn lại chọn hàng hóa/mẫu mã.
   const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
     onChange({
@@ -152,6 +229,7 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
         toRow: (draft) => ({
           ...blankGoodsDiscountRow(),
           targetId: draft.targetId,
+          targetType: draft.targetType,
           code: draft.code,
           name: draft.name,
         }),
@@ -181,6 +259,7 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
             onSelect={(item) =>
               updateRow(row.id, {
                 targetId: item.id,
+                targetType: PromotionTargetType.CATEGORY,
                 code: item.code,
                 name: item.name,
               })
@@ -203,6 +282,7 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
             onSelect={(item) =>
               updateRow(row.id, {
                 targetId: item.id,
+                targetType: PromotionTargetType.ITEM,
                 code: item.code,
                 name: item.name,
               })
@@ -256,6 +336,33 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
           </div>
         ),
     },
+    // Đồng giá không có giá trị theo dòng nên không có gì để chép.
+    ...(isFixedPrice
+      ? []
+      : [
+          {
+            key: "copy",
+            label: "",
+            width: 40,
+            align: "center",
+            type: "readonly",
+            filterSymbol: " ",
+            renderEditor: (row) =>
+              row.targetId ? (
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center text-primary transition-colors hover:bg-primary/10"
+                  onClick={() => copyValueDown(row.id)}
+                  title="Sao chép giá trị xuống các dòng dưới"
+                  aria-label="Sao chép giá trị xuống các dòng dưới"
+                >
+                  <ArrowDownToLine className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <span />
+              ),
+          } satisfies LineColumn<GoodsDiscountRow>,
+        ]),
   ];
 
   return (
@@ -284,6 +391,29 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
           value={form.goodsFixedPrice}
           onChange={(v) => onChange({ goodsFixedPrice: v })}
         />
+        {excelEnabled ? (
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="mr-1 h-4 w-4" />
+              Nhập khẩu
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled={exporting}
+              onClick={handleExport}
+            >
+              <Download className="mr-1 h-4 w-4" />
+              Xuất khẩu
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       <LineItemGrid<GoodsDiscountRow>
@@ -296,6 +426,14 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
         showAddRow={false}
         emptyText="Chưa có hàng hóa"
       />
+
+      {importOpen ? (
+        <ItemDiscountImportDialog
+          method={excelMethod}
+          onOpenChange={setImportOpen}
+          onApply={applyImported}
+        />
+      ) : null}
 
       {pickerOpen ? (
         <PromotionTargetPicker
