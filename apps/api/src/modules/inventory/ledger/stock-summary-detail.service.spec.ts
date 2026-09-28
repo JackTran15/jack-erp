@@ -109,7 +109,7 @@ describe("StockSummaryDetailService.getSkuBreakdown", () => {
    * `getSkuBreakdown` issues its main SQL and `loadPendingTransfers`'s query
    * inside one `Promise.all`, in that order; with a branchId both run.
    */
-  it("excludes a pair stopped with Ngừng theo dõi from the ledger arm of `cells` (AC-01)", async () => {
+  it("builds `cells` from tracked balances only — no ledger-history arm (AC-01, removed-location fix)", async () => {
     const query = jest.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     const service = new StockSummaryDetailService({ query } as never);
 
@@ -123,12 +123,13 @@ describe("StockSummaryDetailService.getSkuBreakdown", () => {
     );
 
     const [sql] = query.mock.calls[0];
-    // The balance arm already keeps only tracked rows; the history arm must
-    // drop a pair whose balance row was explicitly flipped to is_tracked = false.
-    expect(sql).toContain("WHERE sb.organization_id = $1 AND sb.is_tracked = true");
-    expect(sql).toMatch(
-      /FROM stock_ledger_entries sle[\s\S]*NOT EXISTS \(\s*SELECT 1 FROM stock_balances ut[\s\S]*ut\.is_tracked = false/,
-    );
+    // A row is a tracked balance pair. Ledger history alone must not make one:
+    // that arm resurrected pairs stopped with "Ngừng theo dõi" and pairs whose
+    // balance row was removed with "Bỏ hàng hóa khỏi vị trí".
+    const cells = /cells AS \(([\s\S]*?)\n\s*\),/.exec(sql)?.[1] ?? "";
+    expect(cells).toContain("WHERE sb.organization_id = $1 AND sb.is_tracked = true");
+    expect(cells).not.toContain("stock_ledger_entries");
+    expect(cells).not.toContain("UNION");
   });
 });
 

@@ -12,9 +12,9 @@ import {
 /**
  * Feature 2026092101-untracked-location-summary-report, UOW-01.
  *
- * "Chi tiết hàng hóa" (POST /v2/inventory/stock/summary/sku-breakdown) builds
- * its row set from tracked stock_balances UNION every (item, location) pair
- * with ledger history. Stopping a pair with "Ngừng theo dõi" only flips
+ * "Chi tiết hàng hóa" (POST /v2/inventory/stock/summary/sku-breakdown) used to
+ * build its row set from tracked stock_balances UNION every (item, location)
+ * pair with ledger history; it now uses tracked stock_balances only. Stopping a pair with "Ngừng theo dõi" only flips
  * is_tracked and keeps the ledger rows, so the history arm used to put the
  * stopped pair straight back as a 0 / 0 row. The unit spec can only pin the
  * SQL text; whether the NOT EXISTS actually removes the row — in any period,
@@ -250,12 +250,15 @@ describe('Stopped pairs disappear from "Chi tiết hàng hóa" (E2E)', () => {
     });
   });
 
-  describe('AC-05 — a pair with history but no balance row is unchanged', () => {
-    it('still lists E01.01 for item Z through the ledger arm', async () => {
+  // Reversed 2026-09-27 (A-04 of 2026092101 no longer holds): a pair whose
+  // balance row was removed ("Bỏ hàng hóa khỏi vị trí") is retired just like a
+  // stopped one — QA re-reported TRUC79903 @ E01.01, which was exactly this case.
+  // See .ai/debug/sku-breakdown-removed-location-still-shown.md.
+  describe('AC-05 — a pair with history but no balance row is not a row', () => {
+    it('does not list E01.01 for item Z from ledger history alone', async () => {
       const res = await breakdown(itemZ, PERIOD);
 
-      expect(locationIdsOf(res)).toEqual([locStopped]);
-      expect(res.data[0]).toMatchObject({ locationCode: 'E01.01', inQty: 2 });
+      expect(locationIdsOf(res)).toEqual([]);
     });
   });
 

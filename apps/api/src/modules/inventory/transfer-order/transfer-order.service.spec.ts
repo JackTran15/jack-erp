@@ -1234,6 +1234,50 @@ describe('TransferOrderService', () => {
       ]);
     });
 
+    // A location move on one leg arrives as two deltas for the same item: −1 at
+    // the old shelf, +1 at the new one. Keyed by item they must be summed, not
+    // overwritten — the last one used to win, so a pure move deleted the line
+    // from the other leg (XK001375 / NK001415, 2026-09-23).
+    it.each([
+      ['decrease first', [-1, 1]],
+      ['increase first', [1, -1]],
+    ])('leaves the counterpart untouched when a location move nets to zero (%s)', async (_label, qtys) => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
+      goodsReceiptService.getById.mockResolvedValue(
+        importReceipt([receiptLine('1', '230000')]),
+      );
+
+      await service.applyLegRevision(
+        'to-1',
+        qtys.map((quantityDelta) => ({ itemId: 'item-1', quantityDelta })),
+        actorSource,
+        'export',
+      );
+
+      expect(goodsReceiptService.update).not.toHaveBeenCalled();
+    });
+
+    it('applies the net of several deltas for the same item', async () => {
+      toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
+      goodsReceiptService.getById.mockResolvedValue(
+        importReceipt([receiptLine('30', '350000')]),
+      );
+
+      await service.applyLegRevision(
+        'to-1',
+        [
+          { itemId: 'item-1', quantityDelta: -1 },
+          { itemId: 'item-1', quantityDelta: 3 },
+        ],
+        actorSource,
+        'export',
+      );
+
+      expect(savedLines()).toEqual([
+        expect.objectContaining({ quantity: 32, unitPrice: 350000 }),
+      ]);
+    });
+
     it('refuses a decrease the counterpart voucher cannot cover', async () => {
       toRepo.findOne.mockResolvedValue(baseOrder({ importGoodsReceiptId: 'gr-1' }));
       goodsReceiptService.getById.mockResolvedValue(
