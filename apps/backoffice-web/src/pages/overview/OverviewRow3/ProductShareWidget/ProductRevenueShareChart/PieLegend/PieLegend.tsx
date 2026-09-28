@@ -1,5 +1,6 @@
 import { cn } from "@erp/ui";
 import { CHART_COLOR } from "../../../../_lib/echarts/baseOption";
+import { formatViNumber } from "../../../../_lib/format";
 import type { ShareSlice } from "../../../../_api/overview.interface";
 
 interface Props {
@@ -7,10 +8,12 @@ interface Props {
   colors: readonly string[];
   hiddenKeys: string[];
   onToggle: (key: string) => void;
+  /** Hiện thêm giá trị sau tên: "Tên: 1.250" (widget tỉ trọng theo chi nhánh). */
+  showValue?: boolean;
 }
 
-/** Legend dọc bên phải pie — chỉ tên, không hiện giá trị (theo spec). */
-export function PieLegend({ slices, colors, hiddenKeys, onToggle }: Props) {
+/** Legend dọc bên phải pie — mặc định chỉ tên, không hiện giá trị (theo spec). */
+export function PieLegend({ slices, colors, hiddenKeys, onToggle, showValue }: Props) {
   return (
     <ul className="flex shrink-0 flex-col gap-4">
       {slices.map((slice, index) => {
@@ -38,6 +41,11 @@ export function PieLegend({ slices, colors, hiddenKeys, onToggle }: Props) {
                 )}
               >
                 {slice.label}
+                {showValue ? (
+                  <>
+                    : <strong className="font-bold tabular-nums">{formatViNumber(slice.value)}</strong>
+                  </>
+                ) : null}
               </span>
             </button>
           </li>

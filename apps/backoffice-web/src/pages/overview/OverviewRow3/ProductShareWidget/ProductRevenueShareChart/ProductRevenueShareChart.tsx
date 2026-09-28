@@ -14,6 +14,9 @@ interface Props {
   hiddenKeys: string[];
   onToggle: (key: string) => void;
   loading?: boolean;
+  /** Legend hiện kèm giá trị ("Tên: 1.250"). */
+  showLegendValue?: boolean;
+  ariaLabel?: string;
 }
 
 /** Pie tỉ trọng doanh thu + legend dọc bên phải. */
@@ -22,6 +25,8 @@ export function ProductRevenueShareChart({
   hiddenKeys,
   onToggle,
   loading,
+  showLegendValue,
+  ariaLabel = "Biểu đồ tỉ trọng doanh thu hàng hóa",
 }: Props) {
   const visible = slices.filter((s) => !hiddenKeys.includes(s.key));
   const total = visible.reduce((acc, s) => acc + s.value, 0);
@@ -81,6 +86,7 @@ export function ProductRevenueShareChart({
           colors={PIE_COLORS}
           hiddenKeys={hiddenKeys}
           onToggle={onToggle}
+          showValue={showLegendValue}
         />
       </div>
     );
@@ -93,7 +99,7 @@ export function ProductRevenueShareChart({
           option={option}
           height={330}
           loading={loading}
-          ariaLabel="Biểu đồ tỉ trọng doanh thu hàng hóa"
+          ariaLabel={ariaLabel}
         />
       </div>
       <PieLegend
@@ -101,6 +107,7 @@ export function ProductRevenueShareChart({
         colors={PIE_COLORS}
         hiddenKeys={hiddenKeys}
         onToggle={onToggle}
+        showValue={showLegendValue}
       />
     </div>
   );

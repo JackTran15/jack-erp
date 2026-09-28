@@ -7,7 +7,8 @@ interface Props {
   title: ReactNode;
   /** Dropdown kỳ báo cáo nhanh. */
   periodSelect: ReactNode;
-  onOpenOptions: () => void;
+  /** Vắng → không hiện nút ⚙. */
+  onOpenOptions?: () => void;
   onRefresh: () => void;
   refreshing?: boolean;
 }
@@ -30,7 +31,7 @@ export function WidgetHeader({
       <div className="flex shrink-0 items-center gap-2">
         {periodSelect}
         <div className="flex items-center gap-1">
-          <SettingsIconButton onClick={onOpenOptions} />
+          {onOpenOptions ? <SettingsIconButton onClick={onOpenOptions} /> : null}
           <RefreshIconButton onClick={onRefresh} loading={refreshing} />
         </div>
       </div>

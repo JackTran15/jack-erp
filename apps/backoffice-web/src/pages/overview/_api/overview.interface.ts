@@ -36,6 +36,20 @@ export interface DailyActivityData {
   cards: DailyActivityCardData[];
 }
 
+/** Row 1 (chuỗi) — tình hình phát hành HĐĐT của một chi nhánh. */
+export interface EInvoiceBranchStatus {
+  branchId: string;
+  branchName: string;
+  unissued: number;
+  failed: number;
+  issued: number;
+}
+
+export interface EInvoiceStatusData {
+  updatedAt: string;
+  branches: EInvoiceBranchStatus[];
+}
+
 // ── Row 2 ──────────────────────────────────────────────────────────────────
 
 export interface StoreRevenuePoint {
