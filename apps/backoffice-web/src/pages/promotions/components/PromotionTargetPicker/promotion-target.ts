@@ -63,7 +63,7 @@ export function toPromotionTargets(
       targetType: PromotionTargetType.ITEM,
       targetId: line.itemId,
       code: line.sku,
-      name: line.variantLabel ? `${line.name} (${line.variantLabel})` : line.name,
+      name: line.name,
       unit: line.unit,
       sellingPrice: line.sellingPrice ?? 0,
     };

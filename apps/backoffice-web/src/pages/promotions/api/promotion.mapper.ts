@@ -590,6 +590,8 @@ function itemDiscountFromDetail(base: ProgramFormState, detail: PromotionProgram
     targetType: l.targetType,
     code: l.targetCode ?? "",
     name: l.targetName ?? "",
+    unit: l.unit ?? "",
+    sellingPrice: l.sellingPrice ?? null,
     value: isFixedPrice ? "" : (l.discountValue ?? ""),
   }));
   base.goodsDiscountRows = rows.length ? rows : [blankGoodsDiscountRow()];

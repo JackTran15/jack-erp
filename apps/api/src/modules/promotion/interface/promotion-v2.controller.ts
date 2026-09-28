@@ -70,8 +70,8 @@ export class PromotionV2Controller {
 
   /**
    * Xuất các dòng đang có trên lưới "Giảm giá hàng hóa" ra `.xlsx`. Các dòng chỉ
-   * tồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên/ĐVT/giá bán đọc lại
-   * từ DB theo tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).
+   * tồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên đọc lại từ DB theo
+   * tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).
    */
   @Post('item-discount-lines/export')
   @Version('2')

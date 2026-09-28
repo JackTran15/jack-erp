@@ -105,6 +105,10 @@ export interface GoodsDiscountRow {
   code: string;
   /** Tên nhóm hàng hóa (GROUP) hoặc tên hàng hóa (PRODUCT). */
   name: string;
+  /** ĐVT của mẫu mã (`ITEM`) — rỗng với hàng hóa chọn trọn (`PRODUCT`, A-04) và nhóm. */
+  unit: string;
+  /** Giá bán của mẫu mã (`ITEM`) — `null` với hàng hóa chọn trọn (`PRODUCT`, A-04) và nhóm. Chỉ hiển thị, không gửi lên server. */
+  sellingPrice: number | null;
   /** % giảm (PERCENT) hoặc số tiền giảm (AMOUNT) theo phương thức. */
   value: number | "";
 }

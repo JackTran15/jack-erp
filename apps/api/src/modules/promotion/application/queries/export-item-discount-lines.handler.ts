@@ -11,8 +11,9 @@ import {
 import { ExportItemDiscountLinesQuery } from './export-item-discount-lines.query';
 
 /**
- * Dựng file Excel từ các dòng đang có trên lưới (A-15). Mã/tên/ĐVT/giá bán đọc lại
- * từ DB theo tổ chức; dòng có `targetId` không thuộc tổ chức bị bỏ qua (AC-12).
+ * Dựng file Excel từ các dòng đang có trên lưới (A-15). Mã/tên đọc lại từ DB theo tổ chức;
+ * dòng có `targetId` không thuộc tổ chức bị bỏ qua (AC-12). Dữ liệu vào sheet của `method`,
+ * kể cả `FIXED_PRICE` (sheet Đồng giá, không có cột giá trị).
  */
 @QueryHandler(ExportItemDiscountLinesQuery)
 export class ExportItemDiscountLinesHandler implements IQueryHandler<ExportItemDiscountLinesQuery> {
@@ -40,13 +41,7 @@ export class ExportItemDiscountLinesHandler implements IQueryHandler<ExportItemD
       if (line.targetType === PromotionTargetType.ITEM) {
         const item = itemById.get(line.targetId);
         if (!item) continue;
-        lines.push({
-          code: item.code,
-          name: item.name,
-          unit: item.unit,
-          sellingPrice: Number(item.sellingPrice),
-          value: line.value,
-        });
+        lines.push({ code: item.code, name: item.name, value: line.value });
       } else {
         const product = productById.get(line.targetId);
         if (!product) continue;

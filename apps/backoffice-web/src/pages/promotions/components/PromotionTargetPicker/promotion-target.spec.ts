@@ -94,16 +94,18 @@ describe("toPromotionTargets", () => {
     expect(drafts.every((d) => d.targetType === PromotionTargetType.ITEM)).toBe(true);
   });
 
-  it("gắn variantLabel vào tên để hai mẫu mã cùng hàng hóa không trùng tên trên lưới", () => {
+  it("AC-01: giữ nguyên tên mẫu mã, không gắn hậu tố variantLabel", () => {
     const [draft] = toPromotionTargets(
       result({
-        lines: [line({ itemId: "v1", variantLabel: "Đỏ / 39" })],
+        lines: [
+          line({ itemId: "v1", name: "Giày nam ABA2799-D-38", variantLabel: "38 · D" }),
+        ],
         standaloneItemIds: ["v1"],
       }),
       "PRODUCT_OR_ITEM",
     );
 
-    expect(draft.name).toBe("Giày nữ (Đỏ / 39)");
+    expect(draft.name).toBe("Giày nam ABA2799-D-38");
   });
 
   it("chế độ CATEGORY không lấy gì từ kết quả chọn hàng hóa", () => {

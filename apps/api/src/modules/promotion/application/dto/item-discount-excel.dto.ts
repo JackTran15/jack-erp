@@ -3,12 +3,16 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PromotionDiscountMode, PromotionTargetType } from '@erp/shared-interfaces';
 
-/** Phương thức giảm giá có nhập/xuất Excel — tập con của `PromotionDiscountMode`, không có `FIXED_PRICE`. */
-export type ItemDiscountExcelMethod = PromotionDiscountMode.PERCENT | PromotionDiscountMode.AMOUNT;
+/** Phương thức giảm giá có nhập/xuất Excel — mỗi phương thức một sheet trong file. */
+export type ItemDiscountExcelMethod =
+  | PromotionDiscountMode.PERCENT
+  | PromotionDiscountMode.AMOUNT
+  | PromotionDiscountMode.FIXED_PRICE;
 
 export const ITEM_DISCOUNT_EXCEL_METHODS: readonly ItemDiscountExcelMethod[] = [
   PromotionDiscountMode.PERCENT,
   PromotionDiscountMode.AMOUNT,
+  PromotionDiscountMode.FIXED_PRICE,
 ];
 
 /** Loại đích của một dòng Excel — chỉ hàng hóa hoặc sản phẩm, không có nhóm hàng. */
@@ -30,7 +34,7 @@ export class ExportItemDiscountLineDto {
   @IsUUID()
   targetId: string;
 
-  @ApiPropertyOptional({ description: '% giảm hoặc số tiền giảm, theo `method`' })
+  @ApiPropertyOptional({ description: '% giảm hoặc số tiền giảm, theo `method`; bỏ qua với `FIXED_PRICE`' })
   @IsOptional()
   @IsNumber()
   value?: number;
@@ -73,8 +77,14 @@ export class ImportedItemDiscountLine {
   @ApiProperty()
   name: string;
 
-  @ApiProperty({ description: '% giảm hoặc số tiền giảm, theo `method`' })
-  value: number;
+  @ApiPropertyOptional({ description: '% giảm hoặc số tiền giảm, theo `method`; không có với `FIXED_PRICE`' })
+  value?: number;
+
+  @ApiPropertyOptional({ description: 'Đơn vị tính; chỉ dòng `ITEM`' })
+  unit?: string;
+
+  @ApiPropertyOptional({ description: 'Giá bán; chỉ dòng `ITEM`' })
+  sellingPrice?: number;
 }
 
 /** Một dòng lỗi: số dòng Excel + lý do tiếng Việt. */

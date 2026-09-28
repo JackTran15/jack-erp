@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
-import { AppModal } from "@erp/ui";
+import { Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { AppModal, Button } from "@erp/ui";
+import { PromotionDiscountMode } from "@erp/shared-interfaces";
 import { ImportFilePicker } from "../../../../../../../../components/shared/import-wizard/ImportFilePicker";
 import { getUserFacingApiErrorMessage } from "../../../../../../../../lib/user-facing-api-error";
 import {
+  downloadItemDiscountExcel,
   importItemDiscountExcel,
   type ImportedItemDiscountLine,
   type ImportItemDiscountLinesResult,
@@ -25,6 +28,19 @@ export function ItemDiscountImportDialog({ method, onOpenChange, onApply }: Prop
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<ImportItemDiscountLinesResult | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
+  // File mẫu = xuất khẩu với `lines: []` — 3 sheet chỉ có tiêu đề (A-07, AC-14).
+  const downloadTemplate = async () => {
+    setDownloadingTemplate(true);
+    try {
+      await downloadItemDiscountExcel(method, []);
+    } catch (err) {
+      toast.error(getUserFacingApiErrorMessage(err) || "Tải file mẫu thất bại");
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
 
   const check = async (picked: File | null) => {
     setFile(picked);
@@ -69,6 +85,19 @@ export function ItemDiscountImportDialog({ method, onOpenChange, onApply }: Prop
         className="min-h-[140px] flex-none"
       />
 
+      <div className="flex-none">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={downloadingTemplate}
+          onClick={downloadTemplate}
+        >
+          <Download className="mr-1 h-4 w-4" />
+          Tải file mẫu
+        </Button>
+      </div>
+
       {checking ? (
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -87,7 +116,11 @@ export function ItemDiscountImportDialog({ method, onOpenChange, onApply }: Prop
           <p>
             <span className="font-medium">{validCount}</span> dòng hợp lệ,{" "}
             <span className="font-medium text-destructive">{result.errors.length}</span> dòng lỗi.
-            Các dòng hợp lệ sẽ được thêm vào bảng (mã đã có thì cập nhật giá trị).
+            Các dòng hợp lệ sẽ được thêm vào bảng (
+            {method === PromotionDiscountMode.FIXED_PRICE
+              ? "mã đã có được giữ nguyên"
+              : "mã đã có thì cập nhật giá trị"}
+            ).
             Bấm <span className="font-medium">Lưu</span> để lưu chương trình.
           </p>
           {result.errors.length ? (
