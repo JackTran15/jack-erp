@@ -550,6 +550,8 @@ export const navConfig: NavModule[] = [
             permission: "document-numbering.manage",
             views: [STORE_TYPE.SINGLE],
           },
+          // Chưa có quyền backend cho HĐĐT (trang đang chạy mock) — hiện cho mọi người.
+          { to: "/settings/einvoice", label: "Phát hành hóa đơn điện tử" },
           {
             to: "/treasury/deposit-period-lock",
             label: "Khóa sổ tiền gửi",

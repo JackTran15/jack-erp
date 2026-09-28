@@ -1,4 +1,5 @@
 import { AppModal, Button } from "@erp/ui";
+import { useNavigate } from "react-router-dom";
 import type { EInvoiceBranchStatus } from "../../_api/overview.interface";
 import { formatViNumber } from "../../_lib/format";
 
@@ -19,6 +20,8 @@ const TD = "h-8 border border-[#E0E0E0] px-2.5 text-[#333333]";
 
 /** Modal "Xem chi tiết tình hình Phát hành hóa đơn" — bảng HĐĐT theo chi nhánh. */
 export function EInvoiceStatusDetailModal({ open, branches, onClose }: Props) {
+  const navigate = useNavigate();
+
   return (
     <AppModal
       open={open}
@@ -65,9 +68,12 @@ export function EInvoiceStatusDetailModal({ open, branches, onClose }: Props) {
                 </td>
               ))}
               <td className={TD}>
-                {/* Chưa có trang HĐĐT để điều hướng — nối hành động khi có backend. */}
                 <button
                   type="button"
+                  onClick={() => {
+                    onClose();
+                    navigate(`/settings/einvoice?branchId=${encodeURIComponent(branch.branchId)}`);
+                  }}
                   className="text-[#2B2E6E] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2B2E6E]/40"
                 >
                   Kiểm tra
