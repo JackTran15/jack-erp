@@ -5,7 +5,8 @@ import { WidgetHeader } from "./WidgetHeader/WidgetHeader";
 interface Props {
   title: ReactNode;
   periodSelect: ReactNode;
-  onOpenOptions: () => void;
+  /** Vắng → không hiện nút ⚙ (widget không có modal "Tùy chọn"). */
+  onOpenOptions?: () => void;
   onRefresh: () => void;
   refreshing?: boolean;
   /** Thời điểm dữ liệu, hiện ở footer "Dữ liệu: …". */

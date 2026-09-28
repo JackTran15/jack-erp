@@ -61,6 +61,7 @@ import { HttpErrorPage, HttpErrorView } from "./pages/errors/HttpErrorPage";
 import { DocumentNumberingPage } from "./pages/settings/DocumentNumberingPage";
 import { AppearancePage } from "./pages/settings/appearance/AppearancePage";
 import { NotificationTestPage } from "./pages/settings/notification-test/NotificationTestPage";
+import { EInvoicePage } from "./pages/settings/einvoice/EInvoicePage";
 import { ProductsPage } from "./pages/products/ProductsPage";
 import { ProductDetailPage } from "./pages/products/ProductDetailPage";
 import { EmployeesPage } from "./pages/employees/EmployeesPage";
@@ -337,6 +338,7 @@ export function App() {
                   path="/settings/notification-test"
                   element={<NotificationTestPage />}
                 />
+                <Route path="/settings/einvoice" element={<EInvoicePage />} />
                 <Route
                   path="/role-management"
                   element={<RoleManagementPage />}
