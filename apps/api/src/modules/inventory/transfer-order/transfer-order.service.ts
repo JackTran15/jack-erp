@@ -1730,6 +1730,17 @@ export class TransferOrderService implements OnModuleInit {
     actor: ActorContext,
     origin: "export" | "import",
   ): Promise<void> {
+    // The caller's deltas are per (item, location); this side only keys by item.
+    // Sum them first: a location move is −q at the old shelf and +q at the new
+    // one for the same item, and letting one overwrite the other deleted the
+    // line from the counterpart leg (XK001375, .ai/debug/transfer-leg-location-move-drops-line.md).
+    const netByItem = new Map<string, number>();
+    for (const d of deltas) {
+      netByItem.set(d.itemId, (netByItem.get(d.itemId) ?? 0) + d.quantityDelta);
+    }
+    deltas = [...netByItem]
+      .filter(([, quantityDelta]) => quantityDelta !== 0)
+      .map(([itemId, quantityDelta]) => ({ itemId, quantityDelta }));
     if (deltas.length === 0) return;
     const to = await this.findOrFail(orderId, actor.organizationId);
     if (to.status === TransferOrderStatus.CANCELLED) {

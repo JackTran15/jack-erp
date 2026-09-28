@@ -162,6 +162,11 @@ export class StockSummaryDetailService {
         FROM items i
         WHERE i.organization_id = $1 AND i.id = $2 AND i.product_id IS NULL
       ),
+      -- A row is a tracked stock_balances pair, nothing else. Ledger history alone
+      -- no longer makes a row: every movement upserts a balance, so a pair with
+      -- history but no balance is one whose balance was deliberately removed
+      -- ("Bỏ hàng hóa khỏi vị trí") — as retired as a "Ngừng theo dõi" pair
+      -- (.ai/debug/sku-breakdown-removed-location-still-shown.md).
       cells AS (
         SELECT sb.item_id, sb.location_id
         FROM stock_balances sb
@@ -169,23 +174,6 @@ export class StockSummaryDetailService {
         INNER JOIN locations loc
           ON loc.id = sb.location_id AND loc.storage_id = $3 AND loc.is_active = true
         WHERE sb.organization_id = $1 AND sb.is_tracked = true
-        UNION
-        SELECT sle.item_id, sle.location_id
-        FROM stock_ledger_entries sle
-        INNER JOIN grp_items g ON g.id = sle.item_id
-        INNER JOIN locations loc
-          ON loc.id = sle.location_id AND loc.storage_id = $3 AND loc.is_active = true
-        WHERE sle.organization_id = $1 AND sle.posted_at < $5
-          -- A pair explicitly stopped ("Ngừng theo dõi") is not a row, whatever
-          -- its history: stopping only flips the flag, the ledger rows stay.
-          AND NOT EXISTS (
-            SELECT 1 FROM stock_balances ut
-            WHERE ut.organization_id = $1
-              AND ut.item_id = sle.item_id
-              AND ut.location_id = sle.location_id
-              AND ut.is_tracked = false
-          )
-        ${EXCLUDE_VOIDED_DOCS_SQL}
       ),
       balance AS (
         SELECT sb.item_id, sb.location_id, SUM(sb.quantity)::numeric AS qty
