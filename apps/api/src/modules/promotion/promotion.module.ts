@@ -44,6 +44,8 @@ import { SearchPromotionsV2Handler } from './application/queries/search-promotio
 import { GetPromotionHandler } from './application/queries/get-promotion.handler';
 import { EvaluateCartHandler } from './application/queries/evaluate-cart.handler';
 import { SearchVouchersV2Handler } from './application/queries/search-vouchers-v2.handler';
+import { ExportItemDiscountLinesHandler } from './application/queries/export-item-discount-lines.handler';
+import { ImportItemDiscountLinesHandler } from './application/queries/import-item-discount-lines.handler';
 import { PromotionResolver } from './domain/engine/promotion-resolver';
 
 const COMMAND_HANDLERS = [
@@ -54,7 +56,14 @@ const COMMAND_HANDLERS = [
   DeletePromotionHandler,
 ];
 
-const QUERY_HANDLERS = [SearchPromotionsV2Handler, GetPromotionHandler, EvaluateCartHandler, SearchVouchersV2Handler];
+const QUERY_HANDLERS = [
+  SearchPromotionsV2Handler,
+  GetPromotionHandler,
+  EvaluateCartHandler,
+  SearchVouchersV2Handler,
+  ExportItemDiscountLinesHandler,
+  ImportItemDiscountLinesHandler,
+];
 
 @Module({
   imports: [

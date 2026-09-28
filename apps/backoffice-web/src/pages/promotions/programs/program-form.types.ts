@@ -1,3 +1,4 @@
+import type { PromotionTargetType } from "@erp/shared-interfaces";
 import type { PromotionApplyTo, PromotionStatus } from "./programs.types";
 
 /** "Ngày tính KM" khi áp dụng cho khách hàng có sinh nhật. */
@@ -94,6 +95,12 @@ export interface GoodsDiscountRow {
   id: string;
   /** Id thật (product/category id theo goodsDiscountScope) — rỗng khi chưa chọn từ picker. */
   targetId: string;
+  /**
+   * Loại của `targetId`, gán tại nơi chọn (ô tra cứu, picker, đọc lại) — mapper
+   * gửi nguyên giá trị này. Ô tra cứu hàng hóa trả id của inventory item → `ITEM`;
+   * picker có thể trả `PRODUCT` (chọn trọn hàng hóa) hoặc `ITEM` (mẫu mã lẻ).
+   */
+  targetType: PromotionTargetType;
   /** Mã nhóm hàng hóa (GROUP) hoặc mã hàng (PRODUCT). */
   code: string;
   /** Tên nhóm hàng hóa (GROUP) hoặc tên hàng hóa (PRODUCT). */

@@ -6010,6 +6010,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v2/promotions/item-discount-lines/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Xuất các dòng đang có trên lưới "Giảm giá hàng hóa" ra `.xlsx`. Các dòng chỉ
+         *     tồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên/ĐVT/giá bán đọc lại
+         *     từ DB theo tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).
+         */
+        post: operations["PromotionV2Controller_exportItemDiscountLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v2/promotions/item-discount-lines/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Đọc file `.xlsx` và trả `{rows, errors}` để nạp vào lưới "Giảm giá hàng hóa".
+         *     Không ghi DB (ADR-01); lỗi mức file trả 400, lỗi mức dòng nằm trong `errors`.
+         */
+        post: operations["PromotionV2Controller_importItemDiscountLines_v2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v2/promotions/{id}": {
         parameters: {
             query?: never;
@@ -9938,6 +9979,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        LoginDto: {
+            /** @description Email đăng nhập */
+            email: string;
+            /** @description Mật khẩu */
+            password: string;
+            /**
+             * Format: uuid
+             * @description Id tổ chức (tenant)
+             */
+            organizationId: string;
+        };
+        RefreshDto: {
+            /** @description Refresh token đã cấp ở lần đăng nhập trước */
+            refreshToken: string;
+        };
         SwitchBranchDto: {
             /**
              * Format: uuid
@@ -15604,6 +15660,42 @@ export interface components {
             startDate?: components["schemas"]["DateRangeFilterDto"];
             endDate?: components["schemas"]["DateRangeFilterDto"];
         };
+        ExportItemDiscountLineDto: {
+            /** @enum {string} */
+            targetType: "ITEM" | "PRODUCT";
+            /** Format: uuid */
+            targetId: string;
+            /** @description % giảm hoặc số tiền giảm, theo `method` */
+            value?: number;
+        };
+        ExportItemDiscountLinesDto: {
+            /** @enum {string} */
+            method: "PERCENT" | "AMOUNT";
+            lines: components["schemas"]["ExportItemDiscountLineDto"][];
+        };
+        ImportedItemDiscountLine: {
+            /** @description Số dòng Excel (hàng tiêu đề = 1) */
+            rowNumber: number;
+            /** @enum {string} */
+            targetType: "ITEM" | "PRODUCT";
+            /** Format: uuid */
+            targetId: string;
+            code: string;
+            name: string;
+            /** @description % giảm hoặc số tiền giảm, theo `method` */
+            value: number;
+        };
+        ImportItemDiscountRowError: {
+            /** @description Số dòng Excel (hàng tiêu đề = 1) */
+            rowNumber: number;
+            /** @description Mã SKU trong file (đã trim); trống khi thiếu mã */
+            code?: string;
+            message: string;
+        };
+        ImportItemDiscountLinesResult: {
+            rows: components["schemas"]["ImportedItemDiscountLine"][];
+            errors: components["schemas"]["ImportItemDiscountRowError"][];
+        };
         EvaluateCartLineInputDto: {
             /** @description Client-supplied, echoed back in lineDiscounts so the client can map results without guessing by order */
             lineId: string;
@@ -20197,7 +20289,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -20216,7 +20312,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RefreshDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -30479,6 +30579,61 @@ export interface operations {
             };
         };
     };
+    PromotionV2Controller_exportItemDiscountLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExportItemDiscountLinesDto"];
+            };
+        };
+        responses: {
+            /** @description File GiamGiaHangHoa.xlsx */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
+    PromotionV2Controller_importItemDiscountLines_v2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description File .xlsx, tối đa 5 MB, 2.000 dòng
+                     */
+                    file: string;
+                    /** @enum {string} */
+                    method: "PERCENT" | "AMOUNT";
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportItemDiscountLinesResult"];
+                };
+            };
+        };
+    };
     PromotionV2Controller_getById_v2: {
         parameters: {
             query?: never;
@@ -35598,6 +35753,19 @@ export interface operations {
                 search?: string;
                 page?: number;
                 limit?: number;
+                /**
+                 * @description Cửa hàng cần xem, thay cho cửa hàng đang làm việc của người gọi.
+                 *
+                 *     Màn Đổi trả cho thu ngân tra hoá đơn của một cửa hàng KHÁC (A-63). Bản
+                 *     trước app gửi ý định đó bằng header `X-Branch-Id`, và nó KHÔNG BAO GIỜ có
+                 *     tác dụng: `@Actor` giải chi nhánh theo `jwt > header > jwtList` còn token
+                 *     thì luôn mang `branchId`. Đo 2026-09-24 trên dữ liệu dev — hai cửa hàng
+                 *     khác nhau trả về cùng 204 hoá đơn, cùng mã.
+                 *
+                 *     **KHÔNG nới quyền:** `withBranch` vẫn đòi id nằm trong tập chi nhánh được
+                 *     phân công; gửi cửa hàng lạ vẫn là 403. Vắng thì lấy cửa hàng của người gọi.
+                 */
+                branchId?: string;
             };
             header?: never;
             path?: never;
