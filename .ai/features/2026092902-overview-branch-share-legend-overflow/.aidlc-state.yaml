@@ -1,0 +1,81 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: overview-branch-share-legend-overflow
+slug: 2026092902-overview-branch-share-legend-overflow
+profile: none
+created: 2026-09-29T19:58:28
+ruleset: 7
+current_gate: G4
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-29T19:59:22
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-29T19:59:22
+    by: Akenzy
+    evidence: 3 assumptions, none blocking-and-pending; 3 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-29T19:59:22
+    by: Akenzy
+    evidence: 1 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-29T19:59:22
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 1 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-29T19:59:28
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-29T20:02:09
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-29T20:03:35
+    by: Akenzy
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn từ trước session, không thuộc ticket
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-29T20:03:35
+    by: Akenzy
+    reason: scripts/bench-catalog-page.js là file untracked có sẵn từ trước session, không thuộc ticket
+    ticket: T-01-01
+  - gate: G4
+    action: passed
+    at: 2026-09-29T20:03:40
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 1 tickets done, all UoW checklists ticked
+  - gate: G1
+    action: reopened
+    at: 2026-09-29T20:06:24
+    by: Akenzy
+    reason: Akenzy - legend max-height 80% khung (264px) thay vì 100% (330px)
+  - gate: G1
+    action: passed
+    at: 2026-09-29T20:06:52
+    by: Akenzy
+    evidence: 4 assumptions, none blocking-and-pending; 3 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-29T20:06:52
+    by: Akenzy
+    evidence: 1 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-29T20:06:52
+    by: Akenzy
+    evidence: graph valid - 1 UoW, 1 tickets, no cycles
+  - gate: G4
+    action: passed
+    at: 2026-09-29T20:07:01
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 1 tickets done, all UoW checklists ticked
