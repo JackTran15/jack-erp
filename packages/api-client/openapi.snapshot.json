@@ -17409,7 +17409,7 @@
             }
           }
         },
-        "summary": "Xuất các dòng đang có trên lưới \"Giảm giá hàng hóa\" ra `.xlsx`. Các dòng chỉ\ntồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên/ĐVT/giá bán đọc lại\ntừ DB theo tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).",
+        "summary": "Xuất các dòng đang có trên lưới \"Giảm giá hàng hóa\" ra `.xlsx`. Các dòng chỉ\ntồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên đọc lại từ DB theo\ntổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).",
         "tags": [
           "promotions-v2"
         ]
@@ -17439,7 +17439,8 @@
                     "type": "string",
                     "enum": [
                       "PERCENT",
-                      "AMOUNT"
+                      "AMOUNT",
+                      "FIXED_PRICE"
                     ]
                   }
                 }
@@ -46251,7 +46252,7 @@
           },
           "value": {
             "type": "number",
-            "description": "% giảm hoặc số tiền giảm, theo `method`"
+            "description": "% giảm hoặc số tiền giảm, theo `method`; bỏ qua với `FIXED_PRICE`"
           }
         },
         "required": [
@@ -46266,7 +46267,8 @@
             "type": "string",
             "enum": [
               "PERCENT",
-              "AMOUNT"
+              "AMOUNT",
+              "FIXED_PRICE"
             ]
           },
           "lines": {
@@ -46308,7 +46310,15 @@
           },
           "value": {
             "type": "number",
-            "description": "% giảm hoặc số tiền giảm, theo `method`"
+            "description": "% giảm hoặc số tiền giảm, theo `method`; không có với `FIXED_PRICE`"
+          },
+          "unit": {
+            "type": "string",
+            "description": "Đơn vị tính; chỉ dòng `ITEM`"
+          },
+          "sellingPrice": {
+            "type": "number",
+            "description": "Giá bán; chỉ dòng `ITEM`"
           }
         },
         "required": [
@@ -46316,8 +46326,7 @@
           "targetType",
           "targetId",
           "code",
-          "name",
-          "value"
+          "name"
         ]
       },
       "ImportItemDiscountRowError": {

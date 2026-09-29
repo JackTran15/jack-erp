@@ -1,10 +1,20 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { ArrowDownToLine, Download, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { Button, LineItemGrid, type LineColumn, Input, MoneyInput } from "@erp/ui";
+import {
+  Button,
+  LineItemGrid,
+  type LineColumn,
+  Input,
+  MoneyInput,
+  formatMoneyInteger,
+} from "@erp/ui";
 import { LookupField } from "../../../../../../../../components/forms/LookupField";
 import { PromotionTargetPicker } from "../../../../../../components/PromotionTargetPicker/PromotionTargetPicker";
-import { mergeTargetsIntoGrid } from "../../../../../../components/PromotionTargetPicker/promotion-target";
+import {
+  mergeTargetsIntoGrid,
+  promoPrice,
+} from "../../../../../../components/PromotionTargetPicker/promotion-target";
 import { useTrailingEmptyRow } from "../../../../../../../../hooks/useTrailingEmptyRow";
 import { apiClient } from "../../../../../../../../lib/api-axios";
 import { erpApi, requireErpData } from "../../../../../../../../lib/erp-api";
@@ -39,6 +49,8 @@ interface ItemOption {
   code: string;
   name: string;
   unit: string;
+  /** Cột `decimal` không có transformer — server trả chuỗi (`"685000.00"`). */
+  sellingPrice: number | string | null;
 }
 
 interface ItemsResponse {
@@ -117,7 +129,6 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
   const rows = form.goodsDiscountRows;
   const isGroup = form.goodsDiscountScope === GoodsDiscountScope.GROUP;
   const method = form.goodsDiscountMethod;
-  const isPercent = method === GoodsDiscountMethod.PERCENT;
   const isAmount = method === GoodsDiscountMethod.AMOUNT;
   const isFixedPrice = method === GoodsDiscountMethod.FIXED_PRICE;
 
@@ -151,9 +162,13 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
     onChange({ goodsDiscountRows: rows.filter((row) => row.id !== id) });
   };
 
-  // Nhập/Xuất khẩu chỉ có ở phạm vi "Hàng hóa" với % hoặc Số tiền (A-02).
-  const excelEnabled = !isGroup && !isFixedPrice;
-  const excelMethod = isAmount ? PromotionDiscountMode.AMOUNT : PromotionDiscountMode.PERCENT;
+  // Nhập/Xuất khẩu có ở phạm vi "Hàng hóa" với cả 3 phương thức (AC-11).
+  const excelEnabled = !isGroup;
+  const excelMethod = isFixedPrice
+    ? PromotionDiscountMode.FIXED_PRICE
+    : isAmount
+      ? PromotionDiscountMode.AMOUNT
+      : PromotionDiscountMode.PERCENT;
   const [exporting, setExporting] = useState(false);
 
   const handleExport = async () => {
@@ -175,12 +190,12 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
   const [importOpen, setImportOpen] = useState(false);
 
   const applyImported = (imported: ImportedItemDiscountLine[]) => {
-    const valueById = new Map(imported.map((line) => [line.targetId, line.value]));
-    const updated = rows.map((row) =>
-      row.targetId && valueById.has(row.targetId)
-        ? { ...row, value: valueById.get(row.targetId) ?? row.value }
-        : row,
-    );
+    const lineById = new Map(imported.map((line) => [line.targetId, line]));
+    // Đồng giá không có giá trị theo dòng → dòng đã có giữ nguyên (A-09).
+    const updated = rows.map((row) => {
+      const value = row.targetId ? lineById.get(row.targetId)?.value : undefined;
+      return value === undefined ? row : { ...row, value };
+    });
     onChange({
       goodsDiscountRows: mergeTargetsIntoGrid<GoodsDiscountRow>(
         updated,
@@ -189,8 +204,8 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
           targetId: line.targetId,
           code: line.code,
           name: line.name,
-          unit: "",
-          sellingPrice: 0,
+          unit: line.unit ?? "",
+          sellingPrice: line.sellingPrice ?? 0,
         })),
         {
           targetIdOf: (row) => row.targetId,
@@ -201,7 +216,10 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
             targetType: draft.targetType,
             code: draft.code,
             name: draft.name,
-            value: valueById.get(draft.targetId) ?? "",
+            unit: draft.unit,
+            // Dòng mẫu mã (PRODUCT) không có giá bán → để trống (A-04).
+            sellingPrice: lineById.get(draft.targetId)?.sellingPrice ?? null,
+            value: lineById.get(draft.targetId)?.value ?? "",
           }),
         },
       ),
@@ -221,18 +239,24 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
   };
 
   // FR-031 — phạm vi "Nhóm hàng hóa" chọn nhóm; còn lại chọn hàng hóa/mẫu mã.
+  // ĐVT/Giá bán chỉ có ở mẫu mã (`ITEM`); hàng hóa chọn trọn và nhóm để trống (A-04).
   const addFromPicker = (drafts: Parameters<typeof mergeTargetsIntoGrid>[1]) => {
     onChange({
       goodsDiscountRows: mergeTargetsIntoGrid<GoodsDiscountRow>(rows, drafts, {
         targetIdOf: (row) => row.targetId,
         isBlank: (row) => !row.targetId && !row.code.trim() && !row.name.trim(),
-        toRow: (draft) => ({
-          ...blankGoodsDiscountRow(),
-          targetId: draft.targetId,
-          targetType: draft.targetType,
-          code: draft.code,
-          name: draft.name,
-        }),
+        toRow: (draft) => {
+          const isItem = draft.targetType === PromotionTargetType.ITEM;
+          return {
+            ...blankGoodsDiscountRow(),
+            targetId: draft.targetId,
+            targetType: draft.targetType,
+            code: draft.code,
+            name: draft.name,
+            unit: isItem ? draft.unit : "",
+            sellingPrice: isItem ? draft.sellingPrice : null,
+          };
+        },
       }),
     });
     setPickerOpen(false);
@@ -242,11 +266,67 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
   const nameLabel = isGroup ? "Tên nhóm hàng hóa" : "Tên hàng hóa";
   const valueLabel = isAmount ? "Số tiền giảm" : "% giảm giá";
 
+  // Giá KM chỉ đọc, tính khi render bằng `promoPrice()` để làm tròn khớp domain
+  // (ADR-03). Đồng giá → ô Đồng giá cho mọi dòng đã chọn, kể cả `PRODUCT` (A-11);
+  // % / Số tiền → trống khi chưa có giá bán (`PRODUCT`, A-04) hoặc chưa nhập giá trị.
+  const promoPriceText = (row: GoodsDiscountRow): string => {
+    if (!row.targetId) return "";
+    const value = isFixedPrice ? form.goodsFixedPrice : row.value;
+    if (value === "") return "";
+    if (!isFixedPrice && row.sellingPrice == null) return "";
+    const mode = isFixedPrice
+      ? PromotionDiscountMode.FIXED_PRICE
+      : isAmount
+        ? PromotionDiscountMode.AMOUNT
+        : PromotionDiscountMode.PERCENT;
+    return formatMoneyInteger(promoPrice(row.sellingPrice ?? 0, mode, value));
+  };
+
+  // Độ rộng theo bộ cột đang hiện, để lưới 8 cột của phạm vi "Hàng hóa" không
+  // tràn ở 1440px.
+  const priceWidth = isFixedPrice ? "14%" : "13%";
+
+  // ĐVT / Giá bán / Giá KM chỉ có ở phạm vi "Hàng hóa" (AC-08).
+  const unitAndPriceColumns: LineColumn<GoodsDiscountRow>[] = isGroup
+    ? []
+    : [
+        {
+          key: "unit",
+          label: "ĐVT",
+          type: "readonly",
+          width: isFixedPrice ? "10%" : "8%",
+          filterSymbol: "*",
+        },
+        {
+          key: "sellingPrice",
+          label: "Giá bán",
+          type: "readonly",
+          width: priceWidth,
+          align: "right",
+          filterSymbol: "≤",
+          getValue: (row) =>
+            row.sellingPrice == null ? "" : formatMoneyInteger(row.sellingPrice),
+        },
+      ];
+  const promoPriceColumns: LineColumn<GoodsDiscountRow>[] = isGroup
+    ? []
+    : [
+        {
+          key: "promoPrice",
+          label: "Giá khuyến mại",
+          type: "readonly",
+          width: priceWidth,
+          align: "right",
+          filterSymbol: "≤",
+          getValue: promoPriceText,
+        },
+      ];
+
   const columns: LineColumn<GoodsDiscountRow>[] = [
     {
       key: "code",
       label: codeLabel,
-      width: "28%",
+      width: isGroup ? "28%" : isFixedPrice ? "22%" : "20%",
       filterSymbol: "*",
       placeholder: isGroup ? "Tìm mã hoặc tên nhóm hàng hóa" : "Tìm mã hoặc tên hàng hóa",
       renderEditor: (row) =>
@@ -262,6 +342,8 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
                 targetType: PromotionTargetType.CATEGORY,
                 code: item.code,
                 name: item.name,
+                unit: "",
+                sellingPrice: null,
               })
             }
             itemKey={(item) => item.id}
@@ -285,6 +367,8 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
                 targetType: PromotionTargetType.ITEM,
                 code: item.code,
                 name: item.name,
+                unit: item.unit ?? "",
+                sellingPrice: item.sellingPrice == null ? null : Number(item.sellingPrice),
               })
             }
             itemKey={(item) => item.id}
@@ -303,40 +387,46 @@ export function GoodsDiscountGrid({ form, onChange }: Props) {
       key: "name",
       label: nameLabel,
       type: "readonly",
-      width: "37%",
+      width: isGroup ? "37%" : isFixedPrice ? "38%" : "27%",
       filterSymbol: "*",
     },
-    {
-      key: "value",
-      label: valueLabel,
-      width: "20%",
-      align: "right",
-      renderEditor: (row) =>
-        isAmount ? (
-          <MoneyInput
-            className={`${CELL_INPUT_CLASS} text-right`}
-            value={row.value}
-            onChange={(v) => updateRow(row.id, { value: v })}
-          />
-        ) : (
-          <div className="flex items-center">
-            <span className="px-2 text-muted-foreground">≤</span>
-            <Input
-              type="number"
-              min={0}
-              className={`${CELL_INPUT_CLASS} text-right tabular-nums`}
-              disabled={isFixedPrice}
-              value={isPercent ? row.value : ""}
-              onChange={(e) =>
-                updateRow(row.id, {
-                  value: e.target.value === "" ? "" : Number(e.target.value),
-                })
-              }
-            />
-          </div>
-        ),
-    },
-    // Đồng giá không có giá trị theo dòng nên không có gì để chép.
+    ...unitAndPriceColumns,
+    // Đồng giá không có giá trị theo dòng nên bỏ cột giá trị ở mọi phạm vi (A-12)
+    // và cả cột copy xuống.
+    ...(isFixedPrice
+      ? []
+      : [
+          {
+            key: "value",
+            label: valueLabel,
+            width: isGroup ? "20%" : "14%",
+            align: "right",
+            renderEditor: (row) =>
+              isAmount ? (
+                <MoneyInput
+                  className={`${CELL_INPUT_CLASS} text-right`}
+                  value={row.value}
+                  onChange={(v) => updateRow(row.id, { value: v })}
+                />
+              ) : (
+                <div className="flex items-center">
+                  <span className="px-2 text-muted-foreground">≤</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className={`${CELL_INPUT_CLASS} text-right tabular-nums`}
+                    value={row.value}
+                    onChange={(e) =>
+                      updateRow(row.id, {
+                        value: e.target.value === "" ? "" : Number(e.target.value),
+                      })
+                    }
+                  />
+                </div>
+              ),
+          } satisfies LineColumn<GoodsDiscountRow>,
+        ]),
+    ...promoPriceColumns,
     ...(isFixedPrice
       ? []
       : [

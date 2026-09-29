@@ -21,12 +21,21 @@ function dto(method: PromotionDiscountMode, lines: ExportItemDiscountLinesDto['l
   return { method, lines } as ExportItemDiscountLinesDto;
 }
 
-async function readRows(buffer: Buffer): Promise<unknown[][]> {
+const PERCENT_SHEET = 'Giảm giá theo %';
+const AMOUNT_SHEET = 'Giảm giá theo số tiền';
+const FIXED_PRICE_SHEET = 'Đồng giá';
+
+/** Rows of every sheet, keyed by sheet name, in sheet order. */
+async function readSheets(buffer: Buffer): Promise<Record<string, unknown[][]>> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer as any);
-  const rows: unknown[][] = [];
-  wb.worksheets[0].eachRow((row) => rows.push((row.values as unknown[]).slice(1)));
-  return rows;
+  const sheets: Record<string, unknown[][]> = {};
+  for (const ws of wb.worksheets) {
+    const rows: unknown[][] = [];
+    ws.eachRow((row) => rows.push((row.values as unknown[]).slice(1)));
+    sheets[ws.name] = rows;
+  }
+  return sheets;
 }
 
 describe('ExportItemDiscountLinesHandler', () => {
@@ -85,14 +94,14 @@ describe('ExportItemDiscountLinesHandler', () => {
     );
 
     expect(buildSpy).toHaveBeenCalledWith(PromotionDiscountMode.PERCENT, [
-      { code: 'SKU-685', name: 'Hàng 685', unit: 'hộp', sellingPrice: 685000, value: 30 },
+      { code: 'SKU-685', name: 'Hàng 685', value: 30 },
     ]);
-    const rows = await readRows(buffer);
+    const rows = (await readSheets(buffer))[PERCENT_SHEET];
     expect(rows).toHaveLength(2); // header + SKU-685 only
     expect(rows[1][0]).toBe('SKU-685');
   });
 
-  it('AC-09: keeps request order and leaves unit/price empty for PRODUCT rows', async () => {
+  it('AC-12: keeps request order, writes code/name/value only into the method sheet', async () => {
     const buffer = await handler.execute(
       new ExportItemDiscountLinesQuery(
         dto(PromotionDiscountMode.PERCENT, [
@@ -105,29 +114,58 @@ describe('ExportItemDiscountLinesHandler', () => {
     );
 
     expect(buildSpy).toHaveBeenCalledWith(PromotionDiscountMode.PERCENT, [
-      { code: 'SKU-685', name: 'Hàng 685', unit: 'hộp', sellingPrice: 685000, value: 30 },
+      { code: 'SKU-685', name: 'Hàng 685', value: 30 },
       { code: 'PRD-1', name: 'Sản phẩm 1', value: 5 },
-      { code: 'SKU-100', name: 'Hàng 100', unit: 'cái', sellingPrice: 100000, value: 10 },
+      { code: 'SKU-100', name: 'Hàng 100', value: 10 },
     ]);
 
-    const rows = await readRows(buffer);
-    expect(rows[0]).toEqual(['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', '% giảm giá', 'Giá khuyến mại']);
-    expect(rows[1]).toEqual(['SKU-685', 'Hàng 685', 'hộp', 685000, 30, 479500]);
-    expect(rows[2][0]).toBe('PRD-1');
-    expect(rows[2][2]).toBeUndefined(); // ĐVT
-    expect(rows[2][3]).toBeUndefined(); // Giá bán
-    expect(rows[2][5]).toBeUndefined(); // Giá khuyến mại
-    expect(rows[3].slice(0, 2)).toEqual(['SKU-100', 'Hàng 100']);
+    const sheets = await readSheets(buffer);
+    expect(sheets[PERCENT_SHEET]).toEqual([
+      ['Mã SKU*', 'Tên hàng hóa', '% giảm giá'],
+      ['SKU-685', 'Hàng 685', 30],
+      ['PRD-1', 'Sản phẩm 1', 5],
+      ['SKU-100', 'Hàng 100', 10],
+    ]);
+    expect(sheets[AMOUNT_SHEET]).toEqual([['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm']]);
+    expect(sheets[FIXED_PRICE_SHEET]).toEqual([['Mã SKU*', 'Tên hàng hóa']]);
   });
 
-  it('builds a header-only template and skips DB queries when there are no lines', async () => {
+  it('AC-13: FIXED_PRICE writes code + name into the Đồng giá sheet, the other two stay header-only', async () => {
+    const buffer = await handler.execute(
+      new ExportItemDiscountLinesQuery(
+        dto(PromotionDiscountMode.FIXED_PRICE, [
+          { targetType: PromotionTargetType.ITEM, targetId: ITEM_685 },
+          { targetType: PromotionTargetType.ITEM, targetId: ITEM_100 },
+        ]),
+        actor,
+      ),
+    );
+
+    expect(buildSpy).toHaveBeenCalledWith(PromotionDiscountMode.FIXED_PRICE, [
+      { code: 'SKU-685', name: 'Hàng 685' },
+      { code: 'SKU-100', name: 'Hàng 100' },
+    ]);
+    const sheets = await readSheets(buffer);
+    expect(Object.keys(sheets)).toEqual([PERCENT_SHEET, AMOUNT_SHEET, FIXED_PRICE_SHEET]);
+    expect(sheets[FIXED_PRICE_SHEET]).toEqual([
+      ['Mã SKU*', 'Tên hàng hóa'],
+      ['SKU-685', 'Hàng 685'],
+      ['SKU-100', 'Hàng 100'],
+    ]);
+    expect(sheets[PERCENT_SHEET]).toEqual([['Mã SKU*', 'Tên hàng hóa', '% giảm giá']]);
+    expect(sheets[AMOUNT_SHEET]).toEqual([['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm']]);
+  });
+
+  it('builds a header-only 3-sheet template and skips DB queries when there are no lines', async () => {
     const buffer = await handler.execute(new ExportItemDiscountLinesQuery(dto(PromotionDiscountMode.AMOUNT, []), actor));
 
     expect(itemRepo.find).not.toHaveBeenCalled();
     expect(productRepo.find).not.toHaveBeenCalled();
-    const rows = await readRows(buffer);
-    expect(rows).toHaveLength(1);
-    expect(rows[0][4]).toBe('Số tiền giảm');
+    expect(await readSheets(buffer)).toEqual({
+      [PERCENT_SHEET]: [['Mã SKU*', 'Tên hàng hóa', '% giảm giá']],
+      [AMOUNT_SHEET]: [['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm']],
+      [FIXED_PRICE_SHEET]: [['Mã SKU*', 'Tên hàng hóa']],
+    });
   });
 });
 
@@ -141,15 +179,18 @@ describe('ExportItemDiscountLinesDto validation', () => {
     });
   }
 
-  it('accepts PERCENT and AMOUNT with ITEM/PRODUCT lines', async () => {
+  it('accepts PERCENT, AMOUNT and FIXED_PRICE with ITEM/PRODUCT lines', async () => {
     expect(await errorsFor({ method: 'PERCENT', lines: [line] })).toHaveLength(0);
     expect(
       await errorsFor({ method: 'AMOUNT', lines: [{ targetType: 'PRODUCT', targetId: PRODUCT_1 }] }),
     ).toHaveLength(0);
+    expect(
+      await errorsFor({ method: 'FIXED_PRICE', lines: [{ targetType: 'ITEM', targetId: ITEM_685 }] }),
+    ).toHaveLength(0);
   });
 
-  it('rejects FIXED_PRICE, CATEGORY targets, non-uuid ids and more than 2000 lines', async () => {
-    expect(await errorsFor({ method: 'FIXED_PRICE', lines: [line] })).not.toHaveLength(0);
+  it('rejects an unknown method, CATEGORY targets, non-uuid ids and more than 2000 lines', async () => {
+    expect(await errorsFor({ method: 'BOGO', lines: [line] })).not.toHaveLength(0);
     expect(await errorsFor({ method: 'PERCENT', lines: [{ ...line, targetType: 'CATEGORY' }] })).not.toHaveLength(0);
     expect(await errorsFor({ method: 'PERCENT', lines: [{ ...line, targetId: 'nope' }] })).not.toHaveLength(0);
     expect(await errorsFor({ method: 'PERCENT', lines: Array(2001).fill(line) })).not.toHaveLength(0);

@@ -110,6 +110,8 @@ export function blankGoodsDiscountRow(): GoodsDiscountRow {
     targetType: PromotionTargetType.ITEM,
     code: "",
     name: "",
+    unit: "",
+    sellingPrice: null,
     value: "",
   };
 }

@@ -13,7 +13,9 @@ import {
 import { PROMO_IDS, seedPromotionFixtures } from './setup/promotion-seed';
 
 /**
- * UOW-04 (2026092701-promotion-item-discount-import-export) —
+ * UOW-04 (2026092701-promotion-item-discount-import-export), extended by UOW-02
+ * (2026092801-promotion-item-discount-columns-sheets): sheet picked by method,
+ * legacy 1-sheet files still accepted, `FIXED_PRICE` reads codes only —
  * `POST /v2/promotions/item-discount-lines/import`.
  *
  * Files are built with exceljs inside the test, so every case uploads a real
@@ -27,8 +29,12 @@ describe('Promotion — item-discount lines import (e2e)', () => {
 
   const URL = '/v2/promotions/item-discount-lines/import';
   const EXPORT_URL = '/v2/promotions/item-discount-lines/export';
-  const HEADERS_PERCENT = ['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', '% giảm giá', 'Giá khuyến mại'];
-  const HEADERS_AMOUNT = ['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', 'Số tiền giảm', 'Giá khuyến mại'];
+  /** The 6-column, single `Sheet1` layout exported before 2026092801 (AC-18). */
+  const LEGACY_HEADERS_PERCENT = ['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', '% giảm giá', 'Giá khuyến mại'];
+  const LEGACY_HEADERS_AMOUNT = ['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', 'Số tiền giảm', 'Giá khuyến mại'];
+  const SHEET_PERCENT = 'Giảm giá theo %';
+  const SHEET_AMOUNT = 'Giảm giá theo số tiền';
+  const SHEET_FIXED = 'Đồng giá';
   const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
   /** A product (mẫu mã) in the test org, code distinct from every item code — AC-17. */
@@ -52,6 +58,22 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     const sheet = workbook.addWorksheet('Sheet1');
     sheet.addRow(headers);
     for (const row of rows) sheet.addRow(row);
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
+  interface SheetSpec {
+    name: string;
+    headers: string[];
+    rows: Cell[][];
+  }
+
+  async function buildWorkbook(sheets: SheetSpec[]): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    for (const spec of sheets) {
+      const sheet = workbook.addWorksheet(spec.name);
+      sheet.addRow(spec.headers);
+      for (const row of spec.rows) sheet.addRow(row);
+    }
     return Buffer.from(await workbook.xlsx.writeBuffer());
   }
 
@@ -171,8 +193,8 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     await app?.close();
   }, 120_000);
 
-  it('AC-14: PERCENT file with SKU-685=30, SKU-200=20 → 2 valid ITEM rows, 0 errors', async () => {
-    const file = await buildXlsx(HEADERS_PERCENT, [
+  it('[2026092801] AC-18 / [2026092701] AC-14: legacy 1-sheet 6-column PERCENT file → 2 valid ITEM rows, 0 errors', async () => {
+    const file = await buildXlsx(LEGACY_HEADERS_PERCENT, [
       ['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 30, 479_500],
       ['SKU-200', 'Phụ kiện 200', 'Cái', 200_000, 20, 160_000],
     ]);
@@ -187,6 +209,8 @@ describe('Promotion — item-discount lines import (e2e)', () => {
           targetId: PROMO_IDS.item685,
           code: 'SKU-685',
           name: 'Giày nữ 685',
+          unit: 'Cái',
+          sellingPrice: 685_000,
           value: 30,
         },
         {
@@ -195,6 +219,8 @@ describe('Promotion — item-discount lines import (e2e)', () => {
           targetId: PROMO_IDS.item200,
           code: 'SKU-200',
           name: 'Phụ kiện 200',
+          unit: 'Cái',
+          sellingPrice: 200_000,
           value: 20,
         },
       ],
@@ -202,7 +228,7 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     });
   });
 
-  it('AC-15: each bad row comes back with its Excel row number and a Vietnamese reason; valid rows survive', async () => {
+  it('[2026092701] AC-15: each bad row comes back with its Excel row number and a Vietnamese reason; valid rows survive', async () => {
     const file = await percentFile([
       ['SKU-685', 30], // 2 valid
       ['KHONG-TON-TAI', 10], // 3 not found
@@ -234,7 +260,7 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     ]);
   });
 
-  it('AC-15: AMOUNT — non-positive amounts are rejected with the amount message', async () => {
+  it('[2026092701] AC-15: AMOUNT — non-positive amounts are rejected with the amount message', async () => {
     const file = await buildXlsx(['Mã SKU*', 'Số tiền giảm'], [
       ['SKU-685', 50_000],
       ['SKU-100', 0],
@@ -252,9 +278,9 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     ]);
   });
 
-  describe('AC-16: file-level column problems → 400, no rows', () => {
+  describe('[2026092701] AC-16: file-level column problems → 400, no rows', () => {
     it('"Số tiền giảm" column with method=PERCENT', async () => {
-      const file = await buildXlsx(HEADERS_AMOUNT, [['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 50_000, 635_000]]);
+      const file = await buildXlsx(LEGACY_HEADERS_AMOUNT, [['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 50_000, 635_000]]);
 
       const res = await upload(file, 'PERCENT').expect(400);
 
@@ -279,14 +305,14 @@ describe('Promotion — item-discount lines import (e2e)', () => {
       expect(res.body.rows).toBeUndefined();
     });
 
-    it('method=FIXED_PRICE is rejected by validation', async () => {
+    it('an unknown method is rejected by validation', async () => {
       const file = await percentFile([['SKU-685', 30]]);
 
-      await upload(file, 'FIXED_PRICE').expect(400);
+      await upload(file, 'BUY_X_GET_Y').expect(400);
     });
   });
 
-  it('AC-17: case/whitespace-insensitive codes; a product code resolves to PRODUCT', async () => {
+  it('[2026092701] AC-17: case/whitespace-insensitive codes; a product code resolves to PRODUCT', async () => {
     const file = await percentFile([
       [' sku-685 ', 30],
       [`  ${PRODUCT_CODE.toLowerCase()} `, 15],
@@ -302,6 +328,8 @@ describe('Promotion — item-discount lines import (e2e)', () => {
           targetId: PROMO_IDS.item685,
           code: 'SKU-685',
           name: 'Giày nữ 685',
+          unit: 'Cái',
+          sellingPrice: 685_000,
           value: 30,
         },
         {
@@ -317,7 +345,7 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     });
   });
 
-  it('AC-18: item and product codes of another organization are "not found"', async () => {
+  it('[2026092701] AC-18: item and product codes of another organization are "not found"', async () => {
     const file = await percentFile([
       ['SKU-ORGB', 10],
       ['MM-ORGB', 10],
@@ -337,7 +365,7 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     expect(flat).not.toContain('Org B');
   });
 
-  describe('AC-19: size and format limits', () => {
+  describe('[2026092701] AC-19: size and format limits', () => {
     const codeRows = (n: number): Cell[][] =>
       Array.from({ length: n }, (_, i) => [`GEN-${String(i + 1).padStart(4, '0')}`, 10]);
 
@@ -381,7 +409,176 @@ describe('Promotion — item-discount lines import (e2e)', () => {
     });
   });
 
-  describe('AC-20: round-trip — importing an exported file returns the same targetIds and values', () => {
+  describe('[2026092801] AC-15: a 3-sheet file is read from the sheet of the chosen method only', () => {
+    const threeSheetFile = () =>
+      buildWorkbook([
+        { name: SHEET_PERCENT, headers: ['Mã SKU*', 'Tên hàng hóa', '% giảm giá'], rows: [['SKU-685', 'Giày nữ 685', 30]] },
+        {
+          name: SHEET_AMOUNT,
+          headers: ['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm'],
+          rows: [['SKU-200', 'Phụ kiện 200', 20_000]],
+        },
+        { name: SHEET_FIXED, headers: ['Mã SKU*', 'Tên hàng hóa'], rows: [] },
+      ]);
+
+    it('AMOUNT → only SKU-200 (20.000) from "Giảm giá theo số tiền"', async () => {
+      const res = await upload(await threeSheetFile(), 'AMOUNT').expect(200);
+
+      expect(res.body).toEqual({
+        rows: [
+          {
+            rowNumber: 2,
+            targetType: 'ITEM',
+            targetId: PROMO_IDS.item200,
+            code: 'SKU-200',
+            name: 'Phụ kiện 200',
+            unit: 'Cái',
+            sellingPrice: 200_000,
+            value: 20_000,
+          },
+        ],
+        errors: [],
+      });
+    });
+
+    it('PERCENT → only SKU-685 (30) from "Giảm giá theo %"', async () => {
+      const res = await upload(await threeSheetFile(), 'PERCENT').expect(200);
+
+      expect(res.body.errors).toEqual([]);
+      expect(res.body.rows).toEqual([
+        expect.objectContaining({ rowNumber: 2, targetId: PROMO_IDS.item685, code: 'SKU-685', value: 30 }),
+      ]);
+    });
+
+    it('sheet names match after trim, case-insensitively', async () => {
+      const file = await buildWorkbook([
+        { name: '  GIẢM GIÁ THEO SỐ TIỀN ', headers: ['Mã SKU*', 'Số tiền giảm'], rows: [['SKU-200', 20_000]] },
+        { name: 'Ghi chú', headers: ['Mã SKU*', '% giảm giá'], rows: [['SKU-685', 30]] },
+      ]);
+
+      const res = await upload(file, 'AMOUNT').expect(200);
+
+      expect(res.body.errors).toEqual([]);
+      expect(res.body.rows).toEqual([expect.objectContaining({ targetId: PROMO_IDS.item200, value: 20_000 })]);
+    });
+  });
+
+  it('[2026092801] AC-16: FIXED_PRICE — blank code skipped, unknown code and duplicates reported, valid row has no value', async () => {
+    const file = await buildWorkbook([
+      { name: SHEET_PERCENT, headers: ['Mã SKU*', 'Tên hàng hóa', '% giảm giá'], rows: [] },
+      { name: SHEET_AMOUNT, headers: ['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm'], rows: [] },
+      {
+        name: SHEET_FIXED,
+        headers: ['Mã SKU*', 'Tên hàng hóa'],
+        rows: [
+          ['SKU-685', 'Giày nữ 685'], // 2 duplicate of 6
+          ['SKU-200', 'Phụ kiện 200'], // 3 valid
+          [null, 'Dòng không có mã'], // 4 blank code → skipped silently
+          ['KHONG-TON-TAI', 'Không có'], // 5 not found
+          ['sku-685', 'Giày nữ 685'], // 6 duplicate of 2 (case-insensitive)
+        ],
+      },
+    ]);
+
+    const res = await upload(file, 'FIXED_PRICE').expect(200);
+
+    // toEqual on the whole row: a `value` key on a FIXED_PRICE line would fail here.
+    expect(res.body).toEqual({
+      rows: [
+        {
+          rowNumber: 3,
+          targetType: 'ITEM',
+          targetId: PROMO_IDS.item200,
+          code: 'SKU-200',
+          name: 'Phụ kiện 200',
+          unit: 'Cái',
+          sellingPrice: 200_000,
+        },
+      ],
+      errors: [
+        { rowNumber: 2, code: 'SKU-685', message: 'Mã SKU bị trùng trong file (dòng 2, 6)' },
+        { rowNumber: 5, code: 'KHONG-TON-TAI', message: "Không tìm thấy hàng hóa có mã 'KHONG-TON-TAI'" },
+        { rowNumber: 6, code: 'sku-685', message: 'Mã SKU bị trùng trong file (dòng 2, 6)' },
+      ],
+    });
+  });
+
+  describe("[2026092801] AC-17: a multi-sheet file without the method's sheet → 400, no rows", () => {
+    it('PERCENT, sheets "Sheet1" + "Sheet2"', async () => {
+      const file = await buildWorkbook([
+        { name: 'Sheet1', headers: ['Mã SKU*', '% giảm giá'], rows: [['SKU-685', 30]] },
+        { name: 'Sheet2', headers: ['Mã SKU*', '% giảm giá'], rows: [['SKU-100', 10]] },
+      ]);
+
+      const res = await upload(file, 'PERCENT').expect(400);
+
+      expect(res.body.message).toBe("File không có sheet 'Giảm giá theo %'");
+      expect(res.body.rows).toBeUndefined();
+    });
+
+    it('FIXED_PRICE, the two value sheets present but "Đồng giá" missing', async () => {
+      const file = await buildWorkbook([
+        { name: SHEET_PERCENT, headers: ['Mã SKU*', 'Tên hàng hóa', '% giảm giá'], rows: [['SKU-685', 'x', 30]] },
+        { name: SHEET_AMOUNT, headers: ['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm'], rows: [] },
+      ]);
+
+      const res = await upload(file, 'FIXED_PRICE').expect(400);
+
+      expect(res.body.message).toBe("File không có sheet 'Đồng giá'");
+    });
+  });
+
+  describe('[2026092801] AC-18: a legacy 1-sheet 6-column "% giảm giá" file is still accepted', () => {
+    const legacyPercentFile = () =>
+      buildXlsx(LEGACY_HEADERS_PERCENT, [
+        ['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 30, 479_500],
+        ['SKU-200', 'Phụ kiện 200', 'Cái', 200_000, 'abc', null],
+        [null, 'Không có mã', null, null, 150, null],
+      ]);
+
+    it('FIXED_PRICE reads the codes and ignores the value column (A-10)', async () => {
+      const res = await upload(await legacyPercentFile(), 'FIXED_PRICE').expect(200);
+
+      expect(res.body).toEqual({
+        rows: [
+          {
+            rowNumber: 2,
+            targetType: 'ITEM',
+            targetId: PROMO_IDS.item685,
+            code: 'SKU-685',
+            name: 'Giày nữ 685',
+            unit: 'Cái',
+            sellingPrice: 685_000,
+          },
+          {
+            rowNumber: 3,
+            targetType: 'ITEM',
+            targetId: PROMO_IDS.item200,
+            code: 'SKU-200',
+            name: 'Phụ kiện 200',
+            unit: 'Cái',
+            sellingPrice: 200_000,
+          },
+        ],
+        errors: [],
+      });
+    });
+
+    it('AMOUNT → 400, the column does not match the method', async () => {
+      const res = await upload(await legacyPercentFile(), 'AMOUNT').expect(400);
+
+      expect(res.body.message).toBe("File có cột '% giảm giá' nhưng chương trình đang giảm theo số tiền");
+      expect(res.body.rows).toBeUndefined();
+    });
+  });
+
+  describe('[2026092801] AC-19: round-trip — importing an exported 3-sheet file returns the same targets', () => {
+    const PRICE_BY_ITEM: Record<string, number> = {
+      [PROMO_IDS.item685]: 685_000,
+      [PROMO_IDS.item100]: 100_000,
+      [PROMO_IDS.item200]: 200_000,
+    };
+
     it.each([
       [
         'PERCENT',
@@ -398,19 +595,42 @@ describe('Promotion — item-discount lines import (e2e)', () => {
           { targetType: 'ITEM', targetId: PROMO_IDS.item100, value: 150_000 },
         ],
       ],
-    ])('%s', async (method, lines) => {
+      [
+        'FIXED_PRICE',
+        [
+          { targetType: 'ITEM', targetId: PROMO_IDS.item685 },
+          { targetType: 'ITEM', targetId: PROMO_IDS.item200 },
+          { targetType: 'PRODUCT', targetId: PRODUCT_ID },
+        ],
+      ],
+    ])('%s', async (method, lines: { targetType: string; targetId: string; value?: number }[]) => {
       const exported = await exportFile({ method, lines });
 
       const res = await upload(exported, method).expect(200);
 
       expect(res.body.errors).toEqual([]);
+      type Row = { targetType: string; targetId: string; value?: number; unit?: string; sellingPrice?: number };
+      const rows = res.body.rows as Row[];
       expect(
-        res.body.rows.map((r: { targetType: string; targetId: string; value: number }) => ({
+        rows.map((r) => ({
           targetType: r.targetType,
           targetId: r.targetId,
-          value: r.value,
+          ...(r.value !== undefined && { value: r.value }),
         })),
       ).toEqual(lines);
+      if (method === 'FIXED_PRICE') {
+        for (const r of rows) expect(r).not.toHaveProperty('value');
+      }
+
+      // A-14: ITEM rows carry unit + selling price read from the DB; PRODUCT rows carry neither.
+      for (const r of rows) {
+        if (r.targetType === 'ITEM') {
+          expect(r).toMatchObject({ unit: 'Cái', sellingPrice: PRICE_BY_ITEM[r.targetId] });
+        } else {
+          expect(r).not.toHaveProperty('unit');
+          expect(r).not.toHaveProperty('sellingPrice');
+        }
+      }
     });
   });
 

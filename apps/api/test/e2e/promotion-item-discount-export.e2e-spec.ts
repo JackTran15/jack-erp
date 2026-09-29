@@ -13,7 +13,8 @@ import {
 import { PROMO_IDS, seedPromotionFixtures } from './setup/promotion-seed';
 
 /**
- * UOW-03 (2026092701-promotion-item-discount-import-export) —
+ * UOW-03 (2026092701-promotion-item-discount-import-export), reshaped by UOW-02
+ * (2026092801-promotion-item-discount-columns-sheets): one file, 3 sheets —
  * `POST /v2/promotions/item-discount-lines/export`.
  *
  * Every case reads the returned bytes back with exceljs: a controller that lets a
@@ -26,10 +27,14 @@ describe('Promotion — item-discount lines export (e2e)', () => {
   let ds: DataSource;
 
   const URL = '/v2/promotions/item-discount-lines/export';
-  const HEADERS_PERCENT = ['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', '% giảm giá', 'Giá khuyến mại'];
-  const HEADERS_AMOUNT = ['Mã SKU*', 'Tên hàng hóa', 'Đơn vị tính', 'Giá bán', 'Số tiền giảm', 'Giá khuyến mại'];
+  const SHEET_PERCENT = 'Giảm giá theo %';
+  const SHEET_AMOUNT = 'Giảm giá theo số tiền';
+  const SHEET_FIXED = 'Đồng giá';
+  const HEADERS_PERCENT = ['Mã SKU*', 'Tên hàng hóa', '% giảm giá'];
+  const HEADERS_AMOUNT = ['Mã SKU*', 'Tên hàng hóa', 'Số tiền giảm'];
+  const HEADERS_FIXED = ['Mã SKU*', 'Tên hàng hóa'];
 
-  /** An item that lives in another organization — AC-12. */
+  /** An item that lives in another organization — 2026092701 AC-12. */
   const ORG_B = 'a0000000-0000-4000-8000-0000000000b3';
   const ORG_B_ITEM = 'e2000000-0000-4000-8000-0000000000b3';
 
@@ -53,16 +58,17 @@ describe('Promotion — item-discount lines export (e2e)', () => {
         response.on('end', () => callback(null, Buffer.concat(chunks)));
       });
 
-  /** Every row of the first sheet as plain cell values, header row included. */
-  async function readRows(body: Buffer): Promise<unknown[][]> {
+  /** Every sheet in workbook order: its name and every row as plain cell values, header included. */
+  async function readSheets(body: Buffer): Promise<{ name: string; rows: unknown[][] }[]> {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(body as unknown as ArrayBuffer);
-    const sheet = workbook.worksheets[0];
-    const rows: unknown[][] = [];
-    sheet.eachRow({ includeEmpty: false }, (row) => {
-      rows.push((row.values as unknown[]).slice(1));
+    return workbook.worksheets.map((sheet) => {
+      const rows: unknown[][] = [];
+      sheet.eachRow({ includeEmpty: false }, (row) => {
+        rows.push((row.values as unknown[]).slice(1));
+      });
+      return { name: sheet.name, rows };
     });
-    return rows;
   }
 
   // Booting AppModule wires every Kafka consumer (~130s on a local docker stack).
@@ -73,7 +79,7 @@ describe('Promotion — item-discount lines export (e2e)', () => {
     await seedPromotionFixtures(app, base);
     ds = app.get(DataSource);
 
-    // AC-12: a second organization owning one item with a recognisable code/name.
+    // 2026092701 AC-12: a second organization owning one item with a recognisable code/name.
     await ds.query(
       `INSERT INTO organizations (id, organization_id, name, contact_email, status, created_by, created_at, updated_at)
        VALUES ($1::uuid, $1::uuid, 'Org B', 'b-export@test.com', 'ACTIVE', $2::uuid, NOW(), NOW())
@@ -131,7 +137,7 @@ describe('Promotion — item-discount lines export (e2e)', () => {
     await app?.close();
   }, 120_000);
 
-  it('AC-09: PERCENT — headers, request order, 685.000 × 30% = 479.500', async () => {
+  it('[2026092801] AC-12: PERCENT — 3 sheets in order, data only in "Giảm giá theo %", 2–3 columns', async () => {
     const res = await exportLines({
       method: 'PERCENT',
       lines: [
@@ -145,15 +151,23 @@ describe('Promotion — item-discount lines export (e2e)', () => {
     );
     expect(res.headers['content-disposition']).toBe('attachment; filename="GiamGiaHangHoa.xlsx"');
 
-    const rows = await readRows(res.body as Buffer);
-    expect(rows).toEqual([
-      HEADERS_PERCENT,
-      ['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 30, 479_500],
-      ['SKU-100', 'Phụ kiện 100', 'Cái', 100_000, 10, 90_000],
+    const sheets = await readSheets(res.body as Buffer);
+    expect(sheets).toEqual([
+      {
+        name: SHEET_PERCENT,
+        rows: [HEADERS_PERCENT, ['SKU-685', 'Giày nữ 685', 30], ['SKU-100', 'Phụ kiện 100', 10]],
+      },
+      { name: SHEET_AMOUNT, rows: [HEADERS_AMOUNT] },
+      { name: SHEET_FIXED, rows: [HEADERS_FIXED] },
     ]);
+
+    const flat = JSON.stringify(sheets);
+    for (const dropped of ['Đơn vị tính', 'Giá bán', 'Giá khuyến mại']) {
+      expect(flat).not.toContain(dropped);
+    }
   });
 
-  it('AC-09: rows follow the request order, not the DB order', async () => {
+  it('[2026092801] AC-12: rows follow the request order, not the DB order', async () => {
     const res = await exportLines({
       method: 'PERCENT',
       lines: [
@@ -163,11 +177,11 @@ describe('Promotion — item-discount lines export (e2e)', () => {
       ],
     }).expect(200);
 
-    const rows = await readRows(res.body as Buffer);
-    expect(rows.slice(1).map((r) => r[0])).toEqual(['SKU-300', 'SKU-100', 'SKU-685']);
+    const [percent] = await readSheets(res.body as Buffer);
+    expect(percent.rows.slice(1).map((r) => r[0])).toEqual(['SKU-300', 'SKU-100', 'SKU-685']);
   });
 
-  it('AC-10: AMOUNT — "Số tiền giảm" header, promo price floors at 0', async () => {
+  it('[2026092801] AMOUNT — data only in "Giảm giá theo số tiền" with the amount value', async () => {
     const res = await exportLines({
       method: 'AMOUNT',
       lines: [
@@ -176,26 +190,54 @@ describe('Promotion — item-discount lines export (e2e)', () => {
       ],
     }).expect(200);
 
-    const rows = await readRows(res.body as Buffer);
-    expect(rows).toEqual([
-      HEADERS_AMOUNT,
-      ['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 50_000, 635_000],
-      ['SKU-100', 'Phụ kiện 100', 'Cái', 100_000, 150_000, 0],
+    const sheets = await readSheets(res.body as Buffer);
+    expect(sheets).toEqual([
+      { name: SHEET_PERCENT, rows: [HEADERS_PERCENT] },
+      {
+        name: SHEET_AMOUNT,
+        rows: [HEADERS_AMOUNT, ['SKU-685', 'Giày nữ 685', 50_000], ['SKU-100', 'Phụ kiện 100', 150_000]],
+      },
+      { name: SHEET_FIXED, rows: [HEADERS_FIXED] },
     ]);
   });
 
-  it.each([
-    ['PERCENT', HEADERS_PERCENT],
-    ['AMOUNT', HEADERS_AMOUNT],
-  ])('AC-11: %s with no lines — template with the header row only', async (method, headers) => {
-    const res = await exportLines({ method, lines: [] }).expect(200);
+  it('[2026092801] AC-13: FIXED_PRICE — code + name in "Đồng giá", the other two sheets header only', async () => {
+    const res = await exportLines({
+      method: 'FIXED_PRICE',
+      lines: [
+        { targetType: 'ITEM', targetId: PROMO_IDS.item685 },
+        { targetType: 'ITEM', targetId: PROMO_IDS.item200 },
+      ],
+    }).expect(200);
 
     expect(res.headers['content-disposition']).toBe('attachment; filename="GiamGiaHangHoa.xlsx"');
-    const rows = await readRows(res.body as Buffer);
-    expect(rows).toEqual([headers]);
+    const sheets = await readSheets(res.body as Buffer);
+    expect(sheets).toEqual([
+      { name: SHEET_PERCENT, rows: [HEADERS_PERCENT] },
+      { name: SHEET_AMOUNT, rows: [HEADERS_AMOUNT] },
+      {
+        name: SHEET_FIXED,
+        rows: [HEADERS_FIXED, ['SKU-685', 'Giày nữ 685'], ['SKU-200', 'Phụ kiện 200']],
+      },
+    ]);
   });
 
-  it('AC-12: a targetId from another organization is dropped without leaking its code or name', async () => {
+  it.each(['PERCENT', 'AMOUNT', 'FIXED_PRICE'])(
+    '[2026092801] AC-14: %s with no lines — template with 3 header-only sheets',
+    async (method) => {
+      const res = await exportLines({ method, lines: [] }).expect(200);
+
+      expect(res.headers['content-disposition']).toBe('attachment; filename="GiamGiaHangHoa.xlsx"');
+      const sheets = await readSheets(res.body as Buffer);
+      expect(sheets).toEqual([
+        { name: SHEET_PERCENT, rows: [HEADERS_PERCENT] },
+        { name: SHEET_AMOUNT, rows: [HEADERS_AMOUNT] },
+        { name: SHEET_FIXED, rows: [HEADERS_FIXED] },
+      ]);
+    },
+  );
+
+  it('[2026092701] AC-12: a targetId from another organization is dropped without leaking its code or name', async () => {
     const res = await exportLines({
       method: 'PERCENT',
       lines: [
@@ -204,10 +246,10 @@ describe('Promotion — item-discount lines export (e2e)', () => {
       ],
     }).expect(200);
 
-    const rows = await readRows(res.body as Buffer);
-    expect(rows).toEqual([HEADERS_PERCENT, ['SKU-685', 'Giày nữ 685', 'Cái', 685_000, 30, 479_500]]);
+    const sheets = await readSheets(res.body as Buffer);
+    expect(sheets[0].rows).toEqual([HEADERS_PERCENT, ['SKU-685', 'Giày nữ 685', 30]]);
 
-    const flat = JSON.stringify(rows);
+    const flat = JSON.stringify(sheets);
     expect(flat).not.toContain('SKU-ORGB');
     expect(flat).not.toContain('Org B');
   });

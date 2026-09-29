@@ -3,12 +3,19 @@ import * as ExcelJS from 'exceljs';
 import { PromotionDiscountMode } from '@erp/shared-interfaces';
 import { applyWorkbookFont } from '../../../../common/utils/excel-workbook-font.util';
 
-/** Phương thức giảm giá có nhập/xuất Excel. `FIXED_PRICE` không có (ADR-04). */
+/** Phương thức giảm giá có nhập/xuất Excel: mỗi phương thức một sheet (ADR-01). */
 export type ItemDiscountWorkbookMethod =
   | PromotionDiscountMode.PERCENT
-  | PromotionDiscountMode.AMOUNT;
+  | PromotionDiscountMode.AMOUNT
+  | PromotionDiscountMode.FIXED_PRICE;
 
-/** Một dòng xuất ra file. Trống `sellingPrice` hoặc `value` thì ô giá KM để trống. */
+/** Phương thức có cột giá trị trong sheet. */
+type ItemDiscountValueMethod = PromotionDiscountMode.PERCENT | PromotionDiscountMode.AMOUNT;
+
+/**
+ * Một dòng xuất ra file. `value` chỉ ghi ở sheet có cột giá trị.
+ * `unit` / `sellingPrice` không còn được xuất (AC-12); giữ optional để handler cũ còn biên dịch.
+ */
 export interface ItemDiscountWorkbookLine {
   code: string;
   name: string;
@@ -17,42 +24,38 @@ export interface ItemDiscountWorkbookLine {
   value?: number | null;
 }
 
-export type ItemDiscountColumnKey =
-  | 'code'
-  | 'name'
-  | 'unit'
-  | 'sellingPrice'
-  | 'value'
-  | 'promoPrice';
-
-export interface ItemDiscountColumn {
-  key: ItemDiscountColumnKey;
-  /** Tiêu đề cố định; cột `value` lấy theo phương thức qua `itemDiscountValueHeader`. */
-  header?: string;
-  width: number;
+export interface ItemDiscountSheet {
+  method: ItemDiscountWorkbookMethod;
+  /** Tên sheet trong file. */
+  name: string;
+  /** Tiêu đề cột giá trị; `null` khi sheet không có cột giá trị (Đồng giá, A-01). */
+  valueHeader: string | null;
 }
 
-/** Định nghĩa cột duy nhất cho cả `build` và `parse` (ADR-04, A-10). */
-export const ITEM_DISCOUNT_COLUMNS: readonly ItemDiscountColumn[] = [
-  { key: 'code', header: 'Mã SKU*', width: 18 },
-  { key: 'name', header: 'Tên hàng hóa', width: 36 },
-  { key: 'unit', header: 'Đơn vị tính', width: 14 },
-  { key: 'sellingPrice', header: 'Giá bán', width: 14 },
-  { key: 'value', width: 16 },
-  { key: 'promoPrice', header: 'Giá khuyến mại', width: 16 },
+/** Nguồn duy nhất của bố cục file cho cả `build` và `parse`, theo thứ tự sheet (ADR-01, A-06). */
+export const ITEM_DISCOUNT_SHEETS: readonly ItemDiscountSheet[] = [
+  { method: PromotionDiscountMode.PERCENT, name: 'Giảm giá theo %', valueHeader: '% giảm giá' },
+  { method: PromotionDiscountMode.AMOUNT, name: 'Giảm giá theo số tiền', valueHeader: 'Số tiền giảm' },
+  { method: PromotionDiscountMode.FIXED_PRICE, name: 'Đồng giá', valueHeader: null },
 ];
 
-const VALUE_HEADER_BY_METHOD: Record<ItemDiscountWorkbookMethod, string> = {
-  [PromotionDiscountMode.PERCENT]: '% giảm giá',
-  [PromotionDiscountMode.AMOUNT]: 'Số tiền giảm',
-};
+const CODE_HEADER = 'Mã SKU*';
+const NAME_HEADER = 'Tên hàng hóa';
+/** Độ rộng cột theo thứ tự: mã, tên, giá trị. */
+const COLUMN_WIDTHS = [18, 36, 16];
 
-export function itemDiscountValueHeader(method: ItemDiscountWorkbookMethod): string {
-  return VALUE_HEADER_BY_METHOD[method];
+export function itemDiscountSheet(method: ItemDiscountWorkbookMethod): ItemDiscountSheet {
+  return ITEM_DISCOUNT_SHEETS.find((sheet) => sheet.method === method)!;
 }
 
+export function itemDiscountValueHeader(method: ItemDiscountWorkbookMethod): string | null {
+  return itemDiscountSheet(method).valueHeader;
+}
+
+/** Tiêu đề cột của sheet: `Mã SKU*`, `Tên hàng hóa`, rồi cột giá trị nếu có. */
 export function itemDiscountHeaders(method: ItemDiscountWorkbookMethod): string[] {
-  return ITEM_DISCOUNT_COLUMNS.map((col) => col.header ?? itemDiscountValueHeader(method));
+  const valueHeader = itemDiscountValueHeader(method);
+  return valueHeader === null ? [CODE_HEADER, NAME_HEADER] : [CODE_HEADER, NAME_HEADER, valueHeader];
 }
 
 /** Chuẩn hoá tiêu đề để so khớp khi nhập: bỏ `*`, trim, không phân biệt hoa thường. */
@@ -66,40 +69,31 @@ function toNumber(value: number | string | null | undefined): number | undefined
   return Number.isFinite(n) ? n : undefined;
 }
 
-export function itemDiscountPromoPrice(
-  method: ItemDiscountWorkbookMethod,
-  sellingPrice: number | null | undefined,
-  value: number | null | undefined,
-): number | undefined {
-  const price = toNumber(sellingPrice);
-  const v = toNumber(value);
-  if (price === undefined || v === undefined) return undefined;
-  return method === PromotionDiscountMode.PERCENT
-    ? Math.round(price * (1 - v / 100))
-    : Math.max(0, price - v);
-}
-
-/** Dựng file `.xlsx`: hàng 1 là tiêu đề, các dòng sau giữ đúng thứ tự `lines`. */
+/**
+ * Dựng file `.xlsx` đủ 3 sheet theo `ITEM_DISCOUNT_SHEETS`. Chỉ sheet của `method` có dòng dữ liệu,
+ * giữ đúng thứ tự `lines`; hai sheet kia chỉ có hàng tiêu đề (A-07). `lines: []` là file mẫu.
+ */
 export async function buildItemDiscountWorkbook(
   method: ItemDiscountWorkbookMethod,
   lines: ItemDiscountWorkbookLine[],
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Sheet1');
-  sheet.columns = ITEM_DISCOUNT_COLUMNS.map((col) => ({ width: col.width }));
+  for (const def of ITEM_DISCOUNT_SHEETS) {
+    const sheet = workbook.addWorksheet(def.name);
+    const headers = itemDiscountHeaders(def.method);
+    sheet.columns = headers.map((_, i) => ({ width: COLUMN_WIDTHS[i] }));
 
-  const headerRow = sheet.addRow(itemDiscountHeaders(method));
-  headerRow.font = { bold: true };
+    const headerRow = sheet.addRow(headers);
+    headerRow.font = { bold: true };
 
-  for (const line of lines) {
-    sheet.addRow([
-      line.code,
-      line.name,
-      line.unit ?? null,
-      toNumber(line.sellingPrice) ?? null,
-      toNumber(line.value) ?? null,
-      itemDiscountPromoPrice(method, line.sellingPrice, line.value) ?? null,
-    ]);
+    if (def.method !== method) continue;
+    for (const line of lines) {
+      sheet.addRow(
+        def.valueHeader === null
+          ? [line.code, line.name]
+          : [line.code, line.name, toNumber(line.value) ?? null],
+      );
+    }
   }
 
   applyWorkbookFont(workbook);
@@ -116,16 +110,16 @@ export interface ItemDiscountWorkbookRow {
   rowNumber: number;
   /** Mã SKU đã trim; `''` khi ô trống. */
   code: string;
-  /** Giá trị thô của ô cột giá trị: số, chuỗi, `null`, ... */
+  /** Giá trị thô của ô cột giá trị: số, chuỗi, `null`, ... Luôn `null` với `FIXED_PRICE`. */
   rawValue: unknown;
 }
 
-const OTHER_METHOD: Record<ItemDiscountWorkbookMethod, ItemDiscountWorkbookMethod> = {
+const OTHER_METHOD: Record<ItemDiscountValueMethod, ItemDiscountValueMethod> = {
   [PromotionDiscountMode.PERCENT]: PromotionDiscountMode.AMOUNT,
   [PromotionDiscountMode.AMOUNT]: PromotionDiscountMode.PERCENT,
 };
 
-const METHOD_LABEL: Record<ItemDiscountWorkbookMethod, string> = {
+const METHOD_LABEL: Record<ItemDiscountValueMethod, string> = {
   [PromotionDiscountMode.PERCENT]: '%',
   [PromotionDiscountMode.AMOUNT]: 'số tiền',
 };
@@ -154,8 +148,22 @@ function isEmptyRaw(raw: unknown): boolean {
 }
 
 /**
- * Đọc file nhập khẩu: tìm cột `Mã SKU` + cột giá trị theo tiêu đề đã chuẩn hoá ở hàng 1
- * (ADR-04), bỏ dòng trống. Lỗi mức file ném 400 theo bảng lỗi của design.
+ * Chọn sheet theo ADR-02: tên (trim, không phân biệt hoa thường) trùng sheet của `method`;
+ * không có mà file chỉ có một sheet thì dùng sheet đó (mẫu cũ, A-05); còn lại 400 (A-08).
+ */
+function pickSheet(workbook: ExcelJS.Workbook, method: ItemDiscountWorkbookMethod): ExcelJS.Worksheet {
+  const target = itemDiscountSheet(method).name;
+  const key = target.trim().toLowerCase();
+  const byName = workbook.worksheets.find((ws) => ws.name.trim().toLowerCase() === key);
+  if (byName) return byName;
+  if (workbook.worksheets.length === 1) return workbook.worksheets[0];
+  throw new BadRequestException(`File không có sheet '${target}'`);
+}
+
+/**
+ * Đọc file nhập khẩu: chọn sheet theo phương thức (ADR-02), tìm cột `Mã SKU` + cột giá trị theo
+ * tiêu đề đã chuẩn hoá ở hàng 1, bỏ dòng trống. `FIXED_PRICE` chỉ cần cột mã, cột giá trị nếu có
+ * thì bỏ qua và `rawValue` luôn `null` (A-10). Lỗi mức file ném 400 theo bảng lỗi của design.
  */
 export async function parseItemDiscountWorkbook(
   buffer: Buffer,
@@ -167,8 +175,8 @@ export async function parseItemDiscountWorkbook(
   } catch {
     throw new BadRequestException('File không đúng định dạng .xlsx');
   }
-  const sheet = workbook.worksheets[0];
-  if (!sheet) throw new BadRequestException('File không đúng định dạng .xlsx');
+  if (workbook.worksheets.length === 0) throw new BadRequestException('File không đúng định dạng .xlsx');
+  const sheet = pickSheet(workbook, method);
 
   const columnByHeader = new Map<string, number>();
   sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
@@ -176,29 +184,31 @@ export async function parseItemDiscountWorkbook(
     if (header && !columnByHeader.has(header)) columnByHeader.set(header, colNumber);
   });
 
-  const codeHeader = ITEM_DISCOUNT_COLUMNS.find((col) => col.key === 'code')!.header!;
-  const codeCol = columnByHeader.get(normalizeItemDiscountHeader(codeHeader));
+  const codeCol = columnByHeader.get(normalizeItemDiscountHeader(CODE_HEADER));
   if (codeCol === undefined) {
-    throw new BadRequestException(`File thiếu cột '${normalizeHeaderLabel(codeHeader)}'`);
+    throw new BadRequestException(`File thiếu cột '${normalizeHeaderLabel(CODE_HEADER)}'`);
   }
 
-  const valueHeader = itemDiscountValueHeader(method);
-  const valueCol = columnByHeader.get(normalizeItemDiscountHeader(valueHeader));
-  if (valueCol === undefined) {
-    const otherHeader = itemDiscountValueHeader(OTHER_METHOD[method]);
-    if (columnByHeader.has(normalizeItemDiscountHeader(otherHeader))) {
-      throw new BadRequestException(
-        `File có cột '${otherHeader}' nhưng chương trình đang giảm theo ${METHOD_LABEL[method]}`,
-      );
+  let valueCol: number | undefined;
+  if (method !== PromotionDiscountMode.FIXED_PRICE) {
+    const valueHeader = itemDiscountValueHeader(method)!;
+    valueCol = columnByHeader.get(normalizeItemDiscountHeader(valueHeader));
+    if (valueCol === undefined) {
+      const otherHeader = itemDiscountValueHeader(OTHER_METHOD[method])!;
+      if (columnByHeader.has(normalizeItemDiscountHeader(otherHeader))) {
+        throw new BadRequestException(
+          `File có cột '${otherHeader}' nhưng chương trình đang giảm theo ${METHOD_LABEL[method]}`,
+        );
+      }
+      throw new BadRequestException(`File thiếu cột '${valueHeader}'`);
     }
-    throw new BadRequestException(`File thiếu cột '${valueHeader}'`);
   }
 
   const rows: ItemDiscountWorkbookRow[] = [];
   sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber === 1) return;
     const code = cellText(row.getCell(codeCol).value);
-    const rawValue = unwrapCellValue(row.getCell(valueCol).value);
+    const rawValue = valueCol === undefined ? null : unwrapCellValue(row.getCell(valueCol).value);
     if (code === '' && isEmptyRaw(rawValue)) return;
     rows.push({ rowNumber, code, rawValue });
   });

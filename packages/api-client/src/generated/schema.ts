@@ -6021,8 +6021,8 @@ export interface paths {
         put?: never;
         /**
          * Xuất các dòng đang có trên lưới "Giảm giá hàng hóa" ra `.xlsx`. Các dòng chỉ
-         *     tồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên/ĐVT/giá bán đọc lại
-         *     từ DB theo tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).
+         *     tồn tại ở client (chưa lưu) nên gửi lên qua body; mã/tên đọc lại từ DB theo
+         *     tổ chức, dòng của tổ chức khác bị bỏ qua (AC-12).
          */
         post: operations["PromotionV2Controller_exportItemDiscountLines_v2"];
         delete?: never;
@@ -15665,12 +15665,12 @@ export interface components {
             targetType: "ITEM" | "PRODUCT";
             /** Format: uuid */
             targetId: string;
-            /** @description % giảm hoặc số tiền giảm, theo `method` */
+            /** @description % giảm hoặc số tiền giảm, theo `method`; bỏ qua với `FIXED_PRICE` */
             value?: number;
         };
         ExportItemDiscountLinesDto: {
             /** @enum {string} */
-            method: "PERCENT" | "AMOUNT";
+            method: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
             lines: components["schemas"]["ExportItemDiscountLineDto"][];
         };
         ImportedItemDiscountLine: {
@@ -15682,8 +15682,12 @@ export interface components {
             targetId: string;
             code: string;
             name: string;
-            /** @description % giảm hoặc số tiền giảm, theo `method` */
-            value: number;
+            /** @description % giảm hoặc số tiền giảm, theo `method`; không có với `FIXED_PRICE` */
+            value?: number;
+            /** @description Đơn vị tính; chỉ dòng `ITEM` */
+            unit?: string;
+            /** @description Giá bán; chỉ dòng `ITEM` */
+            sellingPrice?: number;
         };
         ImportItemDiscountRowError: {
             /** @description Số dòng Excel (hàng tiêu đề = 1) */
@@ -30619,7 +30623,7 @@ export interface operations {
                      */
                     file: string;
                     /** @enum {string} */
-                    method: "PERCENT" | "AMOUNT";
+                    method: "PERCENT" | "AMOUNT" | "FIXED_PRICE";
                 };
             };
         };

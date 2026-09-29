@@ -2,8 +2,11 @@ import { PromotionDiscountMode, PromotionTargetType } from "@erp/shared-interfac
 import { apiClient } from "../../../lib/api-axios";
 import { triggerBlobDownload } from "../../../lib/download";
 
-/** Phương thức có Nhập/Xuất khẩu — Đồng giá không có giá trị theo dòng (A-02). */
-export type ItemDiscountExcelMethod = PromotionDiscountMode.PERCENT | PromotionDiscountMode.AMOUNT;
+/** Phương thức có Nhập/Xuất khẩu — mỗi phương thức ứng với một sheet trong file. */
+export type ItemDiscountExcelMethod =
+  | PromotionDiscountMode.PERCENT
+  | PromotionDiscountMode.AMOUNT
+  | PromotionDiscountMode.FIXED_PRICE;
 
 export interface ItemDiscountExcelLine {
   targetType: PromotionTargetType;
@@ -12,8 +15,9 @@ export interface ItemDiscountExcelLine {
 }
 
 /**
- * Xuất khẩu các dòng đang có trên lưới (kể cả chưa lưu) ra Excel. Mã/tên/ĐVT/giá
- * bán do backend đọc lại theo tổ chức; lưới trống → file mẫu chỉ có tiêu đề.
+ * Xuất khẩu các dòng đang có trên lưới (kể cả chưa lưu) ra Excel 3 sheet (A-07):
+ * sheet của `method` chứa mã/tên (backend đọc lại theo tổ chức), hai sheet kia chỉ
+ * có tiêu đề. `lines: []` → file mẫu, cả 3 sheet chỉ có tiêu đề.
  */
 export async function downloadItemDiscountExcel(
   method: ItemDiscountExcelMethod,
@@ -41,7 +45,11 @@ export interface ImportedItemDiscountLine {
   targetId: string;
   code: string;
   name: string;
-  value: number;
+  /** Không có khi nhập *Đồng giá* — giá dùng chung ở hàng Thiết lập (A-09). */
+  value?: number;
+  /** Chỉ có ở dòng `ITEM` (A-14). */
+  unit?: string;
+  sellingPrice?: number;
 }
 
 /** Một dòng lỗi — `rowNumber` là số dòng Excel (tiêu đề = 1). */

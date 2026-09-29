@@ -18,7 +18,10 @@ import { ImportItemDiscountLinesQuery } from './import-item-discount-lines.query
 
 const MISSING_CODE_MESSAGE = 'Thiếu mã SKU';
 
-const INVALID_VALUE_MESSAGE: Record<ItemDiscountExcelMethod, string> = {
+/** Phương thức có cột giá trị; `FIXED_PRICE` chỉ cần mã (A-09). */
+type ValueMethod = Exclude<ItemDiscountExcelMethod, PromotionDiscountMode.FIXED_PRICE>;
+
+const INVALID_VALUE_MESSAGE: Record<ValueMethod, string> = {
   [PromotionDiscountMode.PERCENT]: '% giảm giá phải lớn hơn 0 và không quá 100',
   [PromotionDiscountMode.AMOUNT]: 'Số tiền giảm phải lớn hơn 0',
 };
@@ -34,7 +37,7 @@ function normalizeCode(code: string): string {
  * phân cách hàng nghìn (`"1.000"` là 1, `"1,000"` là lỗi): ô số của Excel đến đây đã là
  * `number`, chuỗi có dấu phân cách chỉ xuất hiện khi người dùng gõ tay dạng text.
  */
-function parseValue(raw: unknown, method: ItemDiscountExcelMethod): number | undefined {
+function parseValue(raw: unknown, method: ValueMethod): number | undefined {
   if (raw === null || raw === undefined) return undefined;
   if (typeof raw !== 'number' && typeof raw !== 'string') return undefined;
   const text = String(raw).trim();
@@ -50,12 +53,16 @@ interface ResolvedTarget {
   targetId: string;
   code: string;
   name: string;
+  /** Chỉ dòng `ITEM` (A-14). */
+  unit?: string;
+  sellingPrice?: number;
 }
 
 /**
  * Kiểm tra từng dòng của file nhập khẩu và tra mã theo lô trong tổ chức: một truy vấn
  * `items`, phần còn lại một truy vấn `products`. Không ghi DB. Mỗi dòng lỗi báo đúng một
- * lý do, theo thứ tự ưu tiên: thiếu mã, trùng mã, giá trị, không tìm thấy.
+ * lý do, theo thứ tự ưu tiên: thiếu mã, trùng mã, giá trị, không tìm thấy. `FIXED_PRICE`
+ * (A-09): không kiểm tra giá trị, dòng không có `value`, mã trống thì bỏ qua không báo lỗi.
  */
 @QueryHandler(ImportItemDiscountLinesQuery)
 export class ImportItemDiscountLinesHandler implements IQueryHandler<ImportItemDiscountLinesQuery> {
@@ -75,10 +82,12 @@ export class ImportItemDiscountLinesHandler implements IQueryHandler<ImportItemD
     }
 
     const errorByRow = new Map<number, ImportItemDiscountRowError>();
-    const pending: { row: ItemDiscountWorkbookRow; key: string; value: number }[] = [];
+    const pending: { row: ItemDiscountWorkbookRow; key: string; value?: number }[] = [];
     for (const row of fileRows) {
       if (row.code === '') {
-        errorByRow.set(row.rowNumber, { rowNumber: row.rowNumber, message: MISSING_CODE_MESSAGE });
+        if (method !== PromotionDiscountMode.FIXED_PRICE) {
+          errorByRow.set(row.rowNumber, { rowNumber: row.rowNumber, message: MISSING_CODE_MESSAGE });
+        }
         continue;
       }
       const key = normalizeCode(row.code);
@@ -89,6 +98,10 @@ export class ImportItemDiscountLinesHandler implements IQueryHandler<ImportItemD
           code: row.code,
           message: `Mã SKU bị trùng trong file (dòng ${sameCodeRows.join(', ')})`,
         });
+        continue;
+      }
+      if (method === PromotionDiscountMode.FIXED_PRICE) {
+        pending.push({ row, key });
         continue;
       }
       const value = parseValue(row.rawValue, method);
@@ -115,7 +128,7 @@ export class ImportItemDiscountLinesHandler implements IQueryHandler<ImportItemD
         });
         continue;
       }
-      lineByRow.set(row.rowNumber, { rowNumber: row.rowNumber, ...target, value });
+      lineByRow.set(row.rowNumber, { rowNumber: row.rowNumber, ...target, ...(value !== undefined && { value }) });
     }
 
     // Both lists keep file order.
@@ -136,13 +149,21 @@ export class ImportItemDiscountLinesHandler implements IQueryHandler<ImportItemD
     if (keys.length === 0) return targets;
 
     const items = await this.itemRepo.find({
-      select: { id: true, code: true, name: true },
+      select: { id: true, code: true, name: true, unit: true, sellingPrice: true },
       where: { organizationId, code: matchNormalizedCode(keys) },
     });
     for (const item of items) {
       const key = normalizeCode(item.code);
       if (!targets.has(key)) {
-        targets.set(key, { targetType: PromotionTargetType.ITEM, targetId: item.id, code: item.code, name: item.name });
+        targets.set(key, {
+          targetType: PromotionTargetType.ITEM,
+          targetId: item.id,
+          code: item.code,
+          name: item.name,
+          unit: item.unit,
+          // `decimal` columns come back from pg as strings.
+          sellingPrice: Number(item.sellingPrice),
+        });
       }
     }
 

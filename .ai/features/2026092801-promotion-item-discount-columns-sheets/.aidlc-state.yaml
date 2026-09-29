@@ -1,0 +1,245 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: promotion-item-discount-columns-sheets
+slug: 2026092801-promotion-item-discount-columns-sheets
+profile: none
+created: 2026-09-28T18:12:18
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-28T18:24:27
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-28T18:24:27
+    by: Akenzy
+    evidence: 15 assumptions, none blocking-and-pending; 19 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-28T18:24:27
+    by: Akenzy
+    evidence: 3 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-28T18:24:27
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 8 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T18:25:45
+    by: claude-implementer
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T18:26:20
+    by: claude-implementer
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T18:26:26
+    by: claude-implementer
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:28:00
+    by: claude-implementer
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:28:07
+    by: claude-implementer
+    reason: scripts/bench-catalog-page.js was already untracked before T-01-01 started (pre-existing in git status); all other drift belongs to parallel in-progress tickets T-01-02/T-02-01. T-01-01 only changed promotion-target.ts and promotion-target.spec.ts.
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T18:28:07
+    by: claude-implementer
+    reason: scripts/bench-catalog-page.js was already untracked before T-01-01 started (pre-existing in git status); all other drift belongs to parallel in-progress tickets T-01-02/T-02-01. T-01-01 only changed promotion-target.ts and promotion-target.spec.ts.
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:29:17
+    by: claude-implementer
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:29:26
+    by: claude-implementer
+    reason: scripts/bench-catalog-page.js was already untracked in the working tree before T-01-02 started (present in the session's initial git status); not created or edited by this ticket. All T-01-02 edits are within its 4 declared touches.
+    ticket: T-01-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T18:29:26
+    by: claude-implementer
+    reason: scripts/bench-catalog-page.js was already untracked in the working tree before T-01-02 started (present in the session's initial git status); not created or edited by this ticket. All T-01-02 edits are within its 4 declared touches.
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:29:33
+    by: claude-implementer
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:29:38
+    by: claude-implementer
+    reason: scripts/bench-catalog-page.js was already untracked in the working tree before T-02-01 started (pre-existing, not touched by this ticket); backoffice-web files belong to a parallel implementer (T-01-xx)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T18:29:38
+    by: claude-implementer
+    reason: scripts/bench-catalog-page.js was already untracked in the working tree before T-02-01 started (pre-existing, not touched by this ticket); backoffice-web files belong to a parallel implementer (T-01-xx)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T18:32:18
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T18:32:18
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T18:32:18
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T18:33:00
+    by: claude-implementer
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T18:33:04
+    by: claude-implementer
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:36:49
+    by: claude-implementer
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:36:57
+    by: claude-implementer
+    reason: Drift is not T-02-02's - item-discount-workbook.ts/.spec.ts are accepted T-02-01's uncommitted changes; backoffice-web promotion files belong to T-01-0x tickets edited in parallel by another agent; scripts/bench-catalog-page.js is pre-existing untracked. T-02-02 edited only its declared touches.
+    ticket: T-02-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T18:36:57
+    by: claude-implementer
+    reason: Drift is not T-02-02's - item-discount-workbook.ts/.spec.ts are accepted T-02-01's uncommitted changes; backoffice-web promotion files belong to T-01-0x tickets edited in parallel by another agent; scripts/bench-catalog-page.js is pre-existing untracked. T-02-02 edited only its declared touches.
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:56:33
+    by: claude-implementer
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-28T18:56:40
+    by: claude-implementer
+    reason: flagged files are uncommitted work of accepted T-01-01/T-02-01 and in-review T-02-02, plus pre-existing untracked scripts/bench-catalog-page.js; T-01-03 edited only GoodsDiscountGrid.tsx
+    ticket: T-01-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T18:56:40
+    by: claude-implementer
+    reason: flagged files are uncommitted work of accepted T-01-01/T-02-01 and in-review T-02-02, plus pre-existing untracked scripts/bench-catalog-page.js; T-01-03 edited only GoodsDiscountGrid.tsx
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T18:56:40
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T18:56:40
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T19:07:16
+    by: claude-implementer
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-28T19:18:21
+    by: claude-implementer
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-09-28T19:18:31
+    by: claude-implementer
+    reason: All flagged files are uncommitted working-tree changes of already-accepted tickets T-01-01..T-01-03, T-02-01, T-02-02 (present in git status before T-02-03 started) plus the pre-existing untracked scripts/bench-catalog-page.js; T-02-03 only edited the two e2e specs and regenerated openapi.snapshot.json + schema.ts
+    ticket: T-02-03
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T19:18:31
+    by: claude-implementer
+    reason: All flagged files are uncommitted working-tree changes of already-accepted tickets T-01-01..T-01-03, T-02-01, T-02-02 (present in git status before T-02-03 started) plus the pre-existing untracked scripts/bench-catalog-page.js; T-02-03 only edited the two e2e specs and regenerated openapi.snapshot.json + schema.ts
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T19:20:03
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T19:20:42
+    by: claude-implementer
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-09-28T19:21:54
+    by: claude-implementer
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-09-28T19:22:05
+    by: claude-implementer
+    reason: All flagged files are uncommitted changes from already-accepted UOW-01/UOW-02 tickets of this feature, plus pre-existing untracked scripts/bench-catalog-page.js; T-03-01 only changed its three declared touches - files
+    ticket: T-03-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T19:22:05
+    by: claude-implementer
+    reason: All flagged files are uncommitted changes from already-accepted UOW-01/UOW-02 tickets of this feature, plus pre-existing untracked scripts/bench-catalog-page.js; T-03-01 only changed its three declared touches - files
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T19:32:03
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-28T19:54:01
+    by: claude-implementer
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T23:44:24
+    by: claude-implementer
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-28T23:44:30
+    by: claude-implementer
+    reason: flagged files are uncommitted work of accepted T-01-01..T-03-01 in this feature plus pre-existing untracked scripts/bench-catalog-page.js; T-03-02 edited only GoodsDiscountGrid.tsx and ItemDiscountImportDialog.tsx
+    ticket: T-03-02
+  - gate: G4
+    action: ticket review
+    at: 2026-09-28T23:44:30
+    by: claude-implementer
+    reason: flagged files are uncommitted work of accepted T-01-01..T-03-01 in this feature plus pre-existing untracked scripts/bench-catalog-page.js; T-03-02 edited only GoodsDiscountGrid.tsx and ItemDiscountImportDialog.tsx
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done
+    at: 2026-09-28T23:45:40
+    by: Akenzy
+    ticket: T-03-02
