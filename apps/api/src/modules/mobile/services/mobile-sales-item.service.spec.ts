@@ -158,13 +158,14 @@ describe('MobileSalesItemService', () => {
   });
 
   describe('viewBy=item (phải hỏi tường minh)', () => {
-    it('trả ĐÚNG chín trường — có giá BÁN, không rò giá VỐN', async () => {
+    it('trả ĐÚNG mười trường — có giá BÁN, không rò giá VỐN', async () => {
       const { data } = await runItems();
 
       expect(Object.keys(data[0]).sort()).toEqual([
         'code',
         'id',
         'name',
+        'productId',
         'sellingPrice',
         'thumbnailUrl',
         'type',
@@ -186,6 +187,23 @@ describe('MobileSalesItemService', () => {
       ]) {
         expect(serialized).not.toContain(leak);
       }
+    });
+
+    it('biến thể mang `productId` của MẪU MÃ CHA — app mở Chi tiết từ dòng này (AC-163)', async () => {
+      qb.getManyAndCount.mockResolvedValue([[item({ id: 'it-1', productId: 'p-1' })], 1]);
+
+      const { data } = await runItems();
+
+      expect(data[0].id).toBe('it-1');
+      expect(data[0].productId).toBe('p-1');
+    });
+
+    it('hàng lẻ: `productId` là `null`, không phải chuỗi rỗng hay chính `id`', async () => {
+      qb.getManyAndCount.mockResolvedValue([[item({ id: 'it-9', productId: undefined })], 1]);
+
+      const { data } = await runItems();
+
+      expect(data[0].productId).toBeNull();
     });
 
     it('`type` là `item` và `variantCount` là 1 — dòng bán được ngay', async () => {
@@ -356,6 +374,7 @@ describe('MobileSalesItemService', () => {
 
       expect(data[0].type).toBe('model');
       expect(data[0].id).toBe('p-1');
+      expect(data[0].productId).toBe('p-1');
       expect(data[0].variantCount).toBe(6);
       expect(total).toBe(1);
     });
@@ -395,6 +414,7 @@ describe('MobileSalesItemService', () => {
       // dùng chọn giữa đúng một lựa chọn.
       expect(data[0].type).toBe('item');
       expect(data[0].variantCount).toBe(1);
+      expect(data[0].productId).toBeNull();
     });
 
     it('KHÔNG sinh subquery tồn kho khi tắt bộ lọc còn hàng', async () => {

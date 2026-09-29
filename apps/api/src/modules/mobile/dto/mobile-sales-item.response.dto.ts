@@ -87,6 +87,17 @@ export class MobileSalesItemResponseDto {
       'KHÔNG hết hạn.',
   })
   thumbnailUrl!: string | null;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description:
+      '`products.id` của MẪU MÃ chứa dòng này, để app mở màn Chi tiết mẫu mã từ ' +
+      'một dòng biến thể (erp-sales-consultant-catalog, AC-163). Với `type=model` ' +
+      'bằng chính `id`; với hàng LẺ (không thuộc mẫu mã nào) là `null`. Trường ' +
+      'THÊM — client cũ bỏ qua được.',
+  })
+  productId!: string | null;
 }
 
 export class MobileSalesItemPageDto {

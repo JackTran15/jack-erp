@@ -167,6 +167,10 @@ export class MobileSalesItemService {
     }
 
     const detail = await this.posCatalog.getProductDetail(branchId, productId, 'PRODUCT', actor);
+    const hidden = await this.hiddenLocationIds(
+      detail.variants.flatMap((variant) => (variant.locations ?? []).map((location) => location.locationId)),
+      actor.organizationId,
+    );
 
     return {
       productId,
@@ -188,8 +192,49 @@ export class MobileSalesItemService {
             quantity: storage.quantity,
           })),
         })),
+        // Liệt kê ĐÚNG ba khoá, không trải cả object POS: thêm trường ở bên đó
+        // không được tự rò ra `/mobile`.
+        locations: (variant.locations ?? [])
+          .filter((location) => !hidden.has(location.locationId))
+          .map((location) => ({
+            locationId: location.locationId,
+            name: location.name,
+            quantity: location.quantity,
+          })),
       })),
     };
+  }
+
+  /**
+   * Vị trí KHÔNG bày ở dòng *Vị trí* của app (Loc chốt 2026-09-29):
+   *
+   * - vị trí **Mặc định** (`is_default`) — chỗ POS bán ra khi hàng chưa được xếp kệ, gần như
+   *   mặt hàng nào cũng có, nên nó không nói được hàng NẰM ở đâu;
+   * - vị trí **Chưa xếp** (`is_unassigned`) — vị trí ẢO giữ hàng chưa lên kệ nào; cùng lý do;
+   * - mọi vị trí thuộc một kho **showroom** (có dòng trong `showrooms`) — hàng trưng bày, người
+   *   tư vấn đang đứng ngay đó; câu hỏi của họ là *"lấy thêm ở kệ nào trong kho"*.
+   *
+   * Lọc bằng CỜ chứ không bằng tên (`'Mặc định'`, `'Showroom'`): tên đổi được ở backoffice, cờ
+   * thì không. MỘT lượt truy vấn cho cả mẫu mã, không mỗi biến thể một lượt.
+   */
+  private async hiddenLocationIds(locationIds: string[], organizationId: string): Promise<Set<string>> {
+    const ids = [...new Set(locationIds)];
+    if (ids.length === 0) return new Set();
+
+    const rows: { id: string }[] = await this.dataSource.query(
+      `SELECT l.id
+         FROM locations l
+        WHERE l.id = ANY($1::uuid[])
+          AND l.organization_id = $2
+          AND (l.is_default = true
+               OR l.is_unassigned = true
+               OR EXISTS (SELECT 1 FROM showrooms sh
+                           WHERE sh.storage_id = l.storage_id
+                             AND sh.organization_id = $2))`,
+      [ids, organizationId],
+    );
+
+    return new Set(rows.map((row) => row.id));
   }
 
   async list(
@@ -693,6 +738,8 @@ function toMobileSalesItem(
     sellingPrice: Number(row.sellingPrice) || 0,
     variantCount: 1,
     thumbnailUrl,
+    // Mẫu mã cha — cùng cột mà `imageOwnerOf` đọc. Hàng lẻ không có cha nên `null`.
+    productId: row.productId ?? null,
   };
 }
 
@@ -711,6 +758,8 @@ function toMobileSalesModel(
     sellingPrice: Number(row.sellingPrice) || 0,
     variantCount: Number(row.variantCount) || 1,
     thumbnailUrl,
+    // Ở nhánh gộp, dòng mẫu mã LÀ mẫu mã; dòng hàng lẻ thì không có mẫu mã nào.
+    productId: row.type === 'model' ? row.id : null,
   };
 }
 

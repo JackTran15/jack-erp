@@ -16,15 +16,18 @@ import { MobileSalesItemService } from './mobile-sales-item.service';
  * 1. Nó UỶ QUYỀN — không tự tính. Mọi luật khó (kho tồn 0 vẫn liệt kê, kho chính lên đầu,
  *    balance của kho đã ngưng thì bỏ, chi nhánh không ACTIVE thì không tính) nằm ở
  *    `PosCatalogProductService` và chỉ ở đó.
- * 2. Nó THU HẸP — `PosProductDetailDto` còn mang `locations`, `sellableQuantity`,
- *    `mainShowroomQuantity`, `imageUrl`, `purchasePrice`. Không trường nào trong số đó được
- *    lọt ra `/mobile`, đúng ranh giới mà mọi DTO khác ở đây đang giữ.
+ * 2. Nó THU HẸP — `PosProductDetailDto` còn mang `sellableQuantity`, `mainShowroomQuantity`,
+ *    `imageUrl`, `purchasePrice`. Không trường nào trong số đó được lọt ra `/mobile`, đúng ranh
+ *    giới mà mọi DTO khác ở đây đang giữ. `locations` đã được mở có chủ đích (2026-09-29,
+ *    erp-sales-consultant-catalog AC-164) — và chỉ ba khoá của nó.
  *
  * Vế 2 là thứ KHÔNG có gì khác canh: thêm một dòng vào phép map là rò, và `tsc` im lặng.
  */
 describe('MobileSalesItemService.getModelStock', () => {
   let service: MobileSalesItemService;
   const getProductDetail = jest.fn();
+  // Tra cờ của vị trí (Mặc định / thuộc showroom). Mặc định KHÔNG ẩn gì — mọi test cũ giữ nguyên.
+  const query = jest.fn();
 
   const actor = { organizationId: 'org-1', branchId: 'branch-1', userId: 'u-1', roles: [] } as ActorContext;
 
@@ -40,7 +43,10 @@ describe('MobileSalesItemService.getModelStock', () => {
         mainShowroomQuantity: 4,
         otherBranchQuantity: 5,
         purchasePrice: 111_000,
-        locations: [{ locationId: 'L1', quantity: 9 }],
+        locations: [
+          { locationId: 'L1', name: 'Kệ A1', quantity: 6, internalCode: 'X' },
+          { locationId: 'L2', name: 'Kệ B3', quantity: 3 },
+        ],
         storages: [
           { storageId: 'S1', name: 'Kho A', quantity: 9, isMainShowroom: true },
           { storageId: 'S2', name: 'Kho B', quantity: 0, isMainShowroom: false },
@@ -59,12 +65,13 @@ describe('MobileSalesItemService.getModelStock', () => {
 
   beforeEach(async () => {
     getProductDetail.mockReset();
+    query.mockReset().mockResolvedValue([]);
 
     const module = await Test.createTestingModule({
       providers: [
         MobileSalesItemService,
         { provide: getRepositoryToken(ItemEntity), useValue: {} },
-        { provide: getDataSourceToken(), useValue: {} },
+        { provide: getDataSourceToken(), useValue: { query } },
         // Chỉ để dựng được service — mọi test ở file này nói về `getModelStock`,
         // đường uỷ quyền trọn cho `PosCatalogProductService` và không chạm ảnh.
         { provide: MediaQueryService, useValue: { resolvePublicUrls: jest.fn() } },
@@ -109,9 +116,65 @@ describe('MobileSalesItemService.getModelStock', () => {
               storages: [{ storageId: 'S9', name: 'Kho CN2', quantity: 5 }],
             },
           ],
+          // Giữ THỨ TỰ của POS (số lượng giảm dần) — app bày đúng thứ tự này.
+          locations: [
+            { locationId: 'L1', name: 'Kệ A1', quantity: 6 },
+            { locationId: 'L2', name: 'Kệ B3', quantity: 3 },
+          ],
         },
       ],
     });
+  });
+
+  it('ẨN vị trí Mặc định, Chưa xếp và vị trí thuộc showroom — theo CỜ, tra MỘT lượt cho cả mẫu mã', async () => {
+    getProductDetail.mockResolvedValue({
+      ...detail,
+      variants: [
+        {
+          ...detail.variants[0],
+          locations: [
+            { locationId: 'L1', name: 'A01.01', quantity: -1 },
+            { locationId: 'LD', name: 'Mặc định', quantity: -209 },
+            { locationId: 'LS', name: 'Kệ trưng bày', quantity: 2 },
+          ],
+        },
+        { ...detail.variants[0], itemId: 'i-2', locations: [{ locationId: 'LD', name: 'Mặc định', quantity: -5 }] },
+      ],
+    });
+    query.mockResolvedValue([{ id: 'LD' }, { id: 'LS' }]);
+
+    const res = await service.getModelStock('p-1', actor);
+
+    expect(res.variants[0].locations).toEqual([{ locationId: 'L1', name: 'A01.01', quantity: -1 }]);
+    // Chỉ còn Mặc định thì RỖNG — app bày `—`.
+    expect(res.variants[1].locations).toEqual([]);
+
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0];
+    expect(params).toEqual([['L1', 'LD', 'LS'], 'org-1']);
+    expect(sql).toContain('is_default = true');
+    expect(sql).toContain('is_unassigned = true');
+    expect(sql).toContain('showrooms');
+    expect(sql).toContain('organization_id');
+  });
+
+  it('không có vị trí nào thì KHÔNG hỏi DB', async () => {
+    getProductDetail.mockResolvedValue({ ...detail, variants: [{ ...detail.variants[0], locations: [] }] });
+
+    await service.getModelStock('p-1', actor);
+
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('biến thể không có vị trí nào → `locations: []`, không phải thiếu khoá', async () => {
+    getProductDetail.mockResolvedValue({
+      ...detail,
+      variants: [{ ...detail.variants[0], locations: undefined }],
+    });
+
+    const res = await service.getModelStock('p-1', actor);
+
+    expect(res.variants[0].locations).toEqual([]);
   });
 
   it('KHÔNG rò trường nào mà /mobile đang cố ý giấu', async () => {
@@ -120,7 +183,7 @@ describe('MobileSalesItemService.getModelStock', () => {
     const res = await service.getModelStock('p-1', actor);
     const flat = JSON.stringify(res);
 
-    for (const leaked of ['purchasePrice', 'locations', 'sellableQuantity', 'mainShowroomQuantity', 'imageUrl']) {
+    for (const leaked of ['purchasePrice', 'sellableQuantity', 'mainShowroomQuantity', 'imageUrl', 'internalCode']) {
       expect(flat).not.toContain(leaked);
     }
     // `isMainShowroom` cũng bị cắt: app chỉ cần TÊN và SỐ, còn cờ đó là khái niệm của bề mặt kho.
