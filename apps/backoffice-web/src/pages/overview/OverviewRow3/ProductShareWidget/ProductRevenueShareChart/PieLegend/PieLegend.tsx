@@ -15,7 +15,7 @@ interface Props {
 /** Legend dọc bên phải pie — mặc định chỉ tên, không hiện giá trị (theo spec). */
 export function PieLegend({ slices, colors, hiddenKeys, onToggle, showValue }: Props) {
   return (
-    <ul className="flex shrink-0 flex-col gap-4">
+    <ul className="flex max-h-[80%] shrink-0 flex-col gap-4 overflow-y-auto pr-2">
       {slices.map((slice, index) => {
         const hidden = hiddenKeys.includes(slice.key);
         return (
