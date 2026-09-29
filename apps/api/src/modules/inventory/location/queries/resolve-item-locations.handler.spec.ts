@@ -22,6 +22,19 @@ interface PreferredCandidate {
   balance?: { isTracked: boolean; quantity?: number } | null; // null/undefined = no balance row at all
 }
 
+/**
+ * A stock_balances row joined with its location, for the stock fallback branch.
+ * The fake applies the handler's real predicate (loc.is_active, sb.is_tracked —
+ * no quantity filter) and ORDER BY sb.quantity DESC, loc.code ASC.
+ */
+interface StockCandidate {
+  locationId: string;
+  code: string;
+  quantity: number;
+  isTracked: boolean;
+  isActive?: boolean; // defaults to true
+}
+
 interface Cfg {
   storage?: { id: string } | null;
   items?: { id: string; productId: string | null }[];
@@ -30,6 +43,7 @@ interface Cfg {
   defaultLoc?: { id: string } | null;
   unassignedLoc?: { id: string } | null;
   stockBin?: { locationId: string } | null;
+  stockCandidates?: StockCandidate[];
   locs?: { id: string; code: string; name: string }[];
 }
 
@@ -58,6 +72,10 @@ function makeHandler(cfg: Cfg, andWhereCalls?: string[]): ResolveItemLocationsHa
         andWhereCalls?.push(`ORDER BY ${String(args[0])} ${String(args[1] ?? '')}`.trim());
         return qb;
       };
+      qb.addOrderBy = (...args: unknown[]) => {
+        andWhereCalls?.push(`ORDER BY ${String(args[0])} ${String(args[1] ?? '')}`.trim());
+        return qb;
+      };
       qb.andWhere = (condition: string) => {
         andWhereCalls?.push(condition);
         return qb;
@@ -65,7 +83,13 @@ function makeHandler(cfg: Cfg, andWhereCalls?: string[]): ResolveItemLocationsHa
       // The preferred branch uses ItemStorageLocationEntity; the stock fallback
       // branch uses StockBalanceEntity — return results per entity so they don't mix.
       qb.getOne = async () => {
-        if (entity !== ItemStorageLocationEntity) return cfg.stockBin ?? null;
+        if (entity !== ItemStorageLocationEntity) {
+          if (!cfg.stockCandidates) return cfg.stockBin ?? null;
+          const eligible = cfg.stockCandidates
+            .filter((c) => c.isActive !== false && c.isTracked)
+            .sort((a, b) => b.quantity - a.quantity || a.code.localeCompare(b.code));
+          return eligible.length ? { locationId: eligible[0].locationId } : null;
+        }
         if (!cfg.preferredCandidates) return cfg.preferred ?? null;
         // Reproduces the handler's real predicate: loc.is_active = true, then
         // NOT EXISTS a balance for that exact pair with is_tracked = false —
@@ -294,5 +318,70 @@ describe('ResolveItemLocationsHandler', () => {
     expect(new Set(data.map((r) => r.locationId)).size).toBe(1);
     // Deterministic ordering is expressed in SQL, so assert the ORDER BY was wired in.
     expect(andWhereCalls).toContain('ORDER BY loc.code ASC');
+  });
+  it('AC-01: a tracked bin with quantity <= 0 is still suggested from the stock branch', async () => {
+    const andWhereCalls: string[] = [];
+    const handler = makeHandler(
+      {
+        storage: { id: 'S9' },
+        items: [{ id: 'v11', productId: 'p9' }],
+        preferred: null,
+        // A default location exists: before the fix the handler fell through to
+        // it (source 'default'), which the barcode page leaves blank.
+        defaultLoc: { id: 'DEF' },
+        stockCandidates: [
+          { locationId: 'NEG-id', code: 'C01', quantity: -2, isTracked: true },
+        ],
+        locs: [{ id: 'NEG-id', code: 'C01', name: 'C01' }],
+      },
+      andWhereCalls,
+    );
+
+    const { data } = await handler.execute(
+      new ResolveItemLocationsQuery({ variantItemIds: ['v11'], branchId: 'b1' }, actor),
+    );
+
+    expect(data[0]).toMatchObject({
+      storageId: 'S9',
+      locationId: 'NEG-id',
+      locationCode: 'C01',
+      source: 'stock',
+    });
+    // Tracking is the SQL-level gate; quantity is not filtered, only ranked.
+    expect(andWhereCalls).toContain('sb.is_tracked = true');
+    expect(andWhereCalls).toContain('loc.is_active = true');
+    expect(andWhereCalls.some((c) => /sb\.quantity\s*[<>=]/.test(c))).toBe(false);
+  });
+
+  it('AC-02: ranks tracked bins by quantity DESC then loc.code ASC; untracked/inactive bins excluded', async () => {
+    const andWhereCalls: string[] = [];
+    const handler = makeHandler(
+      {
+        storage: { id: 'S9' },
+        items: [{ id: 'v12', productId: 'p10' }],
+        preferred: null,
+        stockCandidates: [
+          { locationId: 'UNTRACKED', code: 'A00', quantity: 50, isTracked: false },
+          { locationId: 'INACTIVE', code: 'A01', quantity: 40, isTracked: true, isActive: false },
+          { locationId: 'Z0', code: 'Z0', quantity: 0, isTracked: true },
+          { locationId: 'B0', code: 'B0', quantity: 0, isTracked: true },
+          { locationId: 'NEG', code: 'A02', quantity: -1, isTracked: true },
+        ],
+        locs: [{ id: 'B0', code: 'B0', name: 'B0' }],
+      },
+      andWhereCalls,
+    );
+
+    const { data } = await handler.execute(
+      new ResolveItemLocationsQuery({ variantItemIds: ['v12'], branchId: 'b1' }, actor),
+    );
+
+    expect(data[0]).toMatchObject({ locationId: 'B0', source: 'stock' });
+    expect(andWhereCalls).toEqual(
+      expect.arrayContaining(['ORDER BY sb.quantity DESC', 'ORDER BY loc.code ASC']),
+    );
+    expect(andWhereCalls.indexOf('ORDER BY sb.quantity DESC')).toBeLessThan(
+      andWhereCalls.lastIndexOf('ORDER BY loc.code ASC'),
+    );
   });
 });

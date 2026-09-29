@@ -134,7 +134,9 @@ export class ResolveItemLocationsHandler
         groupLocation.set(key, { locationId: isl.locationId, source: 'preferred' });
         continue;
       }
-      // b. Bin currently holding the most stock of any sibling in this storage.
+      // b. Tracked bin of any sibling in this storage, most stock first. Tracking
+      //    alone makes a bin eligible — a tracked bin with quantity <= 0 is still
+      //    suggested ("còn đang theo dõi thì show lên"); quantity only ranks.
       const sb = await manager
         .createQueryBuilder(StockBalanceEntity, 'sb')
         .innerJoin('locations', 'loc', 'loc.id = sb.location_id')
@@ -143,8 +145,8 @@ export class ResolveItemLocationsHandler
         .andWhere('loc.is_active = true')
         .andWhere('sb.is_tracked = true')
         .andWhere('sb.organization_id = :orgId', { orgId })
-        .andWhere('sb.quantity > 0')
         .orderBy('sb.quantity', 'DESC')
+        .addOrderBy('loc.code', 'ASC')
         .getOne();
       if (sb) {
         groupLocation.set(key, { locationId: sb.locationId, source: 'stock' });
