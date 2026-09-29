@@ -92,6 +92,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'pos.sales-order.cancel': 'Hủy đơn hàng tư vấn',
   'pos.sales-order.approve': 'Nhận xử lý đơn hàng tư vấn',
   'pos.sales-order.reject': 'Từ chối đơn hàng tư vấn',
+  'pos.sales-order.deliver': 'Giao hàng và cập nhật trạng thái giao đơn hàng',
   'pos.return.create': 'Tạo trả hàng',
   'pos.exchange.create': 'Tạo đổi hàng',
   'pos.session.manage': 'Mở/đóng ca bán hàng',

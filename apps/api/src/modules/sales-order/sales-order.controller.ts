@@ -19,14 +19,17 @@ import { RequireBranchScope, RequirePermission } from '../auth/decorators';
 import { AuditInterceptor } from '../crud/audit.interceptor';
 import { BranchScopeGuard } from '../rbac/branch-scope.guard';
 import { PermissionGuard } from '../rbac/permission.guard';
+import { BatchSalesOrderDto, SalesOrderBatchResponseDto } from './dto/batch-sales-order.dto';
 import { CancelSalesOrderDto } from './dto/cancel-sales-order.dto';
 import { CreateSalesOrderDto } from './dto/create-sales-order.dto';
+import { DeliverSalesOrdersDto } from './dto/deliver-sales-orders.dto';
 import { RejectSalesOrderDto } from './dto/reject-sales-order.dto';
 import { SalesOrderListQueryDto } from './dto/sales-order-list.query.dto';
 import { SalesOrderHistoryResponseDto } from './dto/sales-order-history.dto';
 import { SalesOrderPointsDto } from './dto/sales-order-points.dto';
 import { SalespeopleQueryDto } from './dto/salespeople.query.dto';
 import { BranchStockCheckRequestDto, StockCheckResponseDto } from './dto/stock-check.dto';
+import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
 import { SalesOrderHistoryService } from './sales-order-history.service';
 import { SALES_ORDER_PERMISSIONS, SalesOrderService } from './sales-order.service';
 import { StockAvailabilityService } from './stock-availability.service';
@@ -142,6 +145,46 @@ export class SalesOrderController {
   }
 
   /**
+   * *Nhận xử lý* nhiều đơn (A-01, ADR-07): mỗi id duyệt nếu cần rồi approve,
+   * từng đơn độc lập. 200 kể cả khi có đơn lỗi — lý do nằm ở `results[i]`.
+   */
+  @Post('process')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(SALES_ORDER_PERMISSIONS.approve)
+  @ApiOkResponse({ type: SalesOrderBatchResponseDto })
+  process(@Body() dto: BatchSalesOrderDto, @Actor() actor: ActorContext): Promise<SalesOrderBatchResponseDto> {
+    return this.service.processBatch(dto.ids, actor);
+  }
+
+  /**
+   * *Giao hàng* nhiều đơn (ADR-07, AC-18, AC-19): `AWAITING_PICKUP | FAILED →
+   * IN_TRANSIT`. 200 kể cả khi có đơn lỗi; đối tác không hợp lệ → 400 cả request.
+   * Khai TRƯỚC các route `:id` POST.
+   */
+  @Post('deliver')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(SALES_ORDER_PERMISSIONS.deliver)
+  @ApiOkResponse({ type: SalesOrderBatchResponseDto })
+  deliver(@Body() dto: DeliverSalesOrdersDto, @Actor() actor: ActorContext): Promise<SalesOrderBatchResponseDto> {
+    return this.service.deliverBatch(dto, actor);
+  }
+
+  /**
+   * *Cập nhật TT* / *Hoàn thành* nhiều đơn theo `DELIVERY_TRANSITIONS` (AC-20,
+   * AC-22). `to = RETURNED` chưa hỗ trợ → 400.
+   */
+  @Post('delivery-status')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(SALES_ORDER_PERMISSIONS.deliver)
+  @ApiOkResponse({ type: SalesOrderBatchResponseDto })
+  deliveryStatus(
+    @Body() dto: UpdateDeliveryStatusDto,
+    @Actor() actor: ActorContext,
+  ): Promise<SalesOrderBatchResponseDto> {
+    return this.service.deliveryStatusBatch(dto, actor);
+  }
+
+  /**
    * Duyệt một đơn web chi nhánh đang giữ (ADR-12). Quyền dùng lại `approve`
    * (A-46); đơn chi nhánh khác → 403 `ORDER_NOT_HELD_BY_BRANCH` (AC-35).
    * Batch = client lặp từng id.
@@ -153,11 +196,15 @@ export class SalesOrderController {
     return this.service.confirm(id, actor);
   }
 
+  /**
+   * *Nhận xử lý* một đơn chi nhánh đang giữ; đơn chi nhánh khác → 403
+   * `ORDER_NOT_HELD_BY_BRANCH`, đơn không đổi (AC-28).
+   */
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   @RequirePermission(SALES_ORDER_PERMISSIONS.approve)
   approve(@Param('id', ParseUUIDPipe) id: string, @Actor() actor: ActorContext) {
-    return this.service.approve(id, actor);
+    return this.service.approve(id, actor, { heldByBranchId: actor.branchId });
   }
 
   @Post(':id/reject')

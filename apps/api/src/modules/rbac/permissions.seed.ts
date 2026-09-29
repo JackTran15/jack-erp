@@ -86,6 +86,9 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "pos.sales-order.cancel", module: "pos" },
   { key: "pos.sales-order.approve", module: "pos" },
   { key: "pos.sales-order.reject", module: "pos" },
+  // Giao đơn cho đối tác + đổi trạng thái giao (feature
+  // 2026092402-pos-order-delivery-lifecycle). Granted wherever approve is.
+  { key: "pos.sales-order.deliver", module: "pos" },
   // Điều phối đơn web: xem pool chưa phân và phân về một chi nhánh, cấp TỔ CHỨC
   // (A-08). Deliberately NOT pos.sales-order.approve: that key is the cashier's
   // "take it to the till", and reusing it would let every branch cashier push

@@ -299,16 +299,18 @@ describe('Online order fulfilment — partner → dispatch → approve → check
       .set('Authorization', authHeader(fixture.seed.accessToken))
       .send({ branchId });
 
+  // Token chi nhánh 2, như `confirm`: `approve()` chỉ nhận đơn chi nhánh của
+  // `actor.branchId` (JWT thắng header) đang giữ — AC-28.
   const approve = (orderId: string) =>
     request(app.getHttpServer())
       .post(`/mobile/sales-orders/${orderId}/approve`)
-      .set('Authorization', authHeader(fixture.seed.accessToken))
+      .set('Authorization', authHeader(secondBranchAccessToken))
       .set('X-Branch-Id', SECOND_BRANCH_ID);
 
   const checkout = (invoiceId: string) =>
     request(app.getHttpServer())
       .post(`/invoices/${invoiceId}/checkout`)
-      .set('Authorization', authHeader(fixture.seed.accessToken))
+      .set('Authorization', authHeader(secondBranchAccessToken))
       .set('X-Branch-Id', SECOND_BRANCH_ID)
       .send({ payments: [] }); // COD: no payment lines → full remainder → debt
 

@@ -20,6 +20,12 @@ export class SalesOrderHistoryEntryResponseDto implements SalesOrderHistoryEntry
   kind: SalesOrderHistoryKind;
 
   @ApiProperty({
+    description:
+      'Nhãn tiếng Việt của mốc; "Cập nhật giao hàng" kèm chuyển trạng thái (vd. "Cập nhật giao hàng: Đang giao hàng → Hoàn thành")',
+  })
+  label: string;
+
+  @ApiProperty({
     type: String,
     nullable: true,
     description: 'Tên người làm; với "Nhận đơn" của đơn web là tên kênh. `null` khi không tra được.',

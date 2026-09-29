@@ -1,0 +1,422 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: pos-order-delivery-lifecycle
+slug: 2026092402-pos-order-delivery-lifecycle
+profile: none
+created: 2026-09-24T20:20:29
+ruleset: 7
+current_gate: G5
+history:
+  - gate: G0
+    action: passed
+    at: 2026-09-24T20:26:34
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-09-24T20:27:59
+    by: Akenzy
+    evidence: 16 assumptions, none blocking-and-pending; 27 acceptance criteria defined
+  - gate: G1
+    action: reopened
+    at: 2026-09-24T20:32:00
+    by: Akenzy
+    reason: Akenzy 2026-09-24 - delivery partner and partner shipping fee are optional (nullable) on Giao hàng; AC-18 and A-04 change
+  - gate: G1
+    action: passed
+    at: 2026-09-24T20:33:54
+    by: Akenzy
+    evidence: 16 assumptions, none blocking-and-pending; 24 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T20:33:54
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T20:37:26
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T20:37:32
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T20:37:32
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T20:39:32
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T20:39:39
+    by: claude
+    reason: scripts/bench-catalog-page.js was untracked before this feature started (session-start git status); not part of T-01-01
+    ticket: T-01-01
+  - gate: G4
+    action: ticket review
+    at: 2026-09-24T20:39:39
+    by: claude
+    reason: scripts/bench-catalog-page.js was untracked before this feature started (session-start git status); not part of T-01-01
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T20:47:52
+    by: Akenzy
+    reason: T-02-01 adds dispatch actions; sales-order-history.service.ts EVENT_KIND must be exhaustive, so the build breaks until T-05-03. Akenzy - merge T-05-03 into T-02-01.
+  - gate: G3
+    action: passed
+    at: 2026-09-24T20:51:19
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-24T20:51:19
+    by: Akenzy
+    reason: scripts/bench-catalog-page.js pre-existing untracked; T-02-01 migration files belong to T-02-01 (concurrent wave)
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T20:51:19
+    by: Akenzy
+    reason: scripts/bench-catalog-page.js pre-existing untracked; T-02-01 migration files belong to T-02-01 (concurrent wave)
+    ticket: T-01-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T20:55:41
+    by: Akenzy
+    reason: Akenzy - T-02-04 drops depends_on T-02-01 (scope hook blocks writing before start; the two tickets are one change split by the 4h ceiling); backoffice OrderHistoryModal + use-order-history added to T-02-04 touches
+  - gate: G3
+    action: passed
+    at: 2026-09-24T20:56:00
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 17 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T20:56:00
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T20:56:18
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:00:47
+    by: Akenzy
+    reason: working rtk tree is shared by the wave - T-01-01 (done, uncommitted), T-01-02 (in progress), T-02-01/T-02-04 (paired), scripts/bench-catalog-page.js (pre-existing untracked)
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:00:47
+    by: Akenzy
+    reason: working rtk tree is shared by the wave - T-01-01 (done, uncommitted), T-01-02 (in progress), T-02-01/T-02-04 (paired), scripts/bench-catalog-page.js (pre-existing untracked)
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:00:47
+    by: Akenzy
+    reason: working rtk tree is shared by the wave - T-01-01 (done, uncommitted), T-01-02 (in progress), T-02-01/T-02-04 (paired), scripts/bench-catalog-page.js (pre-existing untracked)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:00:47
+    by: Akenzy
+    reason: working rtk tree is shared by the wave - T-01-01 (done, uncommitted), T-01-02 (in progress), T-02-01/T-02-04 (paired), scripts/bench-catalog-page.js (pre-existing untracked)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:00:52
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:01:33
+    by: Akenzy
+    reason: working tree shared by the wave - T-01-01/T-02-01/T-02-04 done uncommitted, T-02-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:01:33
+    by: Akenzy
+    reason: working tree shared by the wave - T-01-01/T-02-01/T-02-04 done uncommitted, T-02-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:01:40
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:04:20
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:04:20
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:04:24
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:06:03
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:06:03
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:06:28
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:06:43
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:06:43
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:06:49
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:06:49
+    by: claude
+    ticket: T-04-01
+  - gate: G1
+    action: reopened
+    at: 2026-09-24T21:11:14
+    by: Akenzy
+    reason: Akenzy 2026-09-24 - add AC-28 + ticket for single-order approve branch check (pre-existing hole found in T-02-02); note accepted AC-08 behaviour (confirm may commit before NO_OPEN_SESSION); pos-web dto/interface files added to POS ticket touches
+  - gate: G1
+    action: passed
+    at: 2026-09-24T21:11:47
+    by: Akenzy
+    evidence: 16 assumptions, none blocking-and-pending; 25 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-09-24T21:11:47
+    by: Akenzy
+    evidence: 7 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-09-24T21:11:47
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:11:53
+    by: claude
+    ticket: T-02-05
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:14:28
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-05/T-04-01/T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:14:28
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-05/T-04-01/T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:14:33
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:15:30
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-01-05/T-02-05/T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:15:30
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-01-05/T-02-05/T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-04-01
+  - gate: G3
+    action: reopened
+    at: 2026-09-24T21:20:57
+    by: Akenzy
+    reason: Akenzy - T-02-05 touches += online-order-fulfilment e2e (its approve helper relied on the cross-branch hole); T-02-03 touches += OnlineOrderFilterBar/OnlineOrderTable/use-online-order-list created by T-01-05 (needed to enable Nhận xử lý)
+  - gate: G3
+    action: passed
+    at: 2026-09-24T21:20:57
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 18 tickets, no cycles
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:24:13
+    by: Akenzy
+    reason: working rtk tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:24:13
+    by: Akenzy
+    reason: working rtk tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:24:13
+    by: Akenzy
+    reason: working rtk tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-02-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:24:13
+    by: Akenzy
+    reason: working rtk tree shared by the wave - earlier done tickets uncommitted, T-03-02 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-02-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:24:49
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:24:49
+    by: claude
+    ticket: T-05-01
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:26:35
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-03/T-05-01 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:26:35
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-03/T-05-01 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-09-24T21:32:24
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-03 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-24T21:32:24
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-03 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-24T21:33:33
+    by: claude
+    ticket: T-05-02
+  - gate: G4
+    action: scope
+    at: 2026-09-25T00:44:34
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-03 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-25T00:44:34
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted, T-02-03 in progress, scripts/bench-catalog-page.js pre-existing
+    ticket: T-05-02
+  - gate: G4
+    action: scope
+    at: 2026-09-25T00:47:51
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted; T-02-03 did not regenerate api-client (already regenerated in T-01-03; pos-web uses hand-declared types); scripts/bench-catalog-page.js pre-existing
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-25T00:47:51
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted; T-02-03 did not regenerate api-client (already regenerated in T-01-03; pos-web uses hand-declared types); scripts/bench-catalog-page.js pre-existing
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-25T00:47:57
+    by: claude
+    ticket: T-04-02
+  - gate: G4
+    action: scope
+    at: 2026-09-25T00:58:55
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted; scripts/bench-catalog-page.js pre-existing
+    ticket: T-04-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-25T00:58:55
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted; scripts/bench-catalog-page.js pre-existing
+    ticket: T-04-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-25T00:58:56
+    by: claude
+    ticket: T-04-03
+  - gate: G4
+    action: scope
+    at: 2026-09-25T01:03:28
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted; scripts/bench-catalog-page.js pre-existing
+    ticket: T-04-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-25T01:03:28
+    by: Akenzy
+    reason: working tree shared by the wave - earlier done tickets uncommitted; scripts/bench-catalog-page.js pre-existing
+    ticket: T-04-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-09-25T01:03:38
+    by: claude
+    ticket: T-05-04
+  - gate: G4
+    action: scope
+    at: 2026-09-25T01:10:28
+    by: Akenzy
+    reason: working tree shared by the feature (uncommitted); T-05-04 did not regenerate api-client (already current from T-04-02); scripts/bench-catalog-page.js pre-existing
+    ticket: T-05-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-09-25T01:10:28
+    by: Akenzy
+    reason: working tree shared by the feature (uncommitted); T-05-04 did not regenerate api-client (already current from T-04-02); scripts/bench-catalog-page.js pre-existing
+    ticket: T-05-04
+  - gate: G4
+    action: passed
+    at: 2026-09-27T11:24:12
+    by: Akenzy
+    evidence: no `evidence -` block in .ai/aidlc.yaml — verification is not configured for this repo, so G4 asks for none; all 18 tickets done, all UoW checklists ticked
+  - gate: G5
+    action: passed
+    at: 2026-09-27T11:25:00
+    by: Akenzy
+    evidence: assumptions resolved, ADRs settled, graph valid

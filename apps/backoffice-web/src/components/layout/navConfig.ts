@@ -504,6 +504,11 @@ export const navConfig: NavModule[] = [
             label: "Cửa hàng",
             permission: "branch.read",
           },
+          {
+            to: "/admin/delivery-partners",
+            label: "Đối tác giao hàng",
+            permission: "pos.sales-channel.manage",
+          },
           // { to: "/admin/cash-boxes", label: "Két đựng tiền", views: [STORE_TYPE.SINGLE] },
           // { to: "/admin/work-shifts", label: "Ca làm việc", views: [STORE_TYPE.SINGLE] },
           // {

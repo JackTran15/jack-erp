@@ -28539,6 +28539,102 @@
         ]
       }
     },
+    "/mobile/sales-orders/process": {
+      "post": {
+        "operationId": "SalesOrderController_process",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchSalesOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderBatchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "*Nhận xử lý* nhiều đơn (A-01, ADR-07): mỗi id duyệt nếu cần rồi approve,\ntừng đơn độc lập. 200 kể cả khi có đơn lỗi — lý do nằm ở `results[i]`.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/deliver": {
+      "post": {
+        "operationId": "SalesOrderController_deliver",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeliverSalesOrdersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderBatchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "*Giao hàng* nhiều đơn (ADR-07, AC-18, AC-19): `AWAITING_PICKUP | FAILED →\nIN_TRANSIT`. 200 kể cả khi có đơn lỗi; đối tác không hợp lệ → 400 cả request.\nKhai TRƯỚC các route `:id` POST.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/sales-orders/delivery-status": {
+      "post": {
+        "operationId": "SalesOrderController_deliveryStatus",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeliveryStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesOrderBatchResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "*Cập nhật TT* / *Hoàn thành* nhiều đơn theo `DELIVERY_TRANSITIONS` (AC-20,\nAC-22). `to = RETURNED` chưa hỗ trợ → 400.",
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
     "/mobile/sales-orders/{id}/confirm": {
       "post": {
         "operationId": "SalesOrderController_confirm",
@@ -28595,6 +28691,7 @@
             }
           }
         },
+        "summary": "*Nhận xử lý* một đơn chi nhánh đang giữ; đơn chi nhánh khác → 403\n`ORDER_NOT_HELD_BY_BRANCH`, đơn không đổi (AC-28).",
         "tags": [
           "mobile"
         ]
@@ -28985,6 +29082,85 @@
         "summary": "Đối tác đặt đơn — đơn rơi vào pool chưa phân chi nhánh",
         "tags": [
           "Partner orders"
+        ]
+      }
+    },
+    "/mobile/sales-channels": {
+      "get": {
+        "operationId": "MobileSalesChannelController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/mobile/delivery-partners": {
+      "get": {
+        "operationId": "MobileDeliveryPartnerController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
+        ]
+      }
+    },
+    "/v2/mobile/sales-orders/search": {
+      "post": {
+        "operationId": "BranchSalesOrderV2Controller_search_v2",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchBranchSalesOrdersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "mobile"
         ]
       }
     },
@@ -56437,6 +56613,8 @@
           "CONFIRMED",
           "RETURNED",
           "PROCESSED",
+          "DELIVERED",
+          "DELIVERY_STATUS_UPDATED",
           "REJECTED",
           "CANCELLED"
         ]
@@ -56455,6 +56633,10 @@
                 "$ref": "#/components/schemas/SalesOrderHistoryKind"
               }
             ]
+          },
+          "label": {
+            "type": "string",
+            "description": "Nhãn tiếng Việt của mốc; \"Cập nhật giao hàng\" kèm chuyển trạng thái (vd. \"Cập nhật giao hàng: Đang giao hàng → Hoàn thành\")"
           },
           "actorName": {
             "type": "string",
@@ -56484,6 +56666,7 @@
         "required": [
           "at",
           "kind",
+          "label",
           "actorName",
           "statusAfter"
         ]
@@ -56747,6 +56930,139 @@
         },
         "required": [
           "orders"
+        ]
+      },
+      "BatchSalesOrderDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "SalesOrderBatchResultDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã lỗi máy đọc (vd `NO_OPEN_SESSION`, `ORDER_NOT_PROCESSABLE`); vắng khi `ok` hoặc lỗi không mang mã.",
+            "example": "ORDER_NOT_PROCESSABLE"
+          },
+          "message": {
+            "type": "string",
+            "description": "Lý do hiển thị (tiếng Việt); vắng khi `ok`."
+          }
+        },
+        "required": [
+          "id",
+          "ok"
+        ]
+      },
+      "SalesOrderBatchResponseDto": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalesOrderBatchResultDto"
+            }
+          }
+        },
+        "required": [
+          "results"
+        ]
+      },
+      "DeliverSalesOrdersDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "deliveryPartnerId": {
+            "type": "string",
+            "description": "`delivery_partners.id` — phải đang hoạt động và cùng tổ chức, không thì cả request 400.",
+            "format": "uuid"
+          },
+          "trackingCode": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Mã vận đơn"
+          },
+          "partnerShippingFee": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Phí giao hàng trả đối tác; bỏ trống = NULL"
+          },
+          "packageInfo": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Thông tin gói hàng"
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "DeliveryStatus": {
+        "type": "string",
+        "enum": [
+          "AWAITING_PICKUP",
+          "IN_TRANSIT",
+          "AWAITING_COD",
+          "COMPLETED",
+          "FAILED",
+          "RETURNED"
+        ]
+      },
+      "UpdateDeliveryStatusDto": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "to": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DeliveryStatus"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "ids",
+          "to"
         ]
       },
       "RejectSalesOrderDto": {
@@ -57506,6 +57822,246 @@
           "amountDue",
           "shippingFee",
           "lines"
+        ]
+      },
+      "BranchSalesOrderColumnFiltersDto": {
+        "type": "object",
+        "properties": {
+          "externalOrderId": {
+            "description": "Mã đơn hàng (OCM) → `external_order_id`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "orderDate": {
+            "description": "Ngày đơn hàng → `created_at`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "deliveryInfo": {
+            "description": "Thông tin giao hàng — the grid shows a composed string, so the filter is\nmatched against each source column (recipient name/phone, address line,\nward, province) with OR.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "amountDue": {
+            "description": "Tổng thanh toán → `amount_due`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "status": {
+            "description": "Trạng thái → `status`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "deliveryPartnerName": {
+            "description": "ĐT giao vận → `delivery_partner_name` (snapshot).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "salespersonName": {
+            "description": "NV bán hàng → `salesperson_name` (snapshot).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "invoiceCode": {
+            "description": "Số hoá đơn → `invoices.code`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "note": {
+            "description": "Ghi chú → `note`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "deliveredAt": {
+            "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "invoiceDate": {
+            "description": "Ngày HĐ → `invoices.issued_at`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DateRangeFilterDto"
+              }
+            ]
+          },
+          "customerName": {
+            "description": "Khách hàng → `customer_name` (snapshot).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "trackingCode": {
+            "description": "Mã vận đơn → `tracking_code`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "packageInfo": {
+            "description": "Thông tin gói hàng → `package_info`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "salesChannel": {
+            "description": "Kênh bán hàng → `sales_channel` (snapshot label).",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StringFilterDto"
+              }
+            ]
+          },
+          "deliveryStatus": {
+            "description": "Trạng thái giao → `delivery_status`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnumFilterDto"
+              }
+            ]
+          },
+          "shippingFeeCustomer": {
+            "description": "Phí GH thu khách → `invoices.shipping_fee_amount`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "deposit": {
+            "description": "Đặt cọc → `invoices.deposit_amount`.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "remainingReceivable": {
+            "description": "Khách nợ / Còn phải thu → `invoice_debts.remaining_amount`, 0 without a debt.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          },
+          "partnerShippingFee": {
+            "description": "Phí GH trả ĐT → `partner_shipping_fee`; NULL (unknown) never matches.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CompareFilterDto"
+              }
+            ]
+          }
+        }
+      },
+      "SearchBranchSalesOrdersDto": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "enum": [
+              "ONLINE",
+              "DELIVERY"
+            ],
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string",
+            "description": "`sales_channels.id` — required for the ONLINE view (the sidebar selection), optional for DELIVERY.",
+            "format": "uuid"
+          },
+          "status": {
+            "description": "Status tab (A-13). Absent = \"Tất cả\". DRAFT never matches.",
+            "enum": [
+              "DRAFT",
+              "SENT",
+              "PROCESSED",
+              "REJECTED",
+              "CANCELLED"
+            ],
+            "type": "string"
+          },
+          "deliveryTab": {
+            "description": "DELIVERY view tab. Absent = \"Tất cả\" (every order in the delivery lifecycle).",
+            "enum": [
+              "AWAITING_PICKUP",
+              "IN_TRANSIT",
+              "AWAITING_COD",
+              "COMPLETED",
+              "FAILED",
+              "RETURNED",
+              "CANCELLED",
+              "PAID",
+              "UNPAID"
+            ],
+            "type": "string"
+          },
+          "dateField": {
+            "enum": [
+              "CREATED",
+              "DELIVERED",
+              "INVOICED"
+            ],
+            "type": "string",
+            "default": "CREATED"
+          },
+          "from": {
+            "type": "string",
+            "description": "`YYYY-MM-DD` = a business-local (Asia/Ho_Chi_Minh) day; a full timestamp is an exact instant."
+          },
+          "to": {
+            "type": "string"
+          },
+          "stockShort": {
+            "type": "boolean",
+            "description": "Nhãn \"Thiếu hàng\" (A-10). Absent = no label filter."
+          },
+          "columnFilters": {
+            "$ref": "#/components/schemas/BranchSalesOrderColumnFiltersDto"
+          },
+          "page": {
+            "type": "number",
+            "default": 1,
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "default": 20,
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "view"
         ]
       },
       "ProvinceMergedFromDto": {

@@ -1,3 +1,5 @@
+import { DeliveryStatus } from './entities/sales-order.entity';
+
 /**
  * Hằng số của **cửa ghi cho đối tác** (`POST /v2/partner/orders`).
  *
@@ -36,3 +38,30 @@ export const GEO_CODE_UNKNOWN = 'GEO_CODE_UNKNOWN';
  * trùng chuỗi; đây là nơi khai báo.
  */
 export const CHANNEL_INACTIVE = 'CHANNEL_INACTIVE';
+
+/**
+ * Quyền giao hàng và đổi trạng thái giao (`POST deliver`, `POST delivery-status`
+ * — feature 2026092402-pos-order-delivery-lifecycle).
+ *
+ * Để ở đây chứ không trong `SALES_ORDER_PERMISSIONS` (`sales-order.service.ts`)
+ * chỉ vì ticket khai báo nó (T-02-01) không được sửa service; ticket nối route
+ * nên gom nó về đó. Một chuỗi duy nhất — đừng gõ lại ở call site.
+ */
+export const SALES_ORDER_DELIVER_PERMISSION = 'pos.sales-order.deliver';
+
+/**
+ * Bảng chuyển trạng thái giao — NGUỒN DUY NHẤT cho kiểm tra ở service và cho
+ * `allowedNextStatuses` trả về client (không nhân bản ở FE). Đứng riêng khỏi
+ * `VALID_TRANSITIONS` của `status`: hai trục độc lập (ADR-01).
+ *
+ * `COMPLETED` và `RETURNED` là điểm cuối. `FAILED → IN_TRANSIT` là giao lại;
+ * `→ RETURNED` đi qua huỷ hoá đơn (ADR-04).
+ */
+export const DELIVERY_TRANSITIONS: Readonly<Record<DeliveryStatus, readonly DeliveryStatus[]>> = {
+  [DeliveryStatus.AWAITING_PICKUP]: [DeliveryStatus.IN_TRANSIT],
+  [DeliveryStatus.IN_TRANSIT]: [DeliveryStatus.AWAITING_COD, DeliveryStatus.FAILED, DeliveryStatus.COMPLETED],
+  [DeliveryStatus.FAILED]: [DeliveryStatus.IN_TRANSIT, DeliveryStatus.RETURNED],
+  [DeliveryStatus.AWAITING_COD]: [DeliveryStatus.COMPLETED],
+  [DeliveryStatus.COMPLETED]: [],
+  [DeliveryStatus.RETURNED]: [],
+};

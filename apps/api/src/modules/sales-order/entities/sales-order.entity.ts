@@ -16,6 +16,24 @@ export enum SalesOrderStatus {
 }
 
 /**
+ * Trạng thái GIAO HÀNG — trục thứ hai, đặt cạnh {@link SalesOrderStatus} chứ
+ * không trộn vào nó (ADR-01). NULL = đơn chưa vào vòng đời giao. Bảng chuyển
+ * hợp lệ là `DELIVERY_TRANSITIONS` ở `sales-order.constants.ts`.
+ */
+export enum DeliveryStatus {
+  /** `approve` đặt khi đơn thành `PROCESSED` — chờ giao cho đối tác. */
+  AWAITING_PICKUP = 'AWAITING_PICKUP',
+  IN_TRANSIT = 'IN_TRANSIT',
+  /** Shipper báo đã giao, chờ tiền COD về. */
+  AWAITING_COD = 'AWAITING_COD',
+  COMPLETED = 'COMPLETED',
+  /** Giao thất bại — giao lại (`IN_TRANSIT`) hoặc chuyển hoàn (`RETURNED`). */
+  FAILED = 'FAILED',
+  /** Chuyển hoàn: đi qua huỷ hoá đơn, kéo `status = CANCELLED` (ADR-04). */
+  RETURNED = 'RETURNED',
+}
+
+/**
  * Đơn hàng do TƯ VẤN VIÊN gửi từ app, chờ THU NGÂN nhận xử lý — luồng chỉ có ở
  * mobile. KHÔNG tái dùng `invoices`: bảng đó có `is_draft` nhưng nghĩa là "giữ
  * máy tính tiền", không phải một quy trình duyệt; trộn đơn chưa duyệt vào đó
@@ -27,6 +45,7 @@ export enum SalesOrderStatus {
 @Entity('sales_orders')
 @Index('IDX_sales_orders_org_branch_status_created', ['organizationId', 'branchId', 'status', 'createdAt'])
 @Index('IDX_sales_orders_org_salesperson_created', ['organizationId', 'salespersonId', 'createdAt'])
+@Index('IDX_sales_orders_org_branch_delivery_status', ['organizationId', 'branchId', 'deliveryStatus'])
 export class SalesOrderEntity extends BaseEntity {
   /** `DT000001` — sinh bởi `DocumentNumberingService`, duy nhất theo TỔ CHỨC. */
   @Column({ name: 'document_number', type: 'varchar' })
@@ -192,6 +211,49 @@ export class SalesOrderEntity extends BaseEntity {
   /** `users.id` của người duyệt; NULL khi chưa duyệt. */
   @Column({ name: 'confirmed_by', type: 'uuid', nullable: true })
   confirmedBy: string | null;
+
+  /** Trục giao hàng (ADR-01); NULL = chưa vào vòng đời giao. */
+  @Column({
+    name: 'delivery_status',
+    type: 'enum',
+    enum: DeliveryStatus,
+    enumName: 'sales_order_delivery_status_enum',
+    nullable: true,
+  })
+  deliveryStatus: DeliveryStatus | null;
+
+  /** Lần đầu sang `IN_TRANSIT` — cột "Ngày GH". Giao lại không ghi đè. */
+  @Column({ name: 'delivered_at', type: 'timestamptz', nullable: true })
+  deliveredAt: Date | null;
+
+  /**
+   * `delivery_partners.id` — tuỳ chọn khi giao. FK nằm ở migration
+   * `1790100700000`; cố ý KHÔNG khai `@ManyToOne` ở đây: `autoLoadEntities`
+   * chỉ nạp entity có trong `forFeature`, và một quan hệ trỏ tới entity chưa
+   * nạp làm DataSource ném lỗi lúc boot. Tên đối tác đọc qua
+   * {@link deliveryPartnerName}, không join.
+   */
+  @Column({ name: 'delivery_partner_id', type: 'uuid', nullable: true })
+  deliveryPartnerId: string | null;
+
+  /** Tên đối tác CHỐT lúc giao — đổi tên đối tác sau đó không đổi đơn (ADR-02). */
+  @Column({ name: 'delivery_partner_name', type: 'varchar', length: 200, nullable: true })
+  deliveryPartnerName: string | null;
+
+  /** Mã vận đơn nhập tay. */
+  @Column({ name: 'tracking_code', type: 'varchar', length: 100, nullable: true })
+  trackingCode: string | null;
+
+  /**
+   * "Phí GH trả ĐT" — phí trả cho đối tác, tuỳ chọn. NULL = chưa biết, KHÁC 0;
+   * vì vậy không có default. Chuỗi như mọi cột tiền khác.
+   */
+  @Column({ name: 'partner_shipping_fee', type: 'numeric', precision: 18, scale: 2, nullable: true })
+  partnerShippingFee: string | null;
+
+  /** "Thông tin gói hàng" nhập lúc giao. */
+  @Column({ name: 'package_info', type: 'varchar', length: 500, nullable: true })
+  packageInfo: string | null;
 
   @OneToMany(() => SalesOrderLineEntity, (line) => line.salesOrder, { cascade: ['insert'] })
   lines: SalesOrderLineEntity[];

@@ -237,6 +237,10 @@ export const CASHIER_PERMISSION_KEYS: string[] = [
   'pos.sales-order.cancel',
   'pos.sales-order.approve',
   'pos.sales-order.reject',
+  // …and hands processed orders to the delivery partner / moves them through
+  // the delivery lifecycle. Migration 1790100700000 grants it to every role
+  // that holds `pos.sales-order.approve`.
+  'pos.sales-order.deliver',
   'pos.invoice.read',
   'pos.invoice.write',
   'pos.return.create',

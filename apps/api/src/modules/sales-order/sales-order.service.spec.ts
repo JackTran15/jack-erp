@@ -6,22 +6,31 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import {
   CASHIER_PERMISSION_KEYS,
+  SALES_PERMISSION_KEYS,
   SYSTEM_ADMIN_PERMISSION_KEYS,
 } from '../../database/seeds/org-role-permissions';
 import { REQUIRE_PERMISSION_KEY } from '../auth/decorators';
 import { BranchEntity } from '../branch/branch.entity';
 import { ItemEntity } from '../inventory/location/item.entity';
+import { InvoiceDebtEntity } from '../pos/entities/invoice-debt.entity';
+import { InvoiceEntity } from '../pos/entities/invoice.entity';
 import { InvoiceService } from '../pos/services/invoice.service';
 import { PermissionGuard } from '../rbac/permission.guard';
 import { AdminSalesOrderController } from './controllers/admin-sales-order.controller';
+import { SalesOrderController } from './sales-order.controller';
 import { SALES_ORDER_PERMISSIONS, SalesOrderService, normalizePartnerPhone } from './sales-order.service';
 import type { PartnerCreateOrderDto } from './dto/partner-create-order.dto';
+import { BatchSalesOrderDto } from './dto/batch-sales-order.dto';
+import { DeliverSalesOrdersDto } from './dto/deliver-sales-orders.dto';
+import { UpdateDeliveryStatusDto } from './dto/update-delivery-status.dto';
 import { ReturnSalesOrderDto } from './dto/return-sales-order.dto';
 import { UNASSIGNED_BRANCH_FILTER } from './dto/sales-order-list.query.dto';
+import { DeliveryPartnerEntity } from './entities/delivery-partner.entity';
 import type { SalesChannelEntity } from './entities/sales-channel.entity';
 import { SalesOrderDispatchAction } from './entities/sales-order-dispatch-event.entity';
 import { SalesOrderLineEntity } from './entities/sales-order-line.entity';
-import { SalesOrderStatus } from './entities/sales-order.entity';
+import { DeliveryStatus, SalesOrderStatus } from './entities/sales-order.entity';
+import { decodeDeliveryStatusReason } from './sales-order-history.service';
 
 /**
  * Ba luật đáng khoá nhất, và không luật nào nhìn thấy được bằng mắt trên app:
@@ -634,6 +643,22 @@ describe('SalesOrderService', () => {
       expect(updates[0]).toMatchObject({ status: SalesOrderStatus.CANCELLED });
     });
 
+    it('huỷ đơn KHÔNG đụng delivery_status (tab "Đã huỷ" khoá theo status) — T-05-02', async () => {
+      const { service, updates } = build({
+        current: {
+          status: SalesOrderStatus.PROCESSED,
+          salespersonId: 'sp-1',
+          invoiceId: 'inv-77',
+          deliveryStatus: DeliveryStatus.IN_TRANSIT,
+        },
+      });
+
+      await service.cancel('so-1', 'Khách báo huỷ', actor);
+
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).not.toHaveProperty('deliveryStatus');
+    });
+
     it('hoá đơn từ chối huỷ → ném ra ngoài, đơn KHÔNG đổi trạng thái (rollback)', async () => {
       const { service, updates, cancelInvoiceService } = build({
         current: {
@@ -1239,6 +1264,7 @@ describe('SalesOrderService', () => {
       expect(dispatchEvents.map((e) => e.action)).toEqual([
         SalesOrderDispatchAction.DISPATCH,
         SalesOrderDispatchAction.CONFIRM,
+        SalesOrderDispatchAction.PROCESS,
       ]);
       expect(invoiceService.createDraftIn).toHaveBeenCalledTimes(1);
     });
@@ -1885,6 +1911,849 @@ describe('SalesOrderService', () => {
       ).rejects.toMatchObject({ response: { code: 'ORDER_NOT_HELD_BY_BRANCH' } });
       expect(updates).toEqual([]);
       expect(dispatchEvents).toEqual([]);
+    });
+  });
+  /**
+   * *Nhận xử lý* đưa đơn vào vòng đời giao (ADR-01, AC-06): `AWAITING_PICKUP`
+   * trong CÙNG câu update `PROCESSED`, và một dòng `PROCESS` trong cùng
+   * transaction.
+   */
+  describe('approve: vào vòng đời giao (T-02-02)', () => {
+    it('set delivery_status = AWAITING_PICKUP cùng update PROCESSED, ghi MỘT dòng PROCESS from/to NULL', async () => {
+      const { service, updates, dispatchEvents } = build({
+        current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' },
+      });
+
+      await service.approve('so-1', actor);
+
+      const processed = updates.find((u) => u.status === SalesOrderStatus.PROCESSED);
+      expect(processed).toMatchObject({ invoiceId: 'inv-1', deliveryStatus: DeliveryStatus.AWAITING_PICKUP });
+      expect(dispatchEvents).toEqual([
+        {
+          organizationId: 'org-1',
+          salesOrderId: 'so-1',
+          action: SalesOrderDispatchAction.PROCESS,
+          fromBranchId: null,
+          toBranchId: null,
+          actorUserId: 'u-1',
+          reason: null,
+        },
+      ]);
+    });
+
+    it('approve hỏng (chưa mở ca) → không AWAITING_PICKUP, không dòng PROCESS', async () => {
+      const { service, updates, dispatchEvents } = build({
+        current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' },
+        openSession: false,
+      });
+
+      await expect(service.approve('so-1', actor)).rejects.toMatchObject({ response: { code: 'NO_OPEN_SESSION' } });
+      expect(updates.some((u) => 'deliveryStatus' in u)).toBe(false);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+  });
+
+  /**
+   * `POST /mobile/sales-orders/process` (A-01, ADR-07, AC-06..AC-08): mỗi id
+   * duyệt nếu cần rồi approve, TUẦN TỰ, lỗi từng đơn nằm trong kết quả.
+   */
+  describe('processBatch', () => {
+    const cashier = { canApprove: true };
+    /** Đơn web chi nhánh `br-1` đang giữ, chưa duyệt. */
+    const webUnconfirmed = {
+      id: 'so-web',
+      status: SalesOrderStatus.SENT,
+      branchId: 'br-1',
+      salespersonId: null,
+      salesChannel: 'Website công ty',
+      shippingFee: '30000',
+      confirmedAt: null,
+      confirmedBy: null,
+    };
+
+    it('đơn web CHƯA duyệt → confirm rồi approve: CONFIRM + PROCESS, PROCESSED + AWAITING_PICKUP (AC-06)', async () => {
+      const { service, updates, dispatchEvents, invoiceService } = build({ ...cashier, current: webUnconfirmed });
+      const confirm = jest.spyOn(service, 'confirm');
+
+      const { results } = await service.processBatch(['so-web'], actor);
+
+      expect(results).toEqual([{ id: 'so-web', ok: true }]);
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(updates[0]).toMatchObject({ confirmedBy: 'u-1' });
+      expect(updates.some((u) => u.status === SalesOrderStatus.PROCESSED && u.deliveryStatus === DeliveryStatus.AWAITING_PICKUP)).toBe(true);
+      expect(dispatchEvents.map((e) => e.action)).toEqual([
+        SalesOrderDispatchAction.CONFIRM,
+        SalesOrderDispatchAction.PROCESS,
+      ]);
+      // Phí giao của đơn sang hoá đơn nháp (AC-06: shipping_fee_amount = 30.000).
+      expect(invoiceService.createDraftIn.mock.calls[0][3]).toEqual({ shippingFeeAmount: 30000 });
+    });
+
+    it('đơn web ĐÃ duyệt → chỉ approve, không duyệt lại, không dòng CONFIRM thứ hai', async () => {
+      const { service, dispatchEvents } = build({
+        ...cashier,
+        current: { ...webUnconfirmed, confirmedAt: new Date('2026-09-24T01:00:00Z'), confirmedBy: 'u-9' },
+      });
+      const confirm = jest.spyOn(service, 'confirm');
+
+      const { results } = await service.processBatch(['so-web'], actor);
+
+      expect(results).toEqual([{ id: 'so-web', ok: true }]);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(dispatchEvents.map((e) => e.action)).toEqual([SalesOrderDispatchAction.PROCESS]);
+    });
+
+    it('đơn tư vấn viên → không có bước duyệt, approve thẳng', async () => {
+      const { service } = build({
+        ...cashier,
+        current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' },
+      });
+      const confirm = jest.spyOn(service, 'confirm');
+
+      await expect(service.processBatch(['so-1'], actor)).resolves.toEqual({ results: [{ id: 'so-1', ok: true }] });
+      expect(confirm).not.toHaveBeenCalled();
+    });
+
+    it('chi nhánh CHƯA mở ca → NO_OPEN_SESSION trong kết quả, đơn không tới PROCESSED, không ném (AC-08)', async () => {
+      const { service, updates, dispatchEvents, invoiceService } = build({
+        ...cashier,
+        current: webUnconfirmed,
+        openSession: false,
+      });
+
+      const { results } = await service.processBatch(['so-web'], actor);
+
+      expect(results).toEqual([
+        { id: 'so-web', ok: false, code: 'NO_OPEN_SESSION', message: 'Chi nhánh chưa mở ca' },
+      ]);
+      expect(invoiceService.createDraftIn).not.toHaveBeenCalled();
+      expect(updates.some((u) => u.status === SalesOrderStatus.PROCESSED || 'deliveryStatus' in u)).toBe(false);
+      // confirm và approve là hai transaction: đơn ở lại SENT + đã duyệt — hợp lệ.
+      expect(dispatchEvents.map((e) => e.action)).toEqual([SalesOrderDispatchAction.CONFIRM]);
+    });
+
+    it('một đơn lỗi KHÔNG chặn đơn sau: đơn đầu hỏng giữa chừng, đơn sau vẫn xử lý (AC-07)', async () => {
+      const { service, posSessions, updates } = build({
+        ...cashier,
+        current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' },
+      });
+      posSessions.findOpenForBranch.mockRejectedValueOnce(
+        new ConflictException({ code: 'NO_OPEN_SESSION', message: 'Chi nhánh chưa mở ca' }),
+      );
+
+      const { results } = await service.processBatch(['so-1', 'so-2'], actor);
+
+      expect(results).toEqual([
+        { id: 'so-1', ok: false, code: 'NO_OPEN_SESSION', message: 'Chi nhánh chưa mở ca' },
+        { id: 'so-2', ok: true },
+      ]);
+      expect(updates.filter((u) => u.status === SalesOrderStatus.PROCESSED)).toHaveLength(1);
+    });
+
+    it('đơn không còn SENT → ORDER_NOT_PROCESSABLE, đơn kế tiếp vẫn chạy, đơn lỗi không bị đụng (AC-07)', async () => {
+      const { service, orders, invoiceService } = build({
+        ...cashier,
+        current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' },
+      });
+      const approve = jest.spyOn(service, 'approve');
+      const base = await orders.findOne();
+      (orders.findOne as jest.Mock).mockResolvedValueOnce({ ...base, id: 'so-2', status: SalesOrderStatus.CANCELLED });
+
+      const { results } = await service.processBatch(['so-2', 'so-1'], actor);
+
+      expect(results).toEqual([
+        { id: 'so-2', ok: false, code: 'ORDER_NOT_PROCESSABLE', message: 'Đơn không còn ở trạng thái chưa xử lý' },
+        { id: 'so-1', ok: true },
+      ]);
+      expect(approve).toHaveBeenCalledTimes(1);
+      expect(approve).toHaveBeenCalledWith('so-1', actor, { heldByBranchId: 'br-1' });
+      expect(invoiceService.createDraftIn).toHaveBeenCalledTimes(1);
+    });
+
+    it('đơn của chi nhánh KHÁC → ORDER_NOT_PROCESSABLE, không confirm/approve', async () => {
+      const { service, updates, dispatchEvents } = build({ ...cashier, current: { ...webUnconfirmed, branchId: 'br-2' } });
+      const confirm = jest.spyOn(service, 'confirm');
+      const approve = jest.spyOn(service, 'approve');
+
+      const { results } = await service.processBatch(['so-web'], actor);
+
+      expect(results).toEqual([
+        { id: 'so-web', ok: false, code: 'ORDER_NOT_PROCESSABLE', message: 'Đơn hàng không thuộc chi nhánh đang thao tác' },
+      ]);
+      expect(confirm).not.toHaveBeenCalled();
+      expect(approve).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(0);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+
+    it('đơn rời chi nhánh giữa lượt đọc và lượt khoá → approve chặn DƯỚI khoá: ORDER_NOT_PROCESSABLE, không tạo nháp', async () => {
+      const order = { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' };
+      const { service, lockQb, invoiceService, updates } = build({ ...cashier, current: order });
+      lockQb.getOne.mockResolvedValueOnce({ ...order, id: 'so-1', branchId: 'br-2' });
+
+      const { results } = await service.processBatch(['so-1'], actor);
+
+      expect(results).toEqual([
+        { id: 'so-1', ok: false, code: 'ORDER_NOT_PROCESSABLE', message: 'Đơn không còn ở trạng thái chưa xử lý' },
+      ]);
+      expect(invoiceService.createDraftIn).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(0);
+    });
+
+    it('approve ném 409 KHÔNG mã (đơn vừa được xử lý nơi khác) → ORDER_NOT_PROCESSABLE', async () => {
+      const order = { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-1' };
+      const { service, lockQb } = build({ ...cashier, current: order });
+      lockQb.getOne.mockResolvedValueOnce({ ...order, id: 'so-1', status: SalesOrderStatus.PROCESSED });
+
+      await expect(service.processBatch(['so-1'], actor)).resolves.toEqual({
+        results: [{ id: 'so-1', ok: false, code: 'ORDER_NOT_PROCESSABLE', message: 'Đơn không còn ở trạng thái chưa xử lý' }],
+      });
+    });
+
+    it('approve gọi KHÔNG kèm heldByBranchId → không kiểm chi nhánh (tuỳ chọn của service)', async () => {
+      const { service } = build({ current: { status: SalesOrderStatus.SENT, salespersonId: 'sp-1', branchId: 'br-9' } });
+      await expect(service.approve('so-1', actor)).resolves.toMatchObject({ status: SalesOrderStatus.PROCESSED });
+    });
+  });
+
+  /**
+   * AC-28: route đơn `POST /mobile/sales-orders/:id/approve` chỉ nhận đơn chi
+   * nhánh người gọi (header `X-Branch-Id` → `actor.branchId`) đang giữ. Đi qua
+   * controller THẬT để khoá việc route truyền `heldByBranchId`.
+   */
+  describe('POST :id/approve — chỉ trong chi nhánh người gọi (T-02-05, AC-28)', () => {
+    const consultantOrder = { status: SalesOrderStatus.SENT, salespersonId: 'sp-1' };
+
+    it('đơn chi nhánh KHÁC → 403 ORDER_NOT_HELD_BY_BRANCH, không tra ca, không tạo hoá đơn, đơn vẫn SENT', async () => {
+      const { service, updates, dispatchEvents, posSessions, invoiceService } = build({
+        canApprove: true,
+        current: { ...consultantOrder, branchId: 'br-2' },
+      });
+      const controller = new SalesOrderController(service, {} as never);
+
+      const attempt = controller.approve('so-1', { ...actor, branchId: 'br-1' });
+
+      await expect(attempt).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(attempt).rejects.toMatchObject({ response: { code: 'ORDER_NOT_HELD_BY_BRANCH' } });
+      expect(posSessions.findOpenForBranch).not.toHaveBeenCalled();
+      expect(invoiceService.createDraftIn).not.toHaveBeenCalled();
+      expect(updates).toHaveLength(0);
+      expect(dispatchEvents).toHaveLength(0);
+    });
+
+    it('đơn chi nhánh khác đã PROCESSED → vẫn 403, không lộ trạng thái', async () => {
+      const { service } = build({
+        canApprove: true,
+        current: { ...consultantOrder, status: SalesOrderStatus.PROCESSED, branchId: 'br-2' },
+      });
+      const controller = new SalesOrderController(service, {} as never);
+
+      await expect(controller.approve('so-1', actor)).rejects.toMatchObject({
+        response: { code: 'ORDER_NOT_HELD_BY_BRANCH' },
+      });
+    });
+
+    it('đúng chi nhánh → như cũ: tạo nháp, PROCESSED + AWAITING_PICKUP', async () => {
+      const { service, updates, invoiceService } = build({
+        canApprove: true,
+        current: { ...consultantOrder, branchId: 'br-1' },
+      });
+      const controller = new SalesOrderController(service, {} as never);
+      const approve = jest.spyOn(service, 'approve');
+
+      await expect(controller.approve('so-1', actor)).resolves.toMatchObject({ status: SalesOrderStatus.PROCESSED });
+
+      expect(approve).toHaveBeenCalledWith('so-1', actor, { heldByBranchId: 'br-1' });
+      expect(invoiceService.createDraftIn).toHaveBeenCalledTimes(1);
+      expect(
+        updates.some((u) => u.status === SalesOrderStatus.PROCESSED && u.deliveryStatus === DeliveryStatus.AWAITING_PICKUP),
+      ).toBe(true);
+    });
+  });
+
+  describe('BatchSalesOrderDto', () => {
+    const uuid = (n: number) => `7f1c2b8e-4a3d-4c5e-9f10-${String(n).padStart(12, '0')}`;
+    const errorsOf = (body: unknown) => validate(plainToInstance(BatchSalesOrderDto, body));
+
+    it('1..100 uuid v4 → hợp lệ', async () => {
+      await expect(errorsOf({ ids: [uuid(1)] })).resolves.toHaveLength(0);
+      await expect(errorsOf({ ids: Array.from({ length: 100 }, (_, i) => uuid(i)) })).resolves.toHaveLength(0);
+    });
+
+    it.each([
+      ['rỗng', { ids: [] }],
+      ['101 id', { ids: Array.from({ length: 101 }, (_, i) => uuid(i)) }],
+      ['không phải uuid', { ids: ['so-1'] }],
+      ['thiếu ids', {}],
+    ])('%s → lỗi validate', async (_label, body) => {
+      await expect(errorsOf(body)).resolves.not.toHaveLength(0);
+    });
+  });
+
+  /**
+   * T-05-01: `POST deliver` và `POST delivery-status` (ADR-07, AC-18..AC-20,
+   * AC-22, AC-26). Mỗi đơn một transaction dưới khoá hàng; lỗi từng đơn nằm
+   * trong `results[i]`, không ném.
+   */
+  describe('giao hàng (T-05-01)', () => {
+    const PARTNER_ID = '7f1c2b8e-4a3d-4c5e-9f10-00000000000a';
+    /** Đơn đã nhận xử lý ở `br-1`, hoá đơn `inv-1`, chờ giao. */
+    const awaitingPickup = {
+      id: 'so-1',
+      status: SalesOrderStatus.PROCESSED,
+      branchId: 'br-1',
+      salespersonId: 'sp-1',
+      invoiceId: 'inv-1',
+      deliveryStatus: DeliveryStatus.AWAITING_PICKUP,
+      deliveredAt: null,
+    };
+    const ghn = { id: PARTNER_ID, name: 'GHN', organizationId: 'org-1', isActive: true };
+
+    /**
+     * {@link build} cộng ba bảng mà action giao đọc: hoá đơn (`is_draft`), công
+     * nợ (`remaining_amount`) và danh mục đối tác. Đối tác LỌC theo cả tổ chức
+     * lẫn `is_active` như câu thật, để ca "khác tổ chức" không xanh nhầm.
+     */
+    function setup({
+      current = awaitingPickup as Record<string, unknown>,
+      invoice = { id: 'inv-1', isDraft: false } as Record<string, unknown> | null,
+      debt = null as Record<string, unknown> | null,
+      partners = [ghn] as Array<typeof ghn>,
+    } = {}) {
+      const built = build({ canApprove: true, current });
+      (built.manager.findOne as jest.Mock).mockImplementation(async (entity: unknown) => {
+        if (entity === InvoiceEntity) return invoice;
+        if (entity === InvoiceDebtEntity) return debt;
+        return null;
+      });
+      const partnerRepo = {
+        findOne: jest.fn(async ({ where }: { where: { id: string; organizationId: string; isActive: boolean } }) => {
+          const hit = partners.find(
+            (p) => p.id === where.id && p.organizationId === where.organizationId && p.isActive === where.isActive,
+          );
+          return hit ? { id: hit.id, name: hit.name } : null;
+        }),
+      };
+      (built.dataSource.getRepository as jest.Mock).mockImplementation((entity: unknown) =>
+        entity === DeliveryPartnerEntity ? partnerRepo : built.branchRepo,
+      );
+      return { ...built, partnerRepo };
+    }
+
+    describe('deliverBatch', () => {
+      it('AC-18: AWAITING_PICKUP → IN_TRANSIT, ghi đối tác + snapshot tên, mã vận đơn, phí, gói hàng, delivered_at; một dòng DELIVER', async () => {
+        const { service, updates, dispatchEvents, lockQb, dataSource } = setup();
+
+        const { results } = await service.deliverBatch(
+          { ids: ['so-1'], deliveryPartnerId: PARTNER_ID, trackingCode: ' VD123 ', partnerShippingFee: 20000, packageInfo: '2kg' },
+          actor,
+        );
+
+        expect(results).toEqual([{ id: 'so-1', ok: true }]);
+        expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+        expect(lockQb.setLock).toHaveBeenCalledWith('pessimistic_write');
+        expect(updates).toHaveLength(1);
+        expect(updates[0]).toMatchObject({
+          deliveryStatus: DeliveryStatus.IN_TRANSIT,
+          deliveryPartnerId: PARTNER_ID,
+          deliveryPartnerName: 'GHN',
+          trackingCode: 'VD123',
+          partnerShippingFee: '20000',
+          packageInfo: '2kg',
+        });
+        expect(updates[0].deliveredAt).toBeInstanceOf(Date);
+        expect(dispatchEvents).toEqual([
+          {
+            organizationId: 'org-1',
+            salesOrderId: 'so-1',
+            action: SalesOrderDispatchAction.DELIVER,
+            fromBranchId: null,
+            toBranchId: null,
+            actorUserId: 'u-1',
+            reason: null,
+          },
+        ]);
+      });
+
+      it('AC-18: bỏ trống đối tác + phí + mã + gói → NULL (không phải 0), vẫn giao được, không tra đối tác', async () => {
+        const { service, updates, partnerRepo } = setup();
+
+        const { results } = await service.deliverBatch({ ids: ['so-1'] }, actor);
+
+        expect(results).toEqual([{ id: 'so-1', ok: true }]);
+        expect(partnerRepo.findOne).not.toHaveBeenCalled();
+        expect(updates[0]).toMatchObject({
+          deliveryStatus: DeliveryStatus.IN_TRANSIT,
+          deliveryPartnerId: null,
+          deliveryPartnerName: null,
+          partnerShippingFee: null,
+          trackingCode: null,
+          packageInfo: null,
+        });
+      });
+
+      it('phí 0 nhập tay → ghi "0", khác NULL', async () => {
+        const { service, updates } = setup();
+        await service.deliverBatch({ ids: ['so-1'], partnerShippingFee: 0 }, actor);
+        expect(updates[0].partnerShippingFee).toBe('0');
+      });
+
+      it('giao LẠI từ FAILED → IN_TRANSIT, delivered_at của lần đầu GIỮ NGUYÊN', async () => {
+        const first = new Date('2026-09-20T03:00:00Z');
+        const { service, updates } = setup({
+          current: { ...awaitingPickup, deliveryStatus: DeliveryStatus.FAILED, deliveredAt: first },
+        });
+
+        const { results } = await service.deliverBatch({ ids: ['so-1'], trackingCode: 'VD999' }, actor);
+
+        expect(results).toEqual([{ id: 'so-1', ok: true }]);
+        expect(updates[0]).toMatchObject({ deliveryStatus: DeliveryStatus.IN_TRANSIT, trackingCode: 'VD999' });
+        expect(updates[0]).not.toHaveProperty('deliveredAt');
+      });
+
+      it.each([
+        ['hoá đơn còn nháp', { id: 'inv-1', isDraft: true }, awaitingPickup],
+        ['không có hoá đơn', null, { ...awaitingPickup, invoiceId: null }],
+      ])('AC-19: %s → INVOICE_NOT_FINALIZED, đơn không đổi, không dòng lịch sử', async (_label, invoice, current) => {
+        const { service, updates, dispatchEvents } = setup({ invoice, current });
+
+        const { results } = await service.deliverBatch({ ids: ['so-1'] }, actor);
+
+        expect(results).toEqual([
+          { id: 'so-1', ok: false, code: 'INVOICE_NOT_FINALIZED', message: 'Hoá đơn chưa hoàn tất — mở hoá đơn để thanh toán trước' },
+        ]);
+        expect(updates).toHaveLength(0);
+        expect(dispatchEvents).toHaveLength(0);
+      });
+
+      it.each([
+        ['đang giao', { deliveryStatus: DeliveryStatus.IN_TRANSIT }],
+        ['đã hoàn thành', { deliveryStatus: DeliveryStatus.COMPLETED }],
+        ['chưa vào vòng đời giao', { deliveryStatus: null }],
+        ['đơn đã huỷ (delivery_status còn AWAITING_PICKUP)', { status: SalesOrderStatus.CANCELLED }],
+      ])('%s → INVALID_DELIVERY_TRANSITION, không tra hoá đơn, không ghi', async (_label, patch) => {
+        const { service, updates, dispatchEvents, manager } = setup({ current: { ...awaitingPickup, ...patch } });
+
+        const { results } = await service.deliverBatch({ ids: ['so-1'] }, actor);
+
+        expect(results).toEqual([expect.objectContaining({ id: 'so-1', ok: false, code: 'INVALID_DELIVERY_TRANSITION' })]);
+        expect(manager.findOne).not.toHaveBeenCalled();
+        expect(updates).toHaveLength(0);
+        expect(dispatchEvents).toHaveLength(0);
+      });
+
+      it('đơn chi nhánh KHÁC → ORDER_NOT_HELD_BY_BRANCH, kiểm TRƯỚC trạng thái, không ghi', async () => {
+        const { service, updates, dispatchEvents, manager } = setup({ current: { ...awaitingPickup, branchId: 'br-2' } });
+
+        const { results } = await service.deliverBatch({ ids: ['so-1'] }, actor);
+
+        expect(results).toEqual([
+          { id: 'so-1', ok: false, code: 'ORDER_NOT_HELD_BY_BRANCH', message: 'Đơn hàng không thuộc chi nhánh đang thao tác' },
+        ]);
+        expect(manager.findOne).not.toHaveBeenCalled();
+        expect(updates).toHaveLength(0);
+        expect(dispatchEvents).toHaveLength(0);
+      });
+
+      it('id không thuộc tổ chức (404 của lượt khoá) → ORDER_NOT_HELD_BY_BRANCH, không lộ đơn có tồn tại', async () => {
+        const { service, lockQb } = setup();
+        lockQb.getOne.mockResolvedValueOnce(null);
+
+        await expect(service.deliverBatch({ ids: ['so-x'] }, actor)).resolves.toEqual({
+          results: [{ id: 'so-x', ok: false, code: 'ORDER_NOT_HELD_BY_BRANCH', message: 'Đơn hàng không thuộc chi nhánh đang thao tác' }],
+        });
+      });
+
+      it.each([
+        ['ngừng hoạt động', [{ ...ghn, isActive: false }]],
+        ['thuộc tổ chức khác', [{ ...ghn, organizationId: 'org-2' }]],
+        ['không tồn tại / đã xoá', []],
+      ])('đối tác %s → 400 DELIVERY_PARTNER_INACTIVE cho CẢ request, không mở transaction nào', async (_label, partners) => {
+        const { service, dataSource, updates } = setup({ partners });
+
+        const attempt = service.deliverBatch({ ids: ['so-1', 'so-2'], deliveryPartnerId: PARTNER_ID }, actor);
+
+        await expect(attempt).rejects.toBeInstanceOf(BadRequestException);
+        await expect(attempt).rejects.toMatchObject({ response: { code: 'DELIVERY_PARTNER_INACTIVE' } });
+        expect(dataSource.transaction).not.toHaveBeenCalled();
+        expect(updates).toHaveLength(0);
+      });
+
+      it('một đơn lỗi KHÔNG chặn đơn sau; mỗi đơn một transaction', async () => {
+        const { service, lockQb, updates, dataSource } = setup();
+        lockQb.getOne.mockResolvedValueOnce({ ...awaitingPickup, id: 'so-x', deliveryStatus: DeliveryStatus.COMPLETED });
+
+        const { results } = await service.deliverBatch({ ids: ['so-x', 'so-1'] }, actor);
+
+        expect(results).toEqual([
+          expect.objectContaining({ id: 'so-x', ok: false, code: 'INVALID_DELIVERY_TRANSITION' }),
+          { id: 'so-1', ok: true },
+        ]);
+        expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+        expect(updates).toHaveLength(1);
+      });
+
+      it('lỗi không phải HttpException → dòng lỗi hệ thống, không ném', async () => {
+        const { service, manager } = setup();
+        (manager.update as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+
+        await expect(service.deliverBatch({ ids: ['so-1'] }, actor)).resolves.toEqual({
+          results: [{ id: 'so-1', ok: false, message: 'Lỗi hệ thống khi xử lý đơn' }],
+        });
+      });
+    });
+
+    describe('deliveryStatusBatch', () => {
+      const inTransit = { ...awaitingPickup, deliveryStatus: DeliveryStatus.IN_TRANSIT, deliveredAt: new Date('2026-09-24T02:00:00Z') };
+
+      it.each([
+        [DeliveryStatus.IN_TRANSIT, DeliveryStatus.AWAITING_COD],
+        [DeliveryStatus.IN_TRANSIT, DeliveryStatus.FAILED],
+        [DeliveryStatus.IN_TRANSIT, DeliveryStatus.COMPLETED],
+        [DeliveryStatus.AWAITING_COD, DeliveryStatus.COMPLETED],
+        [DeliveryStatus.FAILED, DeliveryStatus.IN_TRANSIT],
+      ])('AC-20: %s → %s hợp lệ: đổi trạng thái, ghi DELIVERY_STATUS mang from→to với người thực hiện', async (from, to) => {
+        const { service, updates, dispatchEvents } = setup({ current: { ...inTransit, deliveryStatus: from } });
+
+        const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to }, actor);
+
+        expect(results).toEqual([{ id: 'so-1', ok: true }]);
+        expect(updates).toEqual([{ deliveryStatus: to }]);
+        expect(dispatchEvents).toEqual([
+          {
+            organizationId: 'org-1',
+            salesOrderId: 'so-1',
+            action: SalesOrderDispatchAction.DELIVERY_STATUS,
+            fromBranchId: null,
+            toBranchId: null,
+            actorUserId: 'u-1',
+            reason: `${from}->${to}`,
+          },
+        ]);
+      });
+
+      it('lý do tự do được mã hoá vào reason và lịch sử giải ngược được', async () => {
+        const { service, dispatchEvents } = setup({ current: inTransit });
+
+        await service.deliveryStatusBatch(
+          { ids: ['so-1'], to: DeliveryStatus.FAILED, reason: '  Khách không nghe máy: hẹn lại  ' },
+          actor,
+        );
+
+        expect(dispatchEvents[0].reason).toBe('IN_TRANSIT->FAILED: Khách không nghe máy: hẹn lại');
+        expect(decodeDeliveryStatusReason(dispatchEvents[0].reason as string)).toEqual({
+          from: DeliveryStatus.IN_TRANSIT,
+          to: DeliveryStatus.FAILED,
+          reason: 'Khách không nghe máy: hẹn lại',
+        });
+      });
+
+      it.each([
+        ['COMPLETED → IN_TRANSIT', DeliveryStatus.COMPLETED, DeliveryStatus.IN_TRANSIT],
+        ['AWAITING_PICKUP → COMPLETED', DeliveryStatus.AWAITING_PICKUP, DeliveryStatus.COMPLETED],
+        ['AWAITING_COD → FAILED', DeliveryStatus.AWAITING_COD, DeliveryStatus.FAILED],
+        ['FAILED → FAILED', DeliveryStatus.FAILED, DeliveryStatus.FAILED],
+      ])('AC-20: %s ngoài bảng → INVALID_DELIVERY_TRANSITION, không đổi gì', async (_label, from, to) => {
+        const { service, updates, dispatchEvents } = setup({ current: { ...inTransit, deliveryStatus: from } });
+
+        const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to }, actor);
+
+        expect(results).toEqual([expect.objectContaining({ id: 'so-1', ok: false, code: 'INVALID_DELIVERY_TRANSITION' })]);
+        expect(results[0].message).toMatch(/^Không thể chuyển từ .+ sang .+$/);
+        expect(updates).toHaveLength(0);
+        expect(dispatchEvents).toHaveLength(0);
+      });
+
+      it.each([
+        ['IN_TRANSIT', DeliveryStatus.IN_TRANSIT],
+        ['AWAITING_COD', DeliveryStatus.AWAITING_COD],
+      ])('AC-22: %s → COMPLETED khi còn nợ → DEBT_OUTSTANDING kèm số tiền, không đổi gì', async (_label, from) => {
+        const { service, updates, dispatchEvents } = setup({
+          current: { ...inTransit, deliveryStatus: from },
+          debt: { id: 'debt-1', remainingAmount: '150000.00' },
+        });
+
+        const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.COMPLETED }, actor);
+
+        expect(results).toEqual([expect.objectContaining({ id: 'so-1', ok: false, code: 'DEBT_OUTSTANDING' })]);
+        expect(results[0].message).toContain('150.000');
+        expect(updates).toHaveLength(0);
+        expect(dispatchEvents).toHaveLength(0);
+      });
+
+      it('AC-22: công nợ remaining_amount = 0 → COMPLETED', async () => {
+        const { service, updates } = setup({ current: inTransit, debt: { id: 'debt-1', remainingAmount: '0.00' } });
+
+        const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.COMPLETED }, actor);
+
+        expect(results).toEqual([{ id: 'so-1', ok: true }]);
+        expect(updates).toEqual([{ deliveryStatus: DeliveryStatus.COMPLETED }]);
+      });
+
+      describe('→ RETURNED: Chuyển hoàn huỷ hoá đơn (AC-21, A-03, ADR-04)', () => {
+        const failed = { ...inTransit, deliveryStatus: DeliveryStatus.FAILED };
+
+        it('FAILED → RETURNED: huỷ hoá đơn qua CancelInvoiceService trong CÙNG transaction; đơn CANCELLED + RETURNED + vết', async () => {
+          const { service, updates, dispatchEvents, dataSource, manager, cancelInvoiceService } = setup({ current: failed });
+
+          const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.RETURNED }, actor);
+
+          expect(results).toEqual([{ id: 'so-1', ok: true }]);
+          expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+          // Đảo kho (INVOICE_CANCEL), đóng invoice_debts, đảo điểm là việc của
+          // CancelInvoiceService — ở đây phải gọi ĐÚNG nó, đúng hoá đơn, và
+          // bằng manager của chính transaction này.
+          expect(cancelInvoiceService.cancel).toHaveBeenCalledTimes(1);
+          expect(cancelInvoiceService.cancel).toHaveBeenCalledWith('inv-1', { reason: 'Chuyển hoàn' }, actor, manager);
+          expect(updates).toEqual([
+            { deliveryStatus: DeliveryStatus.RETURNED },
+            expect.objectContaining({ status: SalesOrderStatus.CANCELLED, cancelledBy: 'u-1', cancelReason: 'Chuyển hoàn' }),
+          ]);
+          const merged = Object.assign({}, ...updates);
+          expect(merged).toMatchObject({ status: SalesOrderStatus.CANCELLED, deliveryStatus: DeliveryStatus.RETURNED });
+          expect(dispatchEvents).toEqual([
+            {
+              organizationId: 'org-1',
+              salesOrderId: 'so-1',
+              action: SalesOrderDispatchAction.DELIVERY_STATUS,
+              fromBranchId: null,
+              toBranchId: null,
+              actorUserId: 'u-1',
+              reason: 'FAILED->RETURNED',
+            },
+          ]);
+        });
+
+        it('huỷ hoá đơn là bước CUỐI — sau mọi lệnh ghi đơn/vết (publisher bắn trước commit)', async () => {
+          const { service, manager, cancelInvoiceService } = setup({ current: failed });
+
+          await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.RETURNED }, actor);
+
+          const cancelAt = cancelInvoiceService.cancel.mock.invocationCallOrder[0];
+          const writes = [...manager.update.mock.invocationCallOrder, ...manager.insert.mock.invocationCallOrder];
+          expect(writes).toHaveLength(3);
+          expect(Math.max(...writes)).toBeLessThan(cancelAt);
+        });
+
+        it('lý do người dùng đi vào vết, lý do huỷ đơn và lý do huỷ hoá đơn', async () => {
+          const { service, updates, dispatchEvents, cancelInvoiceService } = setup({ current: failed });
+
+          await service.deliveryStatusBatch(
+            { ids: ['so-1'], to: DeliveryStatus.RETURNED, reason: '  Khách từ chối nhận  ' },
+            actor,
+          );
+
+          expect(dispatchEvents[0].reason).toBe('FAILED->RETURNED: Khách từ chối nhận');
+          expect(updates[1]).toMatchObject({ cancelReason: 'Khách từ chối nhận' });
+          expect(cancelInvoiceService.cancel).toHaveBeenCalledWith(
+            'inv-1',
+            { reason: 'Khách từ chối nhận' },
+            actor,
+            expect.anything(),
+          );
+        });
+
+        it.each([
+          [
+            'hoá đơn không ở trạng thái huỷ được',
+            new ConflictException({ code: 'INVOICE_NOT_CANCELLABLE', message: 'Hoá đơn HD1 đang ở trạng thái không huỷ được.' }),
+            { id: 'so-1', ok: false, code: 'INVOICE_NOT_CANCELLABLE', message: 'Hoá đơn HD1 đang ở trạng thái không huỷ được.' },
+          ],
+          [
+            'đã có phiếu đổi trả tất toán',
+            new BadRequestException('Hóa đơn HD1 đã có phiếu đổi trả — huỷ phiếu đổi trả trước, rồi mới huỷ được hóa đơn này.'),
+            {
+              id: 'so-1',
+              ok: false,
+              message: 'Hóa đơn HD1 đã có phiếu đổi trả — huỷ phiếu đổi trả trước, rồi mới huỷ được hóa đơn này.',
+            },
+          ],
+        ])('CancelInvoiceService từ chối (%s) → lỗi của đơn giữ nguyên mã/lời, transaction rollback', async (_label, refusal, expected) => {
+          const { service, dataSource, cancelInvoiceService } = setup({ current: failed });
+          cancelInvoiceService.cancel.mockRejectedValueOnce(refusal);
+
+          const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.RETURNED }, actor);
+
+          expect(results).toEqual([expected]);
+          // "Không đổi gì": lỗi ném RA KHỎI callback của transaction, tức
+          // TypeORM rollback cả `delivery_status`, `status` lẫn dòng vết.
+          await expect(dataSource.transaction.mock.results[0].value).rejects.toBe(refusal);
+        });
+
+        it('một đơn bị CancelInvoiceService từ chối KHÔNG chặn đơn sau; mỗi đơn một transaction', async () => {
+          const { service, dataSource, cancelInvoiceService, lockQb } = setup({ current: failed });
+          // Bộ giả gộp MỌI patch đã ghi vào lượt khoá sau; transaction thật của
+          // đơn đầu đã rollback, nên đơn sau phải đọc lại hàng gốc.
+          lockQb.getOne.mockImplementation(async () => ({ ...failed }));
+          cancelInvoiceService.cancel.mockRejectedValueOnce(
+            new ConflictException({ code: 'INVOICE_NOT_CANCELLABLE', message: 'Không huỷ được' }),
+          );
+
+          const { results } = await service.deliveryStatusBatch({ ids: ['so-x', 'so-1'], to: DeliveryStatus.RETURNED }, actor);
+
+          expect(results).toEqual([
+            { id: 'so-x', ok: false, code: 'INVOICE_NOT_CANCELLABLE', message: 'Không huỷ được' },
+            { id: 'so-1', ok: true },
+          ]);
+          expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+          expect(cancelInvoiceService.cancel).toHaveBeenCalledTimes(2);
+        });
+
+        it.each([
+          ['AWAITING_PICKUP', { deliveryStatus: DeliveryStatus.AWAITING_PICKUP }],
+          ['IN_TRANSIT', { deliveryStatus: DeliveryStatus.IN_TRANSIT }],
+          ['AWAITING_COD', { deliveryStatus: DeliveryStatus.AWAITING_COD }],
+          ['COMPLETED', { deliveryStatus: DeliveryStatus.COMPLETED }],
+          ['RETURNED', { deliveryStatus: DeliveryStatus.RETURNED }],
+          ['FAILED nhưng đơn đã CANCELLED', { deliveryStatus: DeliveryStatus.FAILED, status: SalesOrderStatus.CANCELLED }],
+        ])('%s → RETURNED: INVALID_DELIVERY_TRANSITION, không huỷ hoá đơn, không ghi', async (_label, patch) => {
+          const { service, updates, dispatchEvents, cancelInvoiceService } = setup({ current: { ...inTransit, ...patch } });
+
+          const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.RETURNED }, actor);
+
+          expect(results).toEqual([expect.objectContaining({ id: 'so-1', ok: false, code: 'INVALID_DELIVERY_TRANSITION' })]);
+          expect(cancelInvoiceService.cancel).not.toHaveBeenCalled();
+          expect(updates).toHaveLength(0);
+          expect(dispatchEvents).toHaveLength(0);
+        });
+
+        it('đơn chi nhánh KHÁC → ORDER_NOT_HELD_BY_BRANCH, không huỷ hoá đơn', async () => {
+          const { service, cancelInvoiceService, updates } = setup({ current: { ...failed, branchId: 'br-2' } });
+
+          const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.RETURNED }, actor);
+
+          expect(results).toEqual([expect.objectContaining({ id: 'so-1', ok: false, code: 'ORDER_NOT_HELD_BY_BRANCH' })]);
+          expect(cancelInvoiceService.cancel).not.toHaveBeenCalled();
+          expect(updates).toHaveLength(0);
+        });
+      });
+
+      it('FAILED → IN_TRANSIT giữ delivered_at của lần giao đầu', async () => {
+        const { service, updates } = setup({ current: { ...inTransit, deliveryStatus: DeliveryStatus.FAILED } });
+        await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.IN_TRANSIT }, actor);
+        expect(updates).toEqual([{ deliveryStatus: DeliveryStatus.IN_TRANSIT }]);
+      });
+
+      it('→ IN_TRANSIT qua Cập nhật TT vẫn chặn hoá đơn nháp (AC-19 không lách được)', async () => {
+        const { service, updates } = setup({ current: awaitingPickup, invoice: { id: 'inv-1', isDraft: true } });
+
+        const { results } = await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.IN_TRANSIT }, actor);
+
+        expect(results).toEqual([expect.objectContaining({ id: 'so-1', ok: false, code: 'INVOICE_NOT_FINALIZED' })]);
+        expect(updates).toHaveLength(0);
+      });
+
+      it('AWAITING_PICKUP → IN_TRANSIT qua Cập nhật TT (hoá đơn đã hoàn tất) set delivered_at lần đầu', async () => {
+        const { service, updates } = setup({ current: awaitingPickup });
+        await service.deliveryStatusBatch({ ids: ['so-1'], to: DeliveryStatus.IN_TRANSIT }, actor);
+        expect(updates[0].deliveredAt).toBeInstanceOf(Date);
+      });
+
+      it('đơn chi nhánh KHÁC → ORDER_NOT_HELD_BY_BRANCH; đơn sau vẫn chạy', async () => {
+        const { service, lockQb, updates } = setup({ current: inTransit });
+        lockQb.getOne.mockResolvedValueOnce({ ...inTransit, id: 'so-x', branchId: 'br-2' });
+
+        const { results } = await service.deliveryStatusBatch({ ids: ['so-x', 'so-1'], to: DeliveryStatus.FAILED }, actor);
+
+        expect(results).toEqual([
+          { id: 'so-x', ok: false, code: 'ORDER_NOT_HELD_BY_BRANCH', message: 'Đơn hàng không thuộc chi nhánh đang thao tác' },
+          { id: 'so-1', ok: true },
+        ]);
+        expect(updates).toEqual([{ deliveryStatus: DeliveryStatus.FAILED }]);
+      });
+    });
+
+    /**
+     * AC-26: hai route giao đòi ĐÚNG `pos.sales-order.deliver`, kiểm bằng metadata
+     * VÀ bằng `PermissionGuard` thật với bộ khoá seed cấp cho vai: NV bán hàng
+     * (có `read`, không `deliver`) → 403; thu ngân (có `deliver`) → qua.
+     */
+    describe('SalesOrderController — quyền giao (AC-26)', () => {
+      it.each(['deliver', 'deliveryStatus'] as const)('%s đòi đúng pos.sales-order.deliver', (route) => {
+        expect(Reflect.getMetadata(REQUIRE_PERMISSION_KEY, SalesOrderController.prototype[route])).toBe(
+          'pos.sales-order.deliver',
+        );
+        expect(SALES_ORDER_PERMISSIONS.deliver).toBe('pos.sales-order.deliver');
+      });
+
+      function guardFor(heldKeys: readonly string[], route: 'deliver' | 'deliveryStatus') {
+        const guard = new PermissionGuard(new Reflector(), {
+          hasAnyPermission: jest.fn(async (_u: string, _o: string, keys: string[]) =>
+            keys.some((key) => heldKeys.includes(key)),
+          ),
+        } as never);
+        const context = {
+          getHandler: () => SalesOrderController.prototype[route],
+          getClass: () => SalesOrderController,
+          switchToHttp: () => ({ getRequest: () => ({ user: { userId: 'u-1', organizationId: 'org-1' } }) }),
+        } as never;
+        return guard.canActivate(context);
+      }
+
+      it.each(['deliver', 'deliveryStatus'] as const)(
+        '%s: tài khoản có pos.sales-order.read nhưng KHÔNG có deliver → 403',
+        async (route) => {
+          expect(SALES_PERMISSION_KEYS).toContain('pos.sales-order.read');
+          expect(SALES_PERMISSION_KEYS).not.toContain('pos.sales-order.deliver');
+          await expect(guardFor(SALES_PERMISSION_KEYS, route)).rejects.toBeInstanceOf(ForbiddenException);
+        },
+      );
+
+      it.each(['deliver', 'deliveryStatus'] as const)('%s: thu ngân (seed có deliver) đi lọt', async (route) => {
+        await expect(guardFor(CASHIER_PERMISSION_KEYS, route)).resolves.toBe(true);
+      });
+
+      it('controller chuyển nguyên body xuống service', async () => {
+        const { service } = setup();
+        const controller = new SalesOrderController(service, {} as never);
+        const deliver = jest.spyOn(service, 'deliverBatch');
+        const status = jest.spyOn(service, 'deliveryStatusBatch');
+        const deliverDto = { ids: ['so-1'], trackingCode: 'VD1' };
+        const statusDto = { ids: ['so-1'], to: DeliveryStatus.FAILED };
+
+        await controller.deliver(deliverDto, actor);
+        await controller.deliveryStatus(statusDto, actor);
+
+        expect(deliver).toHaveBeenCalledWith(deliverDto, actor);
+        expect(status).toHaveBeenCalledWith(statusDto, actor);
+      });
+    });
+
+    describe('DTO', () => {
+      const uuid = '7f1c2b8e-4a3d-4c5e-9f10-000000000001';
+      const deliverErrors = (body: unknown) => validate(plainToInstance(DeliverSalesOrdersDto, body));
+      const statusErrors = (body: unknown) => validate(plainToInstance(UpdateDeliveryStatusDto, body));
+
+      it('DeliverSalesOrdersDto: chỉ ids là đủ; đủ trường hợp lệ', async () => {
+        await expect(deliverErrors({ ids: [uuid] })).resolves.toHaveLength(0);
+        await expect(
+          deliverErrors({ ids: [uuid], deliveryPartnerId: PARTNER_ID, trackingCode: 'VD123', partnerShippingFee: 20000, packageInfo: '2kg' }),
+        ).resolves.toHaveLength(0);
+      });
+
+      it.each([
+        ['phí âm', { partnerShippingFee: -1 }],
+        ['phí không phải số', { partnerShippingFee: '20000' }],
+        ['mã vận đơn > 100', { trackingCode: 'x'.repeat(101) }],
+        ['gói hàng > 500', { packageInfo: 'x'.repeat(501) }],
+        ['đối tác không phải uuid', { deliveryPartnerId: 'GHN' }],
+        ['ids rỗng', { ids: [] }],
+      ])('DeliverSalesOrdersDto: %s → lỗi validate', async (_label, patch) => {
+        await expect(deliverErrors({ ids: [uuid], ...patch })).resolves.not.toHaveLength(0);
+      });
+
+      it('UpdateDeliveryStatusDto: to hợp lệ, reason tuỳ chọn', async () => {
+        await expect(statusErrors({ ids: [uuid], to: 'FAILED' })).resolves.toHaveLength(0);
+        await expect(statusErrors({ ids: [uuid], to: 'FAILED', reason: 'Khách hẹn lại' })).resolves.toHaveLength(0);
+      });
+
+      it.each([
+        ['thiếu to', {}],
+        ['to ngoài enum', { to: 'LOST' }],
+        ['reason > 500', { to: 'FAILED', reason: 'x'.repeat(501) }],
+      ])('UpdateDeliveryStatusDto: %s → lỗi validate', async (_label, patch) => {
+        await expect(statusErrors({ ids: [uuid], ...patch })).resolves.not.toHaveLength(0);
+      });
     });
   });
 });
