@@ -53,8 +53,11 @@ JOIN product_attribute_definitions d ON d.id = iav.attribute_definition_id
 JOIN product_attribute_options op ON op.id = iav.option_id
 GROUP BY iav.item_id;
 
+-- product_id here is the model key: the parent product, or the item itself for
+-- legacy items that have no parent product (items.product_id IS NULL).
 CREATE TEMP TABLE t_item ON COMMIT DROP AS
-SELECT it.id AS item_id, it.product_id, it.category_id, it.purchase_price,
+SELECT it.id AS item_id, coalesce(it.product_id, it.id) AS product_id, it.product_id AS parent_product_id,
+       it.is_active, it.is_pos_visible, it.category_id, it.purchase_price,
        coalesce(a.size_label, nullif(btrim(it.odd_size), '')) AS size_label,
        a.color_label
 FROM items it
@@ -71,10 +74,14 @@ JOIN invoice_items li ON li.invoice_id = v.id
 LEFT JOIN t_item ti ON ti.item_id = li.item_id
 WHERE li.is_gift = false;
 
+-- Same scope as the stock summary screen: tracked balances in active storages.
 CREATE TEMP TABLE t_stock ON COMMIT DROP AS
 SELECT sb.item_id, sum(sb.quantity)::numeric AS on_hand
 FROM stock_balances sb
 JOIN t_org o ON o.org = sb.organization_id
+JOIN locations l ON l.id = sb.location_id
+JOIN storages st ON st.id = l.storage_id AND st.is_active = true
+WHERE sb.is_tracked = true
 GROUP BY sb.item_id
 HAVING sum(sb.quantity) > 0;
 
@@ -123,14 +130,30 @@ ORDER BY count(*) DESC
 LIMIT 10;
 
 \echo ''
-\echo '=== 3. Danh mục mẫu =========================================================='
-SELECT (SELECT count(*) FROM products p JOIN t_org o ON o.org = p.organization_id) AS products_total,
-       (SELECT count(DISTINCT product_id) FROM t_line WHERE direction = 'OUT') AS products_ever_sold,
+\echo '=== 3. Danh mục mẫu (mẫu = sản phẩm cha, hoặc chính mặt hàng nếu không có cha) =='
+SELECT (SELECT count(DISTINCT product_id) FROM t_item) AS models_total,
+       (SELECT count(DISTINCT product_id) FROM t_item WHERE is_active AND is_pos_visible) AS models_active_on_pos,
+       (SELECT count(DISTINCT product_id) FROM t_line WHERE direction = 'OUT') AS models_ever_sold,
        (SELECT count(DISTINCT product_id) FROM t_line
-         WHERE direction = 'OUT' AND issued_at >= now() - make_interval(months => :months)) AS products_sold_in_window,
-       (SELECT count(DISTINCT ti.product_id) FROM t_stock s JOIN t_item ti ON ti.item_id = s.item_id) AS products_in_stock_now,
-       (SELECT count(*) FROM t_item) AS items_total,
+         WHERE direction = 'OUT' AND issued_at >= now() - make_interval(months => :months)) AS models_sold_in_window,
+       (SELECT count(DISTINCT ti.product_id) FROM t_stock s JOIN t_item ti ON ti.item_id = s.item_id) AS models_in_stock_now,
        (SELECT round(100.0 * count(size_label) / nullif(count(*), 0), 1) FROM t_item) AS pct_items_with_size;
+
+\echo ''
+\echo '=== 3b. Đối chiếu số mặt hàng (SKU) theo từng định nghĩa ======================'
+\echo 'So với màn Hàng hóa trên backoffice để biết định nghĩa nào khớp với "đang bán".'
+SELECT 'Tất cả mặt hàng' AS definition, count(*) AS items, count(DISTINCT product_id) AS models FROM t_item
+UNION ALL SELECT 'Đang hoạt động (is_active)', count(*), count(DISTINCT product_id) FROM t_item WHERE is_active
+UNION ALL SELECT 'Hoạt động + hiện trên POS', count(*), count(DISTINCT product_id) FROM t_item WHERE is_active AND is_pos_visible
+UNION ALL SELECT 'Không có sản phẩm cha (hàng cũ)', count(*), count(DISTINCT product_id) FROM t_item WHERE parent_product_id IS NULL
+UNION ALL SELECT 'Còn tồn (đang theo dõi, kho hoạt động)', count(*), count(DISTINCT ti.product_id) FROM t_stock s JOIN t_item ti ON ti.item_id = s.item_id
+UNION ALL SELECT 'Hoạt động + hiện trên POS + còn tồn', count(*), count(DISTINCT ti.product_id) FROM t_stock s JOIN t_item ti ON ti.item_id = s.item_id WHERE ti.is_active AND ti.is_pos_visible
+UNION ALL SELECT 'Có bán trong kỳ', count(DISTINCT item_id), count(DISTINCT product_id) FROM t_line
+  WHERE direction = 'OUT' AND issued_at >= now() - make_interval(months => :months)
+UNION ALL SELECT 'Có bán trong 90 ngày', count(DISTINCT item_id), count(DISTINCT product_id) FROM t_line
+  WHERE direction = 'OUT' AND issued_at >= now() - interval '90 days'
+UNION ALL SELECT 'Sản phẩm cha trong bảng products', NULL, count(*) FROM products p JOIN t_org o ON o.org = p.organization_id
+UNION ALL SELECT 'Sản phẩm cha đang hoạt động', NULL, count(*) FROM products p JOIN t_org o ON o.org = p.organization_id WHERE p.is_active;
 
 \echo ''
 \echo '=== 4. Tên thuộc tính biến thể (để kiểm tra nhận diện size/màu) ==============='
@@ -266,7 +289,7 @@ WITH p AS (
          coalesce(sum(l.qty), 0) AS sold,
          coalesce((SELECT sum(s.on_hand) FROM t_stock s JOIN t_item x ON x.item_id = s.item_id
                    WHERE x.product_id = ti.product_id), 0) AS on_hand
-  FROM (SELECT DISTINCT product_id FROM t_item WHERE product_id IS NOT NULL) ti
+  FROM (SELECT DISTINCT product_id FROM t_item) ti
   LEFT JOIN t_line l ON l.product_id = ti.product_id AND l.direction = 'OUT' AND l.type IN ('SALE', 'EXCHANGE')
                     AND l.issued_at >= now() - make_interval(months => :months)
   GROUP BY ti.product_id
@@ -311,7 +334,7 @@ WITH g AS (
          coalesce(sum(s.on_hand), 0) AS on_hand
   FROM t_item ti
   LEFT JOIN t_stock s ON s.item_id = ti.item_id
-  WHERE ti.product_id IS NOT NULL AND ti.size_label IS NOT NULL
+  WHERE ti.size_label IS NOT NULL
   GROUP BY 1, 2, 3
 ), c AS (
   SELECT g.product_id, g.color,
