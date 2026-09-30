@@ -307,23 +307,60 @@ export function InventoryItemBarcodesPage() {
           entries.map((e) => e.itemId),
           activeBranch,
         );
-        const byItemId = new Map(resolved.map((r) => [r.itemId, r]));
+        type Detail = {
+          storageId: string;
+          storageName: string;
+          locationId: string;
+          locationCode: string;
+        };
+        const detailByItemId = new Map<string, Detail>();
+        for (const r of resolved) {
+          // Chỉ nhận chi tiết vị trí thật (kệ ưu tiên / có tồn). Fallback kho
+          // default/showroom ("default"/"none") không tính là gợi ý.
+          if ((r.source === "preferred" || r.source === "stock") && r.storageId && r.locationId) {
+            detailByItemId.set(r.itemId, {
+              storageId: r.storageId,
+              storageName: storageNameById.get(r.storageId) ?? "",
+              locationId: r.locationId,
+              locationCode: r.locationCode ?? "",
+            });
+          }
+        }
+        // Resolver chỉ tra trong kho nhận hàng mặc định của chi nhánh và bỏ qua vị trí
+        // tồn 0 chưa có kệ ưu tiên. Hàng đã được xếp ở kho khác, hoặc chỉ có dòng
+        // "Đang theo dõi" tồn 0 (như ở Chi tiết vị trí hàng hóa), thì lấy vị trí đang
+        // theo dõi đầu tiên trong chi nhánh — cùng nguồn với dropdown Kho/Vị trí.
+        const missing = [
+          ...new Set(entries.map((e) => e.itemId).filter((id) => !detailByItemId.has(id))),
+        ];
+        // Trần đồng thời: thêm hàng loạt từ trang khác có thể là hàng trăm hàng hóa.
+        const worker = async () => {
+          for (let itemId = missing.shift(); itemId; itemId = missing.shift()) {
+            try {
+              const [first] = await loadItemBalances(itemId);
+              if (!first) continue;
+              detailByItemId.set(itemId, {
+                storageId: first.storageId,
+                storageName: storageNameById.get(first.storageId) ?? first.storageName,
+                locationId: first.locationId,
+                locationCode: first.code,
+              });
+            } catch {
+              /* bỏ qua — để trống cho người dùng tự chọn */
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: 6 }, worker));
         const itemIdByRowId = new Map(entries.map((e) => [e.rowId, e.itemId]));
         setRows((prev) =>
           prev.map((row) => {
             const itemId = itemIdByRowId.get(row.rowId);
             if (!itemId) return row;
-            const match = byItemId.get(itemId);
-            // Chỉ điền khi có chi tiết vị trí thật (kệ ưu tiên / có tồn). Trường hợp
-            // fallback kho default/showroom ("default"/"none") để trống cho người dùng tự chọn.
-            const detail =
-              match?.source === "preferred" || match?.source === "stock"
-                ? match
-                : undefined;
+            const detail = detailByItemId.get(itemId);
             return {
               ...row,
               storageId: detail?.storageId ?? "",
-              storageName: storageNameById.get(detail?.storageId ?? "") ?? "",
+              storageName: detail?.storageName ?? "",
               locationId: detail?.locationId ?? "",
               locationCode: detail?.locationCode ?? "",
               locationLoading: false,
@@ -335,7 +372,7 @@ export function InventoryItemBarcodesPage() {
         toast.warning("Không lấy được Kho/Vị trí gợi ý cho hàng hóa vừa thêm");
       }
     },
-    [storageNameById, isChain],
+    [storageNameById, isChain, loadItemBalances],
   );
 
   const handleSelectItem = useCallback(
