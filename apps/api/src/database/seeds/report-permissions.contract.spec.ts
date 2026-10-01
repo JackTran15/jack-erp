@@ -133,11 +133,17 @@ describe('report permission role seeds', () => {
   it.each([
     ['SALES', SALES_PERMISSION_KEYS],
     ['CASHIER', CASHIER_PERMISSION_KEYS],
-  ])('gives %s only the one sales report pos-web runs', (_role, keys) => {
+    ['WAREHOUSE', WAREHOUSE_PERMISSION_KEYS],
+  ])('gives %s only the two item-level sales reports', (_role, keys) => {
     const granted = reportPermissionsOfDomain('sales').filter((k) =>
       keys.includes(k),
     );
-    expect(granted).toEqual([REPORT_PERMISSION_KEYS['revenue-by-item']]);
+    expect([...granted].sort()).toEqual(
+      [
+        REPORT_PERMISSION_KEYS['revenue-by-item'],
+        REPORT_PERMISSION_KEYS['invoice-item-revenue-detail'],
+      ].sort(),
+    );
   });
 
   it.each([
