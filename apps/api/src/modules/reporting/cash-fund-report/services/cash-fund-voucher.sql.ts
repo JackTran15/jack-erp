@@ -91,6 +91,20 @@ export const VOUCHER_TABLES: readonly TableSpec[] = [
 export const SALES_RECEIPT_PURPOSES = ['POS_SALE', 'DEBT_COLLECTION'] as const;
 /** "Chi mua hàng hóa" (A-02): payments to suppliers for goods. */
 export const PURCHASE_PAYMENT_PURPOSES = ['PURCHASE', 'SUPPLIER_PAYMENT'] as const;
+/**
+ * Money handed back to a customer for a sale — a cancelled invoice, a return or
+ * an exchange. The POS writes these as payments under "Chi khác", but they undo
+ * a sale rather than spend anything, so they net out of "Thu từ bán hàng" and
+ * never reach a mục chi (the "Chi tiền" reports). "Kết quả kinh doanh" drops
+ * them for the same reason (`BusinessResultsSource`, REFUND).
+ */
+export const SALES_REFUND_PAYMENT_PURPOSES = ['REFUND'] as const;
+/**
+ * The mirror of a refund: cash taken back from the customer when a return is
+ * cancelled (purpose OTHER, filed under "Thu khác"). It restores a sale, so it
+ * nets back into "Thu từ bán hàng" rather than reading as other income.
+ */
+export const SALES_REFUND_REVERSAL_REFERENCE_TYPES = ['RETURN_CANCEL'] as const;
 
 const quoteList = (values: readonly string[]): string =>
   values.map((v) => `'${v}'`).join(', ');
@@ -132,22 +146,34 @@ export function voucherHeadersSql(): string {
 
 /**
  * All lines of posted vouchers as one relation:
- * (kind, fund, direction, voucher_id, line_id, doc_date, purpose, category_id,
- *  amount, description)
+ * (kind, fund, direction, voucher_id, line_id, doc_date, purpose, reference_type,
+ *  category_id, amount, description)
  */
 export function voucherLinesSql(): string {
   return VOUCHER_TABLES.map(
     (t) => `SELECT '${t.kind}'::text AS kind, '${t.fund}'::text AS fund, '${t.direction}'::text AS direction,
        h.id AS voucher_id, l.id AS line_id, h.${t.dateColumn}::date AS doc_date,
-       h.purpose::text AS purpose, l.category_id, l.amount::numeric AS amount, l.description
+       h.purpose::text AS purpose, h.reference_type::text AS reference_type,
+       l.category_id, l.amount::numeric AS amount, l.description
      FROM ${t.lineTable} l
      JOIN ${t.table} h ON h.id = l.${t.lineFk}
      WHERE ${voucherHeaderWhere('h')}`,
   ).join('\n UNION ALL \n');
 }
 
-/** SQL predicate: this header row belongs to the sales / purchase bucket (A-02). */
+/** SQL predicate: this header row refunds a sale (see SALES_REFUND_PAYMENT_PURPOSES). */
+export function salesRefundPredicate(alias = 'v'): string {
+  return `(${alias}.direction = 'out' AND ${alias}.purpose IN (${quoteList(SALES_REFUND_PAYMENT_PURPOSES)}))`;
+}
+
+/**
+ * SQL predicate: this header row belongs to the sales / purchase bucket (A-02)
+ * — refunds of a sale and their reversals included, so neither reads as a
+ * mục thu/chi.
+ */
 export function fixedBucketPredicate(alias = 'v'): string {
-  return `((${alias}.direction = 'in' AND ${alias}.purpose IN (${quoteList(SALES_RECEIPT_PURPOSES)}))
-       OR (${alias}.direction = 'out' AND ${alias}.purpose IN (${quoteList(PURCHASE_PAYMENT_PURPOSES)})))`;
+  return `((${alias}.direction = 'in' AND (${alias}.purpose IN (${quoteList(SALES_RECEIPT_PURPOSES)})
+             OR ${alias}.reference_type IN (${quoteList(SALES_REFUND_REVERSAL_REFERENCE_TYPES)})))
+       OR (${alias}.direction = 'out' AND ${alias}.purpose IN (${quoteList(PURCHASE_PAYMENT_PURPOSES)}))
+       OR ${salesRefundPredicate(alias)})`;
 }

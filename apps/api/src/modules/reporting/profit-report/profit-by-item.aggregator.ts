@@ -26,7 +26,15 @@ export interface ProfitByItemRowInput {
   /** Line movement direction — OUT adds, IN (return leg) subtracts. */
   direction: ItemDirection;
   quantity: number;
+  /** quantity × unitPrice − manual line discount; the engine promotion is NOT taken off. */
   lineTotal: number;
+  /** Engine promotion on the line (`invoice_items.promotion_discount`). */
+  promotionDiscount: number;
+  /**
+   * This line's share of the invoice's redeemed points, already signed by
+   * invoice type (see `allocateInvoicePoints`) — never multiply it by `sign`.
+   */
+  promoPoints: number;
   /** COGS snapshot at sale time (InvoiceItemEntity.costPrice), per unit. */
   costPrice: number;
 }
@@ -160,7 +168,9 @@ export function aggregateProfitByItem(
     // Net returns/exchanges via line direction: OUT adds, IN (return leg) subtracts.
     const sign = r.direction === ItemDirection.IN ? -1 : 1;
     agg.quantity += sign * r.quantity;
-    agg.revenue += sign * r.lineTotal;
+    // Net revenue — the same (3)-(4)-(9) as "Doanh thu theo mặt hàng", so the
+    // two reports print one figure: what the customer actually paid for it.
+    agg.revenue += sign * (r.lineTotal - r.promotionDiscount) - r.promoPoints;
     agg.costOfGoods += sign * r.quantity * r.costPrice;
   }
   return [...byKey.values()]

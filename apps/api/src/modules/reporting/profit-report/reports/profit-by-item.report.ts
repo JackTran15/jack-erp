@@ -48,6 +48,7 @@ import {
   PROFIT_CONSOLIDATED,
   resolveReportBranchIds,
 } from '../../report-core/report-query.util';
+import { allocateInvoicePoints } from '../../report-core/allocate-points.util';
 import { ReportDefinition } from '../report-definition';
 
 interface ItemMeta {
@@ -215,6 +216,10 @@ export class ProfitByItemReport implements ReportDefinition {
 
     const metaByItemId = await this.loadItemMeta(lines, actor.organizationId);
 
+    // Allocated over every line of the invoice, before the category filter
+    // below, so a share never depends on what the request happens to show.
+    const pointsByLine = allocateInvoicePoints(invoiceRows, lines);
+
     const grain = resolveGrain(dto.filters.statBy);
     // "Kho"/"Vị trí" only resolved at item grain, and only when actually requested.
     const needsLocation =
@@ -252,6 +257,8 @@ export class ProfitByItemReport implements ReportDefinition {
         direction: li.direction,
         quantity: Number(li.quantity ?? 0),
         lineTotal: Number(li.lineTotal ?? 0),
+        promotionDiscount: Number(li.promotionDiscount ?? 0),
+        promoPoints: pointsByLine.get(li) ?? 0,
         costPrice: Number(li.costPrice ?? 0),
       };
     });

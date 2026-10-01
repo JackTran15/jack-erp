@@ -105,6 +105,11 @@ const visibleLines = lines.filter((l) =>
 const EXPECTED_DISCOUNT = 10_000;
 //   Điểm KM = Σ invoiceTypeSign × points; only s2 redeemed any
 const EXPECTED_POINTS = 100_000;
+//   Tiền hàng = Σ sign(direction) × quantity × unitPrice
+//             = 1.000.000 + 1.000.000 − 500.000 + 2.400.000 − 750.000
+const EXPECTED_GOODS = 3_150_000;
+//   Doanh thu = Tiền hàng − Khuyến mại − Điểm KM — what the customers paid.
+const EXPECTED_REVENUE = EXPECTED_GOODS - EXPECTED_DISCOUNT - EXPECTED_POINTS;
 
 function invoiceQb(rows: any[]) {
   const qb: any = {
@@ -240,6 +245,24 @@ describe('Khuyến mại and Điểm KM agree across the four sales reports', ()
 
     expect(result.totals!['lineDiscount']).toBe(EXPECTED_DISCOUNT);
     expect(result.totals!['revenue.promoPoints']).toBe(EXPECTED_POINTS);
+  });
+
+  it('"Doanh thu" is the same net figure in all four reports', async () => {
+    // revenue-by-item and invoice-item-revenue-detail used to leave the points
+    // in, so they read EXPECTED_REVENUE + 100.000 while the invoice-grain
+    // reports (and "Kết quả kinh doanh") took them out.
+    const [daily, listing, byItem, detail] = await Promise.all([
+      run(dailySalesSummary(), ['date', 'revenue.total']),
+      run(invoiceOrderListing(), ['invoiceCode', 'revenue.total']),
+      run(revenueByItem(), ['sku', 'revenue.total']),
+      run(invoiceItemRevenueDetail(), ['invoiceCode', 'lineRevenue']),
+    ]);
+
+    expect(EXPECTED_REVENUE).toBe(3_040_000);
+    expect(daily.totals!['revenue.total']).toBe(EXPECTED_REVENUE);
+    expect(listing.totals!['revenue.total']).toBe(EXPECTED_REVENUE);
+    expect(byItem.totals!['revenue.total']).toBe(EXPECTED_REVENUE);
+    expect(detail.totals!['lineRevenue']).toBe(EXPECTED_REVENUE);
   });
 
   it('the EXCHANGE reversal is what separates the header from the lines', async () => {

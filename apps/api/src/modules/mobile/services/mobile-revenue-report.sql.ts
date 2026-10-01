@@ -1,5 +1,5 @@
 import { ItemDirection } from '../../pos/entities/invoice-item.entity';
-import { InvoiceStatus } from '../../pos/entities/invoice.entity';
+import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
 import { MobileRevenueTimeUnit } from '../dto/mobile-revenue-report.query.dto';
 
 /**
@@ -28,17 +28,17 @@ import { MobileRevenueTimeUnit } from '../dto/mobile-revenue-report.query.dto';
  *   nháp KHÔNG tự rơi, nên `invoiceScopeWhereSql` loại tường minh bằng
  *   `is_draft = false` (no-op ở cột mặc định).
  * - **Loại hoá đơn HUỶ** — web `applyInvoiceStatusFilter` mặc định
- *   `status != 'cancelled'` khi không chọn trạng thái. KHÁC
- *   `MobileBusinessReportService` (báo cáo lợi nhuận, web KHÔNG loại huỷ):
- *   hai màn khớp hai báo cáo web khác nhau, đừng "đồng bộ" một bên.
+ *   `status != 'cancelled'` khi không chọn trạng thái. Báo cáo lợi nhuận web
+ *   (`BusinessResultsSource`) cũng loại huỷ, nên `cellsSql` của
+ *   `MobileBusinessReportService` loại theo.
  * - Dấu theo `direction` của DÒNG: `OUT` cộng, `IN` (chân trả hàng) trừ.
  *   KHÔNG nhân thêm dấu theo loại hoá đơn — RETURN toàn dòng IN, nhân hai
  *   lần là đảo ngược về dương.
- * - `amount = sign × (line_total − promotion_discount)`: `line_total` đã trừ
- *   giảm giá gõ tay nhưng CHƯA trừ khuyến mãi engine phân bổ (nó trừ ở cấp
- *   hoá đơn), nên trừ ở đây. Đây đúng là cột "Doanh thu" web đang hiện; web
- *   KHÔNG trừ điểm KM phân bổ vào cột đó, nên ở đây cũng không — nếu web đổi
- *   thì đổi cả hai.
+ * - `amount = sign × (line_total − promotion_discount) − điểm phân bổ`:
+ *   `line_total` đã trừ giảm giá gõ tay nhưng CHƯA trừ khuyến mãi engine (nó
+ *   trừ ở cấp hoá đơn), nên trừ ở đây; điểm KM của hoá đơn chia xuống dòng
+ *   theo [pointsShareSql]. Đây đúng là cột "Doanh thu" (6)=(3)-(4)-(9) của
+ *   web — nếu web đổi thì đổi cả hai.
  *
  * `invoice_id` có mặt để Tổng quan đếm `COUNT(DISTINCT invoice_id)` trên ĐÚNG
  * tập dòng này — số hoá đơn và doanh thu của màn đó phải cùng một tập, và
@@ -117,7 +117,8 @@ export function revenueLinesSql(params: {
       (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
         * li.quantity                                          AS qty,
       (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
-        * (li.line_total - li.promotion_discount)              AS amount,
+        * (li.line_total - li.promotion_discount)
+        - ${pointsShareSql('li', 'i')}                         AS amount,
       (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
         * li.quantity * li.cost_price                          AS cost
     FROM invoice_items li
@@ -127,6 +128,48 @@ export function revenueLinesSql(params: {
     LEFT JOIN inventory_item_categories c ON c.id = it.category_id
     WHERE ${scope}${subjectClause}${categoryClause}
   )`;
+}
+
+/**
+ * Phần điểm KM của hoá đơn [invoiceAlias] rơi vào dòng [lineAlias], đã mang
+ * dấu theo LOẠI hoá đơn (RETURN âm) — bản SQL của `allocateInvoicePoints`
+ * (`report-core/allocate-points.util.ts`), để Tổng quan/mobile và web chia
+ * cùng một cách:
+ *
+ * - Chia theo tỉ trọng `|line_total|` trên các dòng OUT (điểm trừ vào hàng
+ *   BÁN, không vào hàng trả); hoá đơn không có dòng OUT thì chia trên mọi dòng.
+ * - Mọi dòng được chia đều 0 đồng → dồn cả cho dòng đầu (theo id), để tổng
+ *   không mất.
+ * - Tỉ trọng tính trên TOÀN BỘ dòng của hoá đơn qua truy vấn con, không qua
+ *   window function: CTE `lines` còn lọc theo mặt hàng/nhóm hàng, lọc xong
+ *   mới chia là thổi phồng phần của dòng còn lại.
+ *
+ * Không làm tròn từng dòng như bản TS (bản TS dồn phần lẻ vào dòng cuối);
+ * tổng theo hoá đơn vẫn khớp đúng, từng dòng lệch dưới 1 xu.
+ *
+ * Hoá đơn không dùng điểm (gần như tất cả) đi nhánh `THEN 0`, Postgres không
+ * chạy truy vấn con.
+ */
+export function pointsShareSql(lineAlias: string, invoiceAlias: string): string {
+  const out = `'${ItemDirection.OUT}'`;
+  return `(CASE WHEN ${invoiceAlias}.points_discount_amount = 0 THEN 0 ELSE
+          (CASE WHEN ${invoiceAlias}.type = '${InvoiceType.RETURN}' THEN -1 ELSE 1 END)
+          * ${invoiceAlias}.points_discount_amount
+          * (SELECT CASE
+                WHEN bool_or(x.direction = ${out}) AND ${lineAlias}.direction <> ${out} THEN 0
+                WHEN COALESCE(SUM(ABS(x.line_total)) FILTER (WHERE x.direction = ${out}), 0) > 0
+                  THEN ABS(${lineAlias}.line_total)
+                       / SUM(ABS(x.line_total)) FILTER (WHERE x.direction = ${out})
+                WHEN bool_or(x.direction = ${out})
+                  THEN CASE WHEN ${lineAlias}.id = (array_agg(x.id ORDER BY x.id)
+                         FILTER (WHERE x.direction = ${out}))[1] THEN 1 ELSE 0 END
+                WHEN SUM(ABS(x.line_total)) > 0
+                  THEN ABS(${lineAlias}.line_total) / SUM(ABS(x.line_total))
+                ELSE CASE WHEN ${lineAlias}.id = (array_agg(x.id ORDER BY x.id))[1] THEN 1 ELSE 0 END
+              END
+             FROM invoice_items x
+             WHERE x.invoice_id = ${lineAlias}.invoice_id)
+        END)`;
 }
 
 /** Cột ngày mà một báo cáo doanh thu mobile được phép lọc kỳ theo. */

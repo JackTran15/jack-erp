@@ -42,10 +42,9 @@ import {
   applyBranchScope,
   applyInvoiceStatusFilter,
   SALES_CONSOLIDATED,
-  invoiceTypeSign,
   resolveReportBranchIds,
 } from '../../report-core/report-query.util';
-import { allocatePoints } from '../../report-core/allocate-points.util';
+import { allocateInvoicePoints } from '../../report-core/allocate-points.util';
 import {
   InvoiceReportColumnsFilterDto,
   ReportDefinition,
@@ -254,26 +253,8 @@ export class RevenueByItemReport implements ReportDefinition {
 
     // "Điểm KM" has no per-line backing, so allocate each invoice's redeemed
     // points down to its lines (ADR-04), pre-signed by invoice type so the four
-    // sales reports agree on Σ. Grouping is by invoice: lines of one invoice
-    // share one header amount.
-    const linesByInvoice = new Map<string, typeof lines>();
-    for (const li of lines) {
-      const bucket = linesByInvoice.get(li.invoiceId);
-      if (bucket) bucket.push(li);
-      else linesByInvoice.set(li.invoiceId, [li]);
-    }
-    // Keyed by the line object, not its id: nothing downstream needs the id, and
-    // `allocatePoints` already hands back exactly this map.
-    const pointsByLine = new Map<(typeof lines)[number], number>();
-    for (const invoice of invoiceRows) {
-      const own = linesByInvoice.get(invoice.id);
-      if (!own?.length) continue;
-      const signedPoints =
-        invoiceTypeSign(invoice.type) * Number(invoice.pointsDiscountAmount ?? 0);
-      for (const [line, amount] of allocatePoints(signedPoints, own)) {
-        pointsByLine.set(line, amount);
-      }
-    }
+    // sales reports agree on Σ.
+    const pointsByLine = allocateInvoicePoints(invoiceRows, lines);
 
     const grain = resolveGrain(dto.filters.statBy, dto.filters.statisticByBrand);
     // "Vị trí"/"Mã vị trí" only resolved at item grain, only when actually

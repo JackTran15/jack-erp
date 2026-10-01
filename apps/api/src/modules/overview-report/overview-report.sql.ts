@@ -39,6 +39,7 @@ const excludedReceiptRefs = [
   CashReceiptReferenceType.INVOICE_DEBT,
   CashReceiptReferenceType.RECEIVABLE,
   CashReceiptReferenceType.REVERSAL,
+  CashReceiptReferenceType.RETURN_CANCEL,
 ]
   .map((v) => `'${v}'`)
   .join(', ');
@@ -46,8 +47,9 @@ const excludedReceiptRefs = [
 /**
  * "Thu khác" trong kỳ, theo phương thức — chép ĐÚNG vế 3 và 4 ("thu khác")
  * của `cellsSql` (báo cáo kinh doanh mobile ≡ web KQKD): phiếu thu tiền mặt
- * → `cash`, phiếu thu tiền gửi có `affect_revenue` → `bank_transfer`. Sửa
- * điều kiện ở đó thì sửa cả ở đây.
+ * → `cash`, phiếu thu tiền gửi có `affect_revenue` → `bank_transfer`. Kỳ theo
+ * "Ngày thu" (`voucher_date`/`doc_date`), bỏ phiếu xoá mềm. Sửa điều kiện ở
+ * đó thì sửa cả ở đây.
  */
 export const OTHER_RECEIPTS_SQL = `
   SELECT 'cash' AS method, COALESCE(SUM(l.amount), 0)::float AS amount
@@ -56,8 +58,9 @@ export const OTHER_RECEIPTS_SQL = `
   LEFT JOIN cash_voucher_categories c ON c.id = l.category_id
   WHERE r.organization_id = $1
     AND r.status = '${CashVoucherStatus.POSTED}'
-    AND r.posted_at >= $2::date
-    AND r.posted_at < ($3::date + INTERVAL '1 day')
+    AND r.deleted_at IS NULL
+    AND r.voucher_date >= $2::date
+    AND r.voucher_date <= $3::date
     AND r.branch_id = ANY($4::text[])
     AND (l.category_id IS NULL OR c.direction = '${CashVoucherCategoryDirection.IN}')
     AND (r.reference_type IS NULL OR r.reference_type NOT IN (${excludedReceiptRefs}))
@@ -70,10 +73,11 @@ export const OTHER_RECEIPTS_SQL = `
   LEFT JOIN cash_voucher_categories c ON c.id = l.category_id
   WHERE r.organization_id = $1
     AND r.status = '${BankVoucherStatus.POSTED}'
-    AND r.posted_at >= $2::date
-    AND r.posted_at < ($3::date + INTERVAL '1 day')
+    AND r.deleted_at IS NULL
+    AND r.doc_date >= $2::date
+    AND r.doc_date <= $3::date
     AND r.branch_id = ANY($4::text[])
     AND r.affect_revenue = true
     AND (l.category_id IS NULL OR c.direction = '${CashVoucherCategoryDirection.IN}')
-    AND (r.reference_type IS NULL OR r.reference_type <> '${BankReceiptReferenceType.REVERSAL}')
+    AND (r.reference_type IS NULL OR r.reference_type NOT IN ('${BankReceiptReferenceType.REVERSAL}', '${BankReceiptReferenceType.RETURN_CANCEL}'))
 `;

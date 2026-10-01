@@ -24,7 +24,7 @@ import { StorageEntity } from '../../../inventory/location/storage.entity';
 import { ItemStorageLocationEntity } from '../../../inventory/product/item-storage-location.entity';
 import { StockBalanceEntity } from '../../../inventory/ledger/stock-balance.entity';
 import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
-import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
+import { InvoiceItemEntity, ItemDirection } from '../../../pos/entities/invoice-item.entity';
 import { EmployeeProfileEntity } from '../../../rbac/employee/employee-profile.entity';
 import { RbacService } from '../../../rbac/rbac.service';
 import { InvoiceReportSearchDto } from '../dto/invoice-report-search.dto';
@@ -44,11 +44,10 @@ import {
   applyBranchScope,
   applyInvoiceStatusFilter,
   SALES_CONSOLIDATED,
-  invoiceTypeSign,
   resolveReportBranchIds,
   statDateColumn,
 } from '../../report-core/report-query.util';
-import { allocatePoints } from '../../report-core/allocate-points.util';
+import { allocateInvoicePoints } from '../../report-core/allocate-points.util';
 import { ReportDefinition } from '../report-definition';
 import {
   ItemWarehouseLocation,
@@ -194,26 +193,13 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
     // sales reports agree on Σ. Allocated BEFORE any line filter below: the
     // shares are a property of the invoice, not of what this request happens to
     // show, or filtering by category would silently inflate every share.
-    // Keyed by the line object, not its id: nothing downstream needs the id, and
-    // `allocatePoints` already hands back exactly this map.
-    const pointsByLine = new Map<(typeof lines)[number], number>();
-    if (lines.length) {
-      const linesByInvoice = new Map<string, typeof lines>();
-      for (const li of lines) {
-        const bucket = linesByInvoice.get(li.invoiceId);
-        if (bucket) bucket.push(li);
-        else linesByInvoice.set(li.invoiceId, [li]);
-      }
-      for (const [invoiceId, own] of linesByInvoice) {
-        const invoice = invoiceById.get(invoiceId);
-        if (!invoice) continue;
-        const signedPoints =
-          invoiceTypeSign(invoice.type) * Number(invoice.pointsDiscountAmount ?? 0);
-        for (const [line, amount] of allocatePoints(signedPoints, own)) {
-          pointsByLine.set(line, amount);
-        }
-      }
-    }
+    const pointsByLine = allocateInvoicePoints([...invoiceById.values()], lines);
+    // The allocation is signed by invoice TYPE, but every money cell of this
+    // report is re-signed by line DIRECTION on the way out (IN rows negate).
+    // Store it direction-relative so that negation lands back on the type sign
+    // instead of flipping a RETURN's points positive.
+    const pointsOnLine = (li: (typeof lines)[number]): number =>
+      (li.direction === ItemDirection.IN ? -1 : 1) * (pointsByLine.get(li) ?? 0);
 
     // Filter lines by item category (Nhóm hàng hóa) when requested.
     if (dto.filters.categoryId && lines.length) {
@@ -301,11 +287,13 @@ export class InvoiceItemRevenueDetailReport implements ReportDefinition {
           lineDiscount:
             Number(li.lineDiscount ?? 0) + Number(li.promotionDiscount ?? 0),
           // `lineTotal` mới trừ giảm giá gõ tay, CTKM engine trừ ở cấp hóa đơn.
-          // Trừ nốt ở đây để "Thành tiền" = "Tiền hàng" − "Khuyến mại" trên
-          // từng dòng, và để footer khớp doanh thu thực.
+          // Trừ nốt CTKM và điểm ở đây để "Doanh thu" = "Tiền hàng" − "Tiền KM"
+          // − "Điểm KM" trên từng dòng, và để footer khớp doanh thu thực.
           lineTotal:
-            Number(li.lineTotal ?? 0) - Number(li.promotionDiscount ?? 0),
-          promoPoints: pointsByLine.get(li) ?? 0,
+            Number(li.lineTotal ?? 0) -
+            Number(li.promotionDiscount ?? 0) -
+            pointsOnLine(li),
+          promoPoints: pointsOnLine(li),
           itemNote: li.note ?? null,
           itemCategory: categoryByItemId.get(li.itemId) ?? null,
           locationStorage: location?.storage ?? null,

@@ -111,8 +111,11 @@ export class BusinessResultsSource {
    * reversal copies the original's lines as POSTED while the original flips to
    * REVERSED, so counting it re-adds what it cancelled). Cash receipts drop
    * INVOICE (POS sale, already in 2.1.1), INVOICE_DEBT/RECEIVABLE (AR turning
-   * into cash) and REVERSAL. Deposit vouchers are gated on their own
-   * affectRevenue/affectExpense P&L flag, plus REVERSAL.
+   * into cash), REVERSAL and RETURN_CANCEL (cash taken back when a return is
+   * cancelled — the cancelled return already leaves 2.1.1.b, so counting the
+   * receipt too adds the sale twice). Deposit vouchers are gated on their own
+   * affectRevenue/affectExpense P&L flag, plus REVERSAL (and RETURN_CANCEL on
+   * receipts).
    */
   voucherLineQuery(
     kind: CashFundDocumentKind,
@@ -155,6 +158,7 @@ export class BusinessResultsSource {
               CashReceiptReferenceType.INVOICE_DEBT,
               CashReceiptReferenceType.RECEIVABLE,
               CashReceiptReferenceType.REVERSAL,
+              CashReceiptReferenceType.RETURN_CANCEL,
             ],
           },
         );
@@ -162,9 +166,15 @@ export class BusinessResultsSource {
       case 'BANK_RECEIPT':
         qb.andWhere('voucher.status = :status', { status: BankVoucherStatus.POSTED })
           .andWhere('voucher.affectRevenue = true')
-          .andWhere('(voucher.referenceType IS NULL OR voucher.referenceType != :reversal)', {
-            reversal: BankReceiptReferenceType.REVERSAL,
-          });
+          .andWhere(
+            '(voucher.referenceType IS NULL OR voucher.referenceType NOT IN (:...excludedRefTypes))',
+            {
+              excludedRefTypes: [
+                BankReceiptReferenceType.REVERSAL,
+                BankReceiptReferenceType.RETURN_CANCEL,
+              ],
+            },
+          );
         break;
       case 'BANK_PAYMENT':
         qb.andWhere('voucher.status = :status', { status: BankVoucherStatus.POSTED })

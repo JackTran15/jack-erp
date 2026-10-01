@@ -15,7 +15,7 @@ import {
 } from '../../accounting/deposit-vouchers/enums';
 import { BranchService } from '../../branch/branch.service';
 import { ItemDirection } from '../../pos/entities/invoice-item.entity';
-import { InvoiceType } from '../../pos/entities/invoice.entity';
+import { InvoiceStatus, InvoiceType } from '../../pos/entities/invoice.entity';
 import {
   MobileBranchPerformanceDto,
   MobileBusinessMonthDto,
@@ -181,8 +181,10 @@ export class MobileBusinessReportService {
  *
  * Từng nguồn chép điều kiện của câu tương ứng trong `BusinessResultsReport`:
  * 1. Dòng hàng — tiền hàng (qty × giá bán − KM dòng) và giá vốn (qty × giá
- *    vốn), chiều OUT cộng, IN trừ. Tương đương `goodsSoldOut − goodsReturnedIn
- *    − (lineDiscountOut − lineDiscountIn)` và `cogsOut − cogsReturnedIn`.
+ *    vốn), chiều OUT cộng, IN trừ; dòng IN cộng lại `promotion_discount` (phần
+ *    tiền hoàn giữ lại so với giá niêm yết — không header nào ghi nó). Tương
+ *    đương `goodsSoldOut − goodsReturnedIn − (lineDiscountOut − lineDiscountIn
+ *    − promotionDiscountIn)` và `cogsOut − cogsReturnedIn`.
  * 2. KM đầu phiếu (`discount_amount + points_discount_amount`): SALE/EXCHANGE
  *    trừ khỏi doanh thu, RETURN cộng lại — EXCHANGE xếp cùng SALE theo quyết
  *    định TKT-PRF-04 đã ghi ở `queryHeaderPromo`.
@@ -193,17 +195,28 @@ export class MobileBusinessReportService {
  *    `reference_type` là tài sản/công nợ chứ không phải chi phí.
  * 6. Phiếu chi tiền gửi POSTED có `affect_expense`, loại REVERSAL.
  */
+type VoucherDateColumn = 'voucher_date' | 'doc_date';
+
 export function cellsSql(branchClause: (alias: string) => string): string {
+  // Hoá đơn HUỶ không tính, như web (`BusinessResultsSource` →
+  // `applyInvoiceStatusFilter` mặc định `status != 'cancelled'`). Thiếu vế này
+  // là hoá đơn đã huỷ vẫn cộng doanh thu và giá vốn ở Tổng quan / mobile.
   const invoiceWhere = `
       i.organization_id = $1
+      AND i.status <> '${InvoiceStatus.CANCELLED}'
       AND i.issued_at >= $2::date
       AND i.issued_at < ($3::date + INTERVAL '1 day')
       ${branchClause('i')}`;
-  const voucherWhere = (alias: string, status: string): string => `
+  // Kỳ của phiếu là "Ngày thu/chi" (`voucher_date` phiếu tiền mặt, `doc_date`
+  // phiếu tiền gửi — cột `date` trần), không phải thời điểm ghi sổ: phiếu ghi
+  // sổ muộn rơi sang kỳ sau. Phiếu xoá mềm không tính — web đọc qua TypeORM
+  // nên tự loại, câu SQL thô này phải loại tường minh.
+  const voucherWhere = (alias: string, status: string, dateColumn: VoucherDateColumn): string => `
       ${alias}.organization_id = $1
       AND ${alias}.status = '${status}'
-      AND ${alias}.posted_at >= $2::date
-      AND ${alias}.posted_at < ($3::date + INTERVAL '1 day')
+      AND ${alias}.deleted_at IS NULL
+      AND ${alias}.${dateColumn} >= $2::date
+      AND ${alias}.${dateColumn} <= $3::date
       ${branchClause(alias)}`;
   const notIn = (values: string[]): string => values.map((v) => `'${v}'`).join(', ');
 
@@ -212,6 +225,7 @@ export function cellsSql(branchClause: (alias: string) => string): string {
     CashReceiptReferenceType.INVOICE_DEBT,
     CashReceiptReferenceType.RECEIVABLE,
     CashReceiptReferenceType.REVERSAL,
+    CashReceiptReferenceType.RETURN_CANCEL,
   ]);
   const excludedPaymentRefs = notIn([
     CashPaymentReferenceType.REFUND,
@@ -228,12 +242,15 @@ export function cellsSql(branchClause: (alias: string) => string): string {
       COALESCE(SUM(cells.revenue), 0)::float AS revenue,
       COALESCE(SUM(cells.cost), 0)::float AS cost
     FROM (
-      -- 1. dòng hàng: tiền hàng đã trừ KM dòng, và giá vốn — OUT cộng, IN trừ
+      -- 1. dòng hàng: tiền hàng đã trừ KM dòng, và giá vốn — OUT cộng, IN trừ;
+      --    CTKM trên dòng trả (IN) cộng lại — dòng bán đã nằm trong KM đầu phiếu
       SELECT
         i.branch_id,
         date_trunc('month', i.issued_at) AS bucket,
         (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
-          * (li.quantity * li.unit_price - li.line_discount) AS revenue,
+          * (li.quantity * li.unit_price - li.line_discount)
+          + (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 0 ELSE li.promotion_discount END)
+          AS revenue,
         (CASE WHEN li.direction = '${ItemDirection.OUT}' THEN 1 ELSE -1 END)
           * (li.quantity * li.cost_price) AS cost
       FROM invoice_items li
@@ -255,45 +272,45 @@ export function cellsSql(branchClause: (alias: string) => string): string {
       UNION ALL
 
       -- 3. thu khác — phiếu thu tiền mặt
-      SELECT r.branch_id, date_trunc('month', r.posted_at) AS bucket, l.amount AS revenue, 0 AS cost
+      SELECT r.branch_id, date_trunc('month', r.voucher_date) AS bucket, l.amount AS revenue, 0 AS cost
       FROM cash_receipt_lines l
       JOIN cash_receipts r ON r.id = l.cash_receipt_id
       LEFT JOIN cash_voucher_categories c ON c.id = l.category_id
-      WHERE ${voucherWhere('r', CashVoucherStatus.POSTED)}
+      WHERE ${voucherWhere('r', CashVoucherStatus.POSTED, 'voucher_date')}
         AND (l.category_id IS NULL OR c.direction = '${CashVoucherCategoryDirection.IN}')
         AND (r.reference_type IS NULL OR r.reference_type NOT IN (${excludedReceiptRefs}))
 
       UNION ALL
 
       -- 4. thu khác — phiếu thu tiền gửi
-      SELECT r.branch_id, date_trunc('month', r.posted_at) AS bucket, l.amount AS revenue, 0 AS cost
+      SELECT r.branch_id, date_trunc('month', r.doc_date) AS bucket, l.amount AS revenue, 0 AS cost
       FROM bank_receipt_lines l
       JOIN bank_receipts r ON r.id = l.bank_receipt_id
       LEFT JOIN cash_voucher_categories c ON c.id = l.category_id
-      WHERE ${voucherWhere('r', BankVoucherStatus.POSTED)}
+      WHERE ${voucherWhere('r', BankVoucherStatus.POSTED, 'doc_date')}
         AND r.affect_revenue = true
         AND (l.category_id IS NULL OR c.direction = '${CashVoucherCategoryDirection.IN}')
-        AND (r.reference_type IS NULL OR r.reference_type <> '${BankReceiptReferenceType.REVERSAL}')
+        AND (r.reference_type IS NULL OR r.reference_type NOT IN ('${BankReceiptReferenceType.REVERSAL}', '${BankReceiptReferenceType.RETURN_CANCEL}'))
 
       UNION ALL
 
       -- 5. chi khác — phiếu chi tiền mặt
-      SELECT p.branch_id, date_trunc('month', p.posted_at) AS bucket, 0 AS revenue, l.amount AS cost
+      SELECT p.branch_id, date_trunc('month', p.voucher_date) AS bucket, 0 AS revenue, l.amount AS cost
       FROM cash_payment_lines l
       JOIN cash_payments p ON p.id = l.cash_payment_id
       LEFT JOIN cash_voucher_categories c ON c.id = l.category_id
-      WHERE ${voucherWhere('p', CashVoucherStatus.POSTED)}
+      WHERE ${voucherWhere('p', CashVoucherStatus.POSTED, 'voucher_date')}
         AND (l.category_id IS NULL OR c.direction = '${CashVoucherCategoryDirection.OUT}')
         AND (p.reference_type IS NULL OR p.reference_type NOT IN (${excludedPaymentRefs}))
 
       UNION ALL
 
       -- 6. chi khác — phiếu chi tiền gửi
-      SELECT p.branch_id, date_trunc('month', p.posted_at) AS bucket, 0 AS revenue, l.amount AS cost
+      SELECT p.branch_id, date_trunc('month', p.doc_date) AS bucket, 0 AS revenue, l.amount AS cost
       FROM bank_payment_lines l
       JOIN bank_payments p ON p.id = l.bank_payment_id
       LEFT JOIN cash_voucher_categories c ON c.id = l.category_id
-      WHERE ${voucherWhere('p', BankVoucherStatus.POSTED)}
+      WHERE ${voucherWhere('p', BankVoucherStatus.POSTED, 'doc_date')}
         AND p.affect_expense = true
         AND (l.category_id IS NULL OR c.direction = '${CashVoucherCategoryDirection.OUT}')
         AND (p.reference_type IS NULL OR p.reference_type <> '${BankPaymentReferenceType.REVERSAL}')

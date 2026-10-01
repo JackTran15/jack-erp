@@ -18,7 +18,7 @@ export interface BusinessResultsRawValues {
   goodsReturnedIn: number;
   /** 2.1.3.a — Σ (invoice.discountAmount + pointsDiscountAmount), type IN (SALE, EXCHANGE). */
   promoOnSaleOut: number;
-  /** 2.1.3.b — same, type = RETURN. */
+  /** 2.1.3.b — same, type = RETURN, plus the promotion kept back on returned (IN) lines. */
   promoOnReturnIn: number;
   /** 2.2.{i} — categoryId -> Σ POSTED receipt-line amounts, category.direction=IN, from cash (CashReceiptLineEntity) + deposit (BankReceiptLineEntity, affectRevenue) vouchers combined. */
   otherIncomeByCategory: Record<string, number>;
