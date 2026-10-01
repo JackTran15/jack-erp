@@ -178,6 +178,21 @@ describe('XlsxStreamWriter', () => {
     expect(cell.border?.bottom?.style).toBe('thin');
   });
 
+  it('bolds a row that carries the hidden bold flag and leaves the others plain', async () => {
+    const sheet = await writeAndRead(HEADER, COLUMNS, [
+      { sku: null, name: 'Tiền điện', amount: 150000, bold: 1 },
+      { sku: 'SKU-1', name: 'Giày A', amount: 150000, bold: 0 },
+    ]);
+
+    const group = sheet.getRow(ROW_FIRST_DATA);
+    expect(group.getCell(2).value).toBe('Tiền điện');
+    expect(group.getCell(1).font?.bold).toBe(true);
+    expect(group.getCell(3).font?.bold).toBe(true);
+    expect(group.getCell(3).numFmt).toBe('#,##0');
+    expect(group.getCell(3).border?.bottom?.style).toBe('thin');
+    expect(sheet.getRow(ROW_FIRST_DATA + 1).getCell(2).font?.bold).toBeFalsy();
+  });
+
   it('omits the totals row when there is none', async () => {
     const sheet = await writeAndRead(HEADER, COLUMNS, [
       { sku: 'SKU-1', name: 'Giày A', amount: 1 },

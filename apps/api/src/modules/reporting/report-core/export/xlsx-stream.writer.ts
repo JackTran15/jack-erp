@@ -111,6 +111,13 @@ function labelCell(column: DocumentColumn): string {
   return column.desc ? `${column.label}\n${column.desc}` : column.label;
 }
 
+/**
+ * Hidden row key a report sets on its heading rows (group headers, grand
+ * totals — `CASH_FUND_ROW_KEYS.BOLD`, the profit aggregator's lines). The grid
+ * bolds those rows, so the file does too.
+ */
+const ROW_BOLD_KEY = 'bold';
+
 /** Project one keyed row onto the column order; missing keys become null. */
 function toCells(
   columns: DocumentColumn[],
@@ -169,7 +176,15 @@ export class XlsxStreamWriter implements ExportWriter {
 
   async rows(rows: ReportRow[]): Promise<void> {
     const sheet = this.requireSheet();
-    for (const row of rows) sheet.addRow(toCells(this.columns, row)).commit();
+    for (const row of rows) {
+      const added = sheet.addRow(toCells(this.columns, row));
+      if (row[ROW_BOLD_KEY]) {
+        added.eachCell({ includeEmpty: true }, (cell) => {
+          cell.font = bodyFont({ bold: true });
+        });
+      }
+      added.commit();
+    }
   }
 
   async end(totals: ReportRow | null): Promise<void> {
