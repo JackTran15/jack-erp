@@ -71,6 +71,13 @@ function makeReport(opts: {
     invoiceId: i.id,
     direction: i.type === InvoiceType.RETURN ? ItemDirection.IN : ItemDirection.OUT,
     promotionDiscount: Number(i.discountAmount ?? 0),
+    // One line carrying the whole goods value. No lineDiscount, so gross equals
+    // the header subtotal (Σ lineTotal) — the report's "Tiền hàng".
+    quantity: 1,
+    unitPrice:
+      i.type === InvoiceType.EXCHANGE
+        ? Number(i.netAmount ?? 0)
+        : Number(i.subtotal ?? 0),
   }));
   return new InvoiceOrderListingReport(
     invoicesRepo,
@@ -573,6 +580,45 @@ describe('InvoiceOrderListingReport.exportSource', () => {
 });
 
 describe('InvoiceOrderListingReport — Khuyến mại comes from the lines', () => {
+  it('takes Tiền hàng gross so a per-line discount is subtracted once', async () => {
+    // 2 × 500.000 with 100.000 off on the line: invoices.subtotal stores the
+    // net 900.000. Pairing that with a 100.000 "Khuyến mại" used to total 800.000.
+    const report = makeReport({
+      invoices: [
+        inv({
+          id: 's1',
+          code: 'INV-1',
+          type: InvoiceType.SALE,
+          subtotal: 900000,
+          discountAmount: 0,
+          totalPaid: 900000,
+          amountDue: 0,
+        }),
+      ],
+      lines: [
+        {
+          invoiceId: 's1',
+          direction: ItemDirection.OUT,
+          quantity: 2,
+          unitPrice: 500000,
+          lineDiscount: 100000,
+        },
+      ],
+    });
+
+    const result = await report.buildData(
+      {
+        columns: ['invoiceCode', 'revenue.goods', 'revenue.discount', 'revenue.total'],
+        filters: { issuedAt: { from: '2026-06-01', to: '2026-06-30' } },
+      } as any,
+      actor,
+    );
+
+    expect(result.rows[0]['revenue.goods']).toBe(1000000);
+    expect(result.rows[0]['revenue.discount']).toBe(100000);
+    expect(result.rows[0]['revenue.total']).toBe(900000);
+  });
+
   it('shows an EXCHANGE row whose returned line reverses a promotion the header never recorded', async () => {
     const report = makeReport({
       invoices: [

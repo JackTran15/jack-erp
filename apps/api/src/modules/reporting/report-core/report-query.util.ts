@@ -173,8 +173,21 @@ export function statDateColumn(
     : `${alias}.issuedAt`;
 }
 
+/** Per-invoice money summed from the lines, signed by `direction`. */
+export interface SignedLineMoney {
+  /** Σ quantity × unitPrice — "Tiền hàng" before any discount. */
+  gross: number;
+  /** Σ (lineDiscount + promotionDiscount) — "Khuyến mại". */
+  discount: number;
+}
+
 /**
- * Σ per invoice of each line's promotion contribution, signed by `direction`.
+ * Σ per invoice of each line's gross goods value and promotion contribution,
+ * signed by `direction`.
+ *
+ * Goods must be the GROSS line value: `invoices.subtotal` is Σ lineTotal, which
+ * already has `lineDiscount` taken off, so pairing it with a "Khuyến mại" that
+ * includes `lineDiscount` subtracts that discount twice.
  *
  * The header column `invoices.discount_amount` only ever records the discount on
  * what was *sold*, so an EXCHANGE whose returned line carries a reversed
@@ -186,15 +199,15 @@ export function statDateColumn(
  * get this function wrong.
  *
  * Returns aggregated numbers, never entities — `daily-sales-summary`
- * deliberately never touches `invoice_items`, and loading a month of lines into
- * memory to add them up would quietly change that report's memory profile.
- * An invoice with no lines gets no key at all (not a `0`).
+ * deliberately never loads `invoice_items` rows, and loading a month of lines
+ * into memory to add them up would quietly change that report's memory profile.
+ * An invoice with no lines gets no key at all.
  */
-export async function loadSignedLineDiscounts(
+export async function loadSignedLineMoney(
   repo: Repository<InvoiceItemEntity>,
   invoiceIds: string[],
-): Promise<Map<string, number>> {
-  const out = new Map<string, number>();
+): Promise<Map<string, SignedLineMoney>> {
+  const out = new Map<string, SignedLineMoney>();
   if (!invoiceIds.length) return out;
 
   // Postgres caps bind parameters at 65535; chunk well under it.
@@ -206,15 +219,25 @@ export async function loadSignedLineDiscounts(
       .select('line.invoiceId', 'invoiceId')
       .addSelect(
         `SUM(CASE WHEN line.direction = :inDirection THEN -1 ELSE 1 END
+             * (line.quantity * line.unitPrice))`,
+        'gross',
+      )
+      .addSelect(
+        `SUM(CASE WHEN line.direction = :inDirection THEN -1 ELSE 1 END
              * (line.lineDiscount + line.promotionDiscount))`,
         'amount',
       )
       .where('line.invoiceId IN (:...ids)', { ids })
       .setParameter('inDirection', ItemDirection.IN)
       .groupBy('line.invoiceId')
-      .getRawMany<{ invoiceId: string; amount: string }>();
+      .getRawMany<{ invoiceId: string; gross: string; amount: string }>();
 
-    for (const r of rows) out.set(r.invoiceId, Number(r.amount ?? 0));
+    for (const r of rows) {
+      out.set(r.invoiceId, {
+        gross: Number(r.gross ?? 0),
+        discount: Number(r.amount ?? 0),
+      });
+    }
   }
   return out;
 }

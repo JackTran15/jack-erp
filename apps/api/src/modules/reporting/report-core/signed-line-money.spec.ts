@@ -1,12 +1,14 @@
 import { Repository } from 'typeorm';
 import { InvoiceItemEntity, ItemDirection } from '../../pos/entities/invoice-item.entity';
-import { loadSignedLineDiscounts } from './report-query.util';
+import { loadSignedLineMoney } from './report-query.util';
 
 interface FakeLine {
   invoiceId: string;
   direction: ItemDirection;
   lineDiscount: number;
   promotionDiscount: number;
+  quantity?: number;
+  unitPrice?: number;
 }
 
 /**
@@ -30,20 +32,20 @@ function fakeRepo(lines: FakeLine[]) {
         groupBy: () => qb,
         getRawMany: () => {
           calls.push({ ids });
-          const sums = new Map<string, number>();
+          const sums = new Map<string, { gross: number; amount: number }>();
           for (const l of lines) {
             if (!ids.includes(l.invoiceId)) continue;
             const sign = l.direction === ItemDirection.IN ? -1 : 1;
-            sums.set(
-              l.invoiceId,
-              (sums.get(l.invoiceId) ?? 0) +
-                sign * (l.lineDiscount + l.promotionDiscount),
-            );
+            const cur = sums.get(l.invoiceId) ?? { gross: 0, amount: 0 };
+            cur.gross += sign * (l.quantity ?? 0) * (l.unitPrice ?? 0);
+            cur.amount += sign * (l.lineDiscount + l.promotionDiscount);
+            sums.set(l.invoiceId, cur);
           }
           return Promise.resolve(
-            [...sums].map(([invoiceId, amount]) => ({
+            [...sums].map(([invoiceId, v]) => ({
               invoiceId,
-              amount: String(amount),
+              gross: String(v.gross),
+              amount: String(v.amount),
             })),
           );
         },
@@ -61,11 +63,11 @@ const line = (
   promotionDiscount = 0,
 ): FakeLine => ({ invoiceId, direction, lineDiscount, promotionDiscount });
 
-describe('loadSignedLineDiscounts', () => {
+describe('loadSignedLineMoney', () => {
   it('returns an empty map and never touches the database for an empty id list', async () => {
     const { repo, calls } = fakeRepo([line('i1', ItemDirection.OUT, 100)]);
 
-    const result = await loadSignedLineDiscounts(repo, []);
+    const result = await loadSignedLineMoney(repo, []);
 
     expect(result.size).toBe(0);
     expect(calls).toHaveLength(0);
@@ -77,17 +79,17 @@ describe('loadSignedLineDiscounts', () => {
       line('i1', ItemDirection.OUT, 0, 150_000),
     ]);
 
-    const result = await loadSignedLineDiscounts(repo, ['i1']);
+    const result = await loadSignedLineMoney(repo, ['i1']);
 
-    expect(result.get('i1')).toBe(200_000);
+    expect(result.get('i1')?.discount).toBe(200_000);
   });
 
   it('sums IN lines negatively — a return reverses the original promotion', async () => {
     const { repo } = fakeRepo([line('i1', ItemDirection.IN, 0, 150_000)]);
 
-    const result = await loadSignedLineDiscounts(repo, ['i1']);
+    const result = await loadSignedLineMoney(repo, ['i1']);
 
-    expect(result.get('i1')).toBe(-150_000);
+    expect(result.get('i1')?.discount).toBe(-150_000);
   });
 
   it('nets an EXCHANGE that has both legs', async () => {
@@ -98,17 +100,29 @@ describe('loadSignedLineDiscounts', () => {
       line('i1', ItemDirection.IN, 0, 150_000),
     ]);
 
-    const result = await loadSignedLineDiscounts(repo, ['i1']);
+    const result = await loadSignedLineMoney(repo, ['i1']);
 
-    expect(result.get('i1')).toBe(-150_000);
+    expect(result.get('i1')?.discount).toBe(-150_000);
+  });
+
+  it('sums gross goods signed by direction, before any discount', async () => {
+    // A sold line of 2 × 500.000 with 100.000 off, and one returned line of 300.000.
+    const { repo } = fakeRepo([
+      { ...line('i1', ItemDirection.OUT, 100_000), quantity: 2, unitPrice: 500_000 },
+      { ...line('i1', ItemDirection.IN, 0), quantity: 1, unitPrice: 300_000 },
+    ]);
+
+    const result = await loadSignedLineMoney(repo, ['i1']);
+
+    expect(result.get('i1')).toEqual({ gross: 700_000, discount: 100_000 });
   });
 
   it('omits an invoice that has no lines rather than mapping it to zero', async () => {
     const { repo } = fakeRepo([line('i1', ItemDirection.OUT, 100)]);
 
-    const result = await loadSignedLineDiscounts(repo, ['i1', 'i2']);
+    const result = await loadSignedLineMoney(repo, ['i1', 'i2']);
 
-    expect(result.get('i1')).toBe(100);
+    expect(result.get('i1')?.discount).toBe(100);
     expect(result.has('i2')).toBe(false);
   });
 
@@ -118,10 +132,10 @@ describe('loadSignedLineDiscounts', () => {
       line('i2', ItemDirection.IN, 70),
     ]);
 
-    const result = await loadSignedLineDiscounts(repo, ['i1', 'i2']);
+    const result = await loadSignedLineMoney(repo, ['i1', 'i2']);
 
-    expect(result.get('i1')).toBe(100);
-    expect(result.get('i2')).toBe(-70);
+    expect(result.get('i1')?.discount).toBe(100);
+    expect(result.get('i2')?.discount).toBe(-70);
   });
 
   it('chunks large id lists and merges the chunks', async () => {
@@ -131,10 +145,10 @@ describe('loadSignedLineDiscounts', () => {
       line('i20000', ItemDirection.OUT, 20),
     ]);
 
-    const result = await loadSignedLineDiscounts(repo, ids);
+    const result = await loadSignedLineMoney(repo, ids);
 
     expect(calls).toHaveLength(2);
-    expect(result.get('i0')).toBe(10);
-    expect(result.get('i20000')).toBe(20);
+    expect(result.get('i0')?.discount).toBe(10);
+    expect(result.get('i20000')?.discount).toBe(20);
   });
 });

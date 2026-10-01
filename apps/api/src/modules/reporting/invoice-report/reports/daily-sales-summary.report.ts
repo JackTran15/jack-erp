@@ -44,7 +44,7 @@ import {
   applyInvoiceStatusFilter,
   SALES_CONSOLIDATED,
   invoiceTypeSign,
-  loadSignedLineDiscounts,
+  loadSignedLineMoney,
   resolveReportBranchIds,
   signedGoods,
 } from '../../report-core/report-query.util';
@@ -170,16 +170,16 @@ export class DailySalesSummaryReport implements ReportDefinition {
     const invoiceRows = await qb.getMany();
 
     // Sign each invoice's contribution by type so returns/exchanges net instead
-    // of inflating totals. Goods use the net line value (SALE +subtotal, RETURN
-    // −subtotal, EXCHANGE newSubtotal−returnSubtotal); the header money fields and
+    // of inflating totals. Goods are the GROSS line value from the lines (falling
+    // back to the header subtotal for an invoice with no lines); the header money fields and
     // payments/promotions are signed by type (RETURN negates). Signing lives here
     // (not the aggregator) so the cash-refund netting in TKT-RPT-03 composes.
     const dated = invoiceRows.filter((i) => i.issuedAt);
     // "Khuyến mại" comes from the lines, not `invoices.discount_amount`: the
     // header only ever records the discount on what was sold, so an EXCHANGE
     // whose returned line reverses a promotion shows nothing there. Signing is
-    // already inside the helper (by `direction`) — see loadSignedLineDiscounts.
-    const lineDiscounts = await loadSignedLineDiscounts(
+    // already inside the helper (by `direction`) — see loadSignedLineMoney.
+    const lineMoney = await loadSignedLineMoney(
       this.lineItems,
       dated.map((i) => i.id),
     );
@@ -195,10 +195,10 @@ export class DailySalesSummaryReport implements ReportDefinition {
       return {
         id: i.id,
         day: toBusinessDate(i.issuedAt!),
-        subtotal: signedGoods(i),
-        // No `sign *` here, unlike every other field: `direction` has already
-        // negated a RETURN's lines, and signing twice flips it back positive.
-        discountAmount: lineDiscounts.get(i.id) ?? 0,
+        // No `sign *` on these two, unlike every other field: `direction` has
+        // already negated a RETURN's lines, and signing twice flips it back.
+        subtotal: lineMoney.get(i.id)?.gross ?? signedGoods(i),
+        discountAmount: lineMoney.get(i.id)?.discount ?? 0,
         pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
         totalPaid: sign * Number(i.totalPaid ?? 0) - cashRefund,
       };

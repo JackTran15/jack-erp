@@ -50,7 +50,8 @@ import {
   applyInvoiceStatusFilter,
   SALES_CONSOLIDATED,
   invoiceTypeSign,
-  loadSignedLineDiscounts,
+  loadSignedLineMoney,
+  type SignedLineMoney,
   resolveReportBranchIds,
   signedGoods,
   statDateColumn,
@@ -292,9 +293,11 @@ export class InvoiceOrderListingReport implements ReportDefinition {
         isDynamicColumnKey(c),
     );
     const needsVoucher = referenced.includes('payment.voucher');
-    // Three columns read `discountAmount`, so any of them pulls the line sums in.
-    const needsLineDiscount = referenced.some(
+    // Goods and discount both come from the line sums, so any column reading
+    // either of them pulls the sums in.
+    const needsLineMoney = referenced.some(
       (c) =>
+        c === 'revenue.goods' ||
         c === 'revenue.discount' ||
         c === 'revenue.promoRate' ||
         c === 'revenue.total',
@@ -314,9 +317,9 @@ export class InvoiceOrderListingReport implements ReportDefinition {
     // "Khuyến mại" comes from the lines, not `invoices.discount_amount`: the
     // header only records the discount on what was sold, so an EXCHANGE whose
     // returned line reverses a promotion shows nothing there.
-    const lineDiscounts = needsLineDiscount
-      ? await loadSignedLineDiscounts(this.lineItems, invoiceIds)
-      : new Map<string, number>();
+    const lineMoney = needsLineMoney
+      ? await loadSignedLineMoney(this.lineItems, invoiceIds)
+      : new Map<string, SignedLineMoney>();
     const customerById = needsCustomer
       ? await this.loadCustomers(invoiceRows, actor.organizationId)
       : new Map<string, CustomerEntity>();
@@ -341,10 +344,12 @@ export class InvoiceOrderListingReport implements ReportDefinition {
         issuedAt: i.issuedAt!,
         code: i.code,
         status: i.status,
-        subtotal: signedGoods(i),
-        // No `sign *` here, unlike every other field: `direction` has already
-        // negated a RETURN's lines, and signing twice flips it back positive.
-        discountAmount: lineDiscounts.get(i.id) ?? 0,
+        // Gross goods, not `invoices.subtotal` (already net of lineDiscount):
+        // "Khuyến mại" includes lineDiscount, so the net value would lose it twice.
+        // No `sign *` on these two, unlike every other field: `direction` has
+        // already negated a RETURN's lines, and signing twice flips it back.
+        subtotal: lineMoney.get(i.id)?.gross ?? signedGoods(i),
+        discountAmount: lineMoney.get(i.id)?.discount ?? 0,
         pointsDiscountAmount: sign * Number(i.pointsDiscountAmount ?? 0),
         totalPaid: sign * Number(i.totalPaid ?? 0),
         amountDue: sign * Number(i.amountDue ?? 0),
