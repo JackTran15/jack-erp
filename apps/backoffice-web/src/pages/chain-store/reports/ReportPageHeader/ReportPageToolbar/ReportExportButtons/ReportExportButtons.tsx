@@ -8,6 +8,7 @@ import {
 } from "@erp/ui";
 import { CloudUpload, Loader2, Printer } from "lucide-react";
 import { toast } from "sonner";
+import { STORE_TYPE } from "../../../../../../constants/store.constant";
 import { useBranchStore } from "../../../../../../store/common/branch/branch.store";
 import { useTableStore } from "../../../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../../../store/page-stores/report/report.context";
@@ -39,7 +40,10 @@ export function ReportExportButtons() {
   const columnsState = useTableStore((s) => s.columns);
   const appliedRequest = useReportStore((s) => s.appliedRequest);
   const branch = useReportStore((s) => s.branch);
-  const activeBranchId = useBranchStore((s) => s.branchId);
+  // Chuỗi cửa hàng: không có chi nhánh header — `branchId` của store vẫn giữ
+  // chi nhánh chọn trước đó, gửi nó đi sẽ thu báo cáo chuỗi về một chi nhánh.
+  const headerBranchId = useBranchStore((s) => s.branchId);
+  const activeBranchId = branch === STORE_TYPE.CHAIN ? null : headerBranchId;
 
   // Visible columns in display order — read from the live table state
   // (`columns.order` / `columns.visibility`), not from `config.columns`, which
