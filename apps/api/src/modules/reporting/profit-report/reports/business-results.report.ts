@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
+import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import {
   PROFIT_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
@@ -46,6 +47,19 @@ import { BUSINESS_RESULTS_COLUMNS, isKnownBusinessResultsColumn } from '../busin
 import { ProfitReportSearchDto } from '../dto/profit-report-search.dto';
 import { enrichHeader } from '../report-column.util';
 import { ReportDefinition } from '../report-definition';
+
+// voucher_date/doc_date are plain `date` columns ("Ngày thu/chi"), so calendar
+// bounds compare inclusively with no timezone shift; postedAt is only the
+// moment the voucher was booked and can fall in a later period.
+function applyVoucherDateRange<T extends ObjectLiteral>(
+  qb: SelectQueryBuilder<T>,
+  col: string,
+  fromDate: string,
+  toDate: string,
+): void {
+  qb.andWhere(`${col} >= :voucherFrom`, { voucherFrom: fromDate.slice(0, 10) })
+    .andWhere(`${col} <= :voucherTo`, { voucherTo: toDate.slice(0, 10) });
+}
 
 /**
  * "Kết quả kinh doanh" — fixed P&L statement (2.2 "Thu khác" and 3.2 "Chi phí
@@ -210,10 +224,9 @@ export class BusinessResultsReport implements ReportDefinition {
     const qb = this.lineItems
       .createQueryBuilder('li')
       .innerJoin(InvoiceEntity, 'invoice', 'invoice.id = li.invoiceId')
-      .where('invoice.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('invoice.issuedAt >= :fromDate', { fromDate })
-      .andWhere('invoice.issuedAt <= :toDate', { toDate });
+      .where('invoice.organizationId = :orgId', { orgId: organizationId });
     applyBranchScope(qb, 'invoice', branchIds);
+    new FilterBuilder(qb).applyDateRange('invoice.issuedAt', { from: fromDate, to: toDate });
 
     const rows = await qb
       .select('li.direction', 'direction')
@@ -257,10 +270,9 @@ export class BusinessResultsReport implements ReportDefinition {
   ): Promise<{ headerSaleAndExchange: number; headerReturn: number }> {
     const qb = this.invoices
       .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('invoice.issuedAt >= :fromDate', { fromDate })
-      .andWhere('invoice.issuedAt <= :toDate', { toDate });
+      .where('invoice.organizationId = :orgId', { orgId: organizationId });
     applyBranchScope(qb, 'invoice', branchIds);
+    new FilterBuilder(qb).applyDateRange('invoice.issuedAt', { from: fromDate, to: toDate });
 
     const rows = await qb
       .select('invoice.type', 'type')
@@ -316,8 +328,6 @@ export class BusinessResultsReport implements ReportDefinition {
       .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
       .where('payment.organizationId = :orgId', { orgId: organizationId })
       .andWhere('payment.status = :status', { status: CashVoucherStatus.POSTED })
-      .andWhere('payment.postedAt >= :fromDate', { fromDate })
-      .andWhere('payment.postedAt <= :toDate', { toDate })
       .andWhere('(line.categoryId IS NULL OR category.direction = :outDirection)', {
         outDirection: CashVoucherCategoryDirection.OUT,
       })
@@ -333,6 +343,7 @@ export class BusinessResultsReport implements ReportDefinition {
         },
       );
     applyBranchScope(qb, 'payment', branchIds);
+    applyVoucherDateRange(qb, 'payment.voucherDate', fromDate, toDate);
 
     const rows = await qb
       .select('line.categoryId', 'categoryId')
@@ -381,8 +392,6 @@ export class BusinessResultsReport implements ReportDefinition {
       .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
       .where('receipt.organizationId = :orgId', { orgId: organizationId })
       .andWhere('receipt.status = :status', { status: CashVoucherStatus.POSTED })
-      .andWhere('receipt.postedAt >= :fromDate', { fromDate })
-      .andWhere('receipt.postedAt <= :toDate', { toDate })
       .andWhere('(line.categoryId IS NULL OR category.direction = :inDirection)', {
         inDirection: CashVoucherCategoryDirection.IN,
       })
@@ -398,6 +407,7 @@ export class BusinessResultsReport implements ReportDefinition {
         },
       );
     applyBranchScope(qb, 'receipt', branchIds);
+    applyVoucherDateRange(qb, 'receipt.voucherDate', fromDate, toDate);
 
     const rows = await qb
       .select('line.categoryId', 'categoryId')
@@ -444,8 +454,6 @@ export class BusinessResultsReport implements ReportDefinition {
       .where('receipt.organizationId = :orgId', { orgId: organizationId })
       .andWhere('receipt.status = :status', { status: BankVoucherStatus.POSTED })
       .andWhere('receipt.affectRevenue = true')
-      .andWhere('receipt.postedAt >= :fromDate', { fromDate })
-      .andWhere('receipt.postedAt <= :toDate', { toDate })
       .andWhere('(line.categoryId IS NULL OR category.direction = :inDirection)', {
         inDirection: CashVoucherCategoryDirection.IN,
       })
@@ -453,6 +461,7 @@ export class BusinessResultsReport implements ReportDefinition {
         reversal: BankReceiptReferenceType.REVERSAL,
       });
     applyBranchScope(qb, 'receipt', branchIds);
+    applyVoucherDateRange(qb, 'receipt.docDate', fromDate, toDate);
 
     return this.collectByCategory(qb);
   }
@@ -476,8 +485,6 @@ export class BusinessResultsReport implements ReportDefinition {
       .where('payment.organizationId = :orgId', { orgId: organizationId })
       .andWhere('payment.status = :status', { status: BankVoucherStatus.POSTED })
       .andWhere('payment.affectExpense = true')
-      .andWhere('payment.postedAt >= :fromDate', { fromDate })
-      .andWhere('payment.postedAt <= :toDate', { toDate })
       .andWhere('(line.categoryId IS NULL OR category.direction = :outDirection)', {
         outDirection: CashVoucherCategoryDirection.OUT,
       })
@@ -485,6 +492,7 @@ export class BusinessResultsReport implements ReportDefinition {
         reversal: BankPaymentReferenceType.REVERSAL,
       });
     applyBranchScope(qb, 'payment', branchIds);
+    applyVoucherDateRange(qb, 'payment.docDate', fromDate, toDate);
 
     return this.collectByCategory(qb);
   }
