@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import {
   fixedBucketPredicate,
+  salesRefundPredicate,
   voucherHeadersSql,
   voucherLinesSql,
 } from './cash-fund-voucher.sql';
@@ -21,7 +22,11 @@ export interface FundAmounts {
 }
 
 export interface CashFundPeriodTotals {
-  /** Receipts with purpose POS_SALE / DEBT_COLLECTION (A-02), from the voucher header. */
+  /**
+   * Receipts with purpose POS_SALE / DEBT_COLLECTION (A-02), from the voucher
+   * header, less the payments that refunded a sale (purpose REFUND), plus the
+   * cash taken back when a return was cancelled (RETURN_CANCEL).
+   */
   inSales: FundAmounts;
   /** Payments with purpose PURCHASE / SUPPLIER_PAYMENT (A-02), from the voucher header. */
   outPurchase: FundAmounts;
@@ -120,7 +125,9 @@ export class CashFundPeriodService {
 
     const headerRows = (await this.dataSource.query(
       `SELECT v.fund, v.direction,
-              CASE WHEN ${fixedBucketPredicate('v')} THEN 'fixed' ELSE 'other' END AS bucket,
+              CASE WHEN ${salesRefundPredicate('v')} THEN 'refund'
+                   WHEN ${fixedBucketPredicate('v')} THEN 'fixed'
+                   ELSE 'other' END AS bucket,
               COALESCE(SUM(v.total_amount), 0) AS amount
          FROM (${voucherHeadersSql()}) v
         WHERE ${inRange}
@@ -129,7 +136,7 @@ export class CashFundPeriodService {
     )) as {
       fund: 'cash' | 'deposit';
       direction: 'in' | 'out';
-      bucket: 'fixed' | 'other';
+      bucket: 'refund' | 'fixed' | 'other';
       amount: unknown;
     }[];
 
@@ -158,7 +165,11 @@ export class CashFundPeriodService {
     };
     const otherHeaders = { in: zeroFunds(), out: zeroFunds() };
     for (const r of headerRows) {
-      if (r.bucket === 'fixed') {
+      if (r.bucket === 'refund') {
+        // Netted out of the sales line, not added to "chi": the closing balance
+        // is unchanged, and a cancelled invoice stops reading as an expense.
+        totals.inSales[r.fund] -= num(r.amount);
+      } else if (r.bucket === 'fixed') {
         (r.direction === 'in' ? totals.inSales : totals.outPurchase)[r.fund] += num(r.amount);
       } else {
         otherHeaders[r.direction][r.fund] += num(r.amount);

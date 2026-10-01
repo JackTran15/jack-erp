@@ -19,6 +19,8 @@
  * accountants reconcile this column against the invoice header.
  */
 import { ItemDirection } from '../../pos/entities/invoice-item.entity';
+import { InvoiceType } from '../../pos/entities/invoice.entity';
+import { invoiceTypeSign } from './report-query.util';
 
 export interface AllocatablePointsLine {
   direction: ItemDirection;
@@ -60,5 +62,36 @@ export function allocatePoints<T extends AllocatablePointsLine>(
     running = round2(running + share);
     out.set(l, share);
   });
+  return out;
+}
+
+/**
+ * Every line's share of its invoice's redeemed points, signed the way the
+ * invoice-grain reports sign the header (`invoiceTypeSign × pointsAmount`).
+ *
+ * Shares are a property of the invoice, so pass ALL of an invoice's lines —
+ * allocate before any line filter, or filtering by category inflates every
+ * share. Lines whose invoice is not in `invoices` get no entry.
+ */
+export function allocateInvoicePoints<T extends AllocatablePointsLine & { invoiceId: string }>(
+  invoices: Array<{ id: string; type: InvoiceType; pointsDiscountAmount?: number | string | null }>,
+  lines: T[],
+): Map<T, number> {
+  const out = new Map<T, number>();
+  const linesByInvoice = new Map<string, T[]>();
+  for (const li of lines) {
+    const bucket = linesByInvoice.get(li.invoiceId);
+    if (bucket) bucket.push(li);
+    else linesByInvoice.set(li.invoiceId, [li]);
+  }
+  for (const invoice of invoices) {
+    const own = linesByInvoice.get(invoice.id);
+    if (!own?.length) continue;
+    const signedPoints =
+      invoiceTypeSign(invoice.type) * Number(invoice.pointsDiscountAmount ?? 0);
+    for (const [line, amount] of allocatePoints(signedPoints, own)) {
+      out.set(line, amount);
+    }
+  }
   return out;
 }

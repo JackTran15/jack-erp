@@ -126,6 +126,12 @@ export class GrossProfitByInvoiceReport implements ReportDefinition {
       const cur = lineContribByInvoiceId.get(li.invoiceId) ?? { gross: 0, discount: 0 };
       cur.gross += sign * Number(li.quantity ?? 0) * Number(li.unitPrice ?? 0);
       cur.discount += sign * Number(li.lineDiscount ?? 0);
+      // A returned line's engine promotion is what the refund kept back from
+      // the list price; no header records it, so it nets out of "Giảm giá"
+      // here. On a sold line it is already inside the header `discountAmount`.
+      if (li.direction === ItemDirection.IN) {
+        cur.discount -= Number(li.promotionDiscount ?? 0);
+      }
       lineContribByInvoiceId.set(li.invoiceId, cur);
     }
 

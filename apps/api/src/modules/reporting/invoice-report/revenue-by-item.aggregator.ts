@@ -217,9 +217,11 @@ export function aggregateByItem(
     // `promoPoints` đã mang dấu từ lúc phân bổ (theo loại hoá đơn), nên KHÔNG
     // nhân `sign` lần nữa — khác với `discount` lấy dấu từ `direction`.
     agg.promoPoints += r.promoPoints;
-    // `lineTotal` chưa trừ khuyến mãi engine (nó được trừ ở cấp hóa đơn), nên
-    // phải trừ ở đây để "Doanh thu" đúng là (3)-(4)-(9) như tiêu đề cột.
-    agg.total += sign * (r.lineTotal - r.promotionDiscount);
+    // "Doanh thu" = (3)-(4)-(9) như tiêu đề cột. `lineTotal` mới trừ giảm giá
+    // gõ tay, chưa trừ khuyến mãi engine (trừ ở cấp hoá đơn) nên trừ ở đây;
+    // điểm KM đã mang dấu nên trừ thẳng, không nhân `sign`. Bỏ điểm là doanh
+    // thu cao hơn số khách thực trả, lệch Kết quả kinh doanh và Bảng kê hoá đơn.
+    agg.total += sign * (r.lineTotal - r.promotionDiscount) - r.promoPoints;
   }
   return [...byKey.values()]
     .map((a) => ({

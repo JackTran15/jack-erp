@@ -22,11 +22,34 @@ const row = (over: Partial<ProfitByItemRowInput> = {}): ProfitByItemRowInput => 
   direction: ItemDirection.OUT,
   quantity: 2,
   lineTotal: 2000,
+  promotionDiscount: 0,
+  promoPoints: 0,
   costPrice: 500,
   ...over,
 });
 
 describe('aggregateProfitByItem', () => {
+  it('nets the engine promotion and the allocated points out of revenue', () => {
+    const [g] = aggregateProfitByItem(
+      [row({ lineTotal: 2000, promotionDiscount: 200, promoPoints: 100 })],
+      'item',
+    );
+    // (3) 2000 − (4) 200 − (9) 100 — the same figure "Doanh thu theo mặt hàng" prints.
+    expect(g.revenue).toBe(1700);
+    expect(itemGroupCellValue('grossProfit', g)).toBe(700);
+  });
+
+  it('adds back the promotion kept on a returned line, not its list price', () => {
+    // Exchange RTN-202608-00035: sold 780.000, returned a 720.000 item bought
+    // with an 80.000 promotion — the customer paid 140.000, so that is revenue.
+    const rows = [
+      row({ itemId: 'a', itemCode: 'A', direction: ItemDirection.OUT, quantity: 1, lineTotal: 780000, costPrice: 0 }),
+      row({ itemId: 'b', itemCode: 'B', direction: ItemDirection.IN, quantity: 1, lineTotal: 720000, promotionDiscount: 80000, costPrice: 0 }),
+    ];
+    const groups = aggregateProfitByItem(rows, 'item');
+    expect(groups.reduce((s, g) => s + g.revenue, 0)).toBe(140000);
+  });
+
   it('sums revenue and costOfGoods for a plain SALE line', () => {
     const [g] = aggregateProfitByItem([row()], 'item');
     expect(g).toMatchObject({ quantity: 2, revenue: 2000, costOfGoods: 1000 });

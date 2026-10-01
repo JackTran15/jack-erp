@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 import { CashFundPeriodService } from './cash-fund-period.service';
 import {
   fixedBucketPredicate,
+  salesRefundPredicate,
   voucherHeaderWhere,
   voucherHeadersSql,
   voucherLinesSql,
@@ -42,8 +43,17 @@ describe('cash-fund voucher SQL', () => {
 
   it('buckets sales receipts and purchase payments by purpose (A-02)', () => {
     const p = fixedBucketPredicate('v');
-    expect(p).toContain("v.direction = 'in' AND v.purpose IN ('POS_SALE', 'DEBT_COLLECTION')");
+    expect(p).toContain("v.direction = 'in' AND (v.purpose IN ('POS_SALE', 'DEBT_COLLECTION')");
+    // Cash taken back when a return is cancelled restores a sale, not "Thu khác".
+    expect(p).toContain("v.reference_type IN ('RETURN_CANCEL')");
     expect(p).toContain("v.direction = 'out' AND v.purpose IN ('PURCHASE', 'SUPPLIER_PAYMENT')");
+  });
+
+  it('keeps a refund of a sale out of the mục chi — the "Chi tiền" reports read NOT fixed', () => {
+    // A cancelled invoice's refund is written as a "Chi khác" payment; leaving it
+    // outside the fixed bucket is what made it read as an expense.
+    expect(salesRefundPredicate('v')).toBe("(v.direction = 'out' AND v.purpose IN ('REFUND'))");
+    expect(fixedBucketPredicate('v')).toContain(salesRefundPredicate('v'));
   });
 });
 
@@ -126,6 +136,25 @@ describe('CashFundPeriodService', () => {
       const [lineSql] = query.mock.calls[1] as [string, unknown[]];
       expect(lineSql).toContain('v.category_id IS NOT NULL');
       expect(lineSql).toContain('AND NOT ((v.direction');
+    });
+
+    it('nets refunds of a sale out of "Thu từ bán hàng" instead of counting them as chi', async () => {
+      query
+        .mockResolvedValueOnce([
+          { fund: 'cash', direction: 'in', bucket: 'fixed', amount: '1300000' },
+          // two invoices for one sale, one cancelled → its 650.000 refunded
+          { fund: 'cash', direction: 'out', bucket: 'refund', amount: '650000' },
+          { fund: 'deposit', direction: 'out', bucket: 'refund', amount: '100000' },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const t = await service.periodTotals(scope(['b-a']), '2026-09-01', '2026-09-30');
+
+      expect(t.inSales).toEqual({ cash: 650000, deposit: -100000 });
+      expect(t.outPurchase).toEqual({ cash: 0, deposit: 0 });
+      expect(t.outUncategorized).toEqual({ cash: 0, deposit: 0 });
+      const [headerSql] = query.mock.calls[0] as [string, unknown[]];
+      expect(headerSql).toContain(`CASE WHEN ${salesRefundPredicate('v')} THEN 'refund'`);
     });
 
     it('rounds to the cent and never goes negative on uncategorised when lines and header agree', async () => {

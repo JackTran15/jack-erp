@@ -137,8 +137,16 @@ export class BusinessResultsReport implements ReportDefinition {
       // voucher/discount-code/promotion + loyalty points. Both pools are real
       // promotional spend; the invoice detail dialog shows per-line "KM ..."
       // labels that only ever hit lineDiscount, never invoice.discountAmount.
+      //
+      // The engine promotion (`invoice_items.promotionDiscount`) is counted
+      // once per leg: on a sale its OUT lines already roll up into the header
+      // `discountAmount`, so only the IN lines add it here. On a returned line
+      // it is everything the refund kept back from the list price (the
+      // original promotion plus its share of points), and no header carries
+      // it — leave it out and 2.1 drops by that amount below "Bảng kê hoá đơn".
       promoOnSaleOut: goodsAndCogs.lineDiscountOut + headerPromo.headerSaleAndExchange,
-      promoOnReturnIn: goodsAndCogs.lineDiscountIn + headerPromo.headerReturn,
+      promoOnReturnIn:
+        goodsAndCogs.lineDiscountIn + goodsAndCogs.promotionDiscountIn + headerPromo.headerReturn,
       otherIncomeByCategory: otherIncome.byCategory,
       otherIncomeUncategorized: otherIncome.uncategorized,
       otherExpenseByCategory: otherExpense.byCategory,
@@ -162,6 +170,7 @@ export class BusinessResultsReport implements ReportDefinition {
     goodsReturnedIn: number;
     lineDiscountOut: number;
     lineDiscountIn: number;
+    promotionDiscountIn: number;
     cogsOut: number;
     cogsReturnedIn: number;
   }> {
@@ -170,12 +179,14 @@ export class BusinessResultsReport implements ReportDefinition {
       .select('li.direction', 'direction')
       .addSelect('COALESCE(SUM(li.quantity * li.unitPrice), 0)', 'grossSum')
       .addSelect('COALESCE(SUM(li.lineDiscount), 0)', 'lineDiscountSum')
+      .addSelect('COALESCE(SUM(li.promotionDiscount), 0)', 'promotionDiscountSum')
       .addSelect('COALESCE(SUM(li.quantity * li.costPrice), 0)', 'cogsSum')
       .groupBy('li.direction')
       .getRawMany<{
         direction: ItemDirection;
         grossSum: string;
         lineDiscountSum: string;
+        promotionDiscountSum: string;
         cogsSum: string;
       }>();
 
@@ -186,6 +197,7 @@ export class BusinessResultsReport implements ReportDefinition {
       goodsReturnedIn: Number(inn?.grossSum ?? 0),
       lineDiscountOut: Number(out?.lineDiscountSum ?? 0),
       lineDiscountIn: Number(inn?.lineDiscountSum ?? 0),
+      promotionDiscountIn: Number(inn?.promotionDiscountSum ?? 0),
       cogsOut: Number(out?.cogsSum ?? 0),
       cogsReturnedIn: Number(inn?.cogsSum ?? 0),
     };

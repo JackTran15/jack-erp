@@ -8,6 +8,7 @@ import {
   chartMonthsOf,
   chartWindowOf,
   MobileBusinessReportService,
+  cellsSql,
 } from './mobile-business-report.service';
 
 const BRANCH_A = '20000000-0000-4000-8000-000000000001';
@@ -170,5 +171,28 @@ describe('MobileBusinessReportService', () => {
 
       expect(result.totals.revenue).toBe(1);
     });
+  });
+});
+
+describe('cellsSql', () => {
+  const sql = cellsSql((alias) => `AND ${alias}.branch_id = ANY($4::text[])`);
+
+  it('bỏ hoá đơn HUỶ như Kết quả kinh doanh web', () => {
+    expect(sql).toContain("i.status <> 'cancelled'");
+  });
+
+  it('phiếu thu/chi: lọc theo ngày chứng từ, bỏ phiếu xoá mềm, không đọc posted_at', () => {
+    expect(sql).not.toContain('posted_at');
+    expect(sql).toContain('r.voucher_date >= $2::date');
+    expect(sql).toContain('p.doc_date <= $3::date');
+    expect(sql.match(/deleted_at IS NULL/g)).toHaveLength(4);
+  });
+
+  it('phiếu thu lại tiền khi huỷ phiếu trả hàng không phải "thu khác"', () => {
+    expect(sql.match(/'RETURN_CANCEL'/g)).toHaveLength(2);
+  });
+
+  it('dòng trả (IN) cộng lại CTKM giữ lại khi hoàn tiền', () => {
+    expect(sql).toContain("THEN 0 ELSE li.promotion_discount END");
   });
 });
