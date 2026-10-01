@@ -73,6 +73,15 @@ export interface ReportFilterValues {
   [REPORT_FILTERS_LINE.EXPENSE_CATEGORY]: string;
   // Quỹ tiền (#6): bucket thời gian; chưa set = "day".
   [REPORT_FILTERS_LINE.TIME_BUCKET]: CashFundTimeBucket;
+  [REPORT_FILTERS_LINE.PROFIT_DRILL_SCOPE]: ProfitDrillScopeValue;
+}
+
+/** Ô vừa click của "Kết quả kinh doanh", chuyển thẳng thành filter của báo cáo chi tiết. */
+export interface ProfitDrillScopeValue {
+  otherLineDirection?: "in" | "out";
+  /** Id mục thu/chi, hoặc "uncategorized"; vắng = mọi mục. */
+  voucherCategoryId?: string;
+  cogsDirection?: "in" | "out";
 }
 
 // Bộ filter đã "áp dụng" (commit khi bấm Lấy dữ liệu / Đồng ý) — nguồn gọi API data.

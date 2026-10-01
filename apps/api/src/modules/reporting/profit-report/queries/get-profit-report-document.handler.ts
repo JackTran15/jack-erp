@@ -41,6 +41,15 @@ export function profitFilterSummary(
         : null,
     filters.statBy ? `Thống kê theo: ${GROUP_BY_LABELS_VI[filters.statBy]}` : null,
     filters.categoryId ? `Nhóm hàng hóa: ${FILTERED_MARKER}` : null,
+    filters.otherLineDirection
+      ? `Loại: ${filters.otherLineDirection === 'in' ? 'Thu khác' : 'Chi phí khác'}`
+      : null,
+    filters.voucherCategoryId
+      ? `Mục: ${filters.voucherCategoryId === 'uncategorized' ? 'Không có mục' : FILTERED_MARKER}`
+      : null,
+    filters.cogsDirection
+      ? `Loại: ${filters.cogsDirection === 'in' ? 'Nhập kho hàng trả lại' : 'Xuất kho bán hàng'}`
+      : null,
     previous?.from || previous?.to
       ? `Kỳ so sánh: ${previous.from ? formatDocumentDate(previous.from) : '—'} — ${
           previous.to ? formatDocumentDate(previous.to) : '—'

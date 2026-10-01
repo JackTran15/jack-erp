@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
-import { FilterBuilder } from '../../../../common/filters/filter.builder';
+import { Repository } from 'typeorm';
 import {
   PROFIT_REPORT_COLUMN_LABELS_VI,
   InvoiceReportResult,
@@ -9,57 +8,29 @@ import {
   ReportRow,
 } from '@erp/shared-interfaces';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
-import { CashPaymentEntity } from '../../../accounting/cash-vouchers/cash-payments/cash-payment.entity';
-import { CashPaymentLineEntity } from '../../../accounting/cash-vouchers/cash-payments/cash-payment-line.entity';
-import { CashReceiptEntity } from '../../../accounting/cash-vouchers/cash-receipts/cash-receipt.entity';
-import { CashReceiptLineEntity } from '../../../accounting/cash-vouchers/cash-receipts/cash-receipt-line.entity';
 import { CashVoucherCategoryEntity } from '../../../accounting/cash-vouchers/cash-voucher-categories/cash-voucher-category.entity';
-import {
-  CashPaymentReferenceType,
-  CashReceiptReferenceType,
-  CashVoucherCategoryDirection,
-  CashVoucherStatus,
-} from '../../../accounting/cash-vouchers/enums';
-import { BankReceiptEntity } from '../../../accounting/deposit-vouchers/bank-receipts/bank-receipt.entity';
-import { BankReceiptLineEntity } from '../../../accounting/deposit-vouchers/bank-receipts/bank-receipt-line.entity';
-import { BankPaymentEntity } from '../../../accounting/deposit-vouchers/bank-payments/bank-payment.entity';
-import { BankPaymentLineEntity } from '../../../accounting/deposit-vouchers/bank-payments/bank-payment-line.entity';
-import {
-  BankPaymentReferenceType,
-  BankReceiptReferenceType,
-  BankVoucherStatus,
-} from '../../../accounting/deposit-vouchers/enums';
+import { CashVoucherCategoryDirection } from '../../../accounting/cash-vouchers/enums';
 import { ItemDirection } from '../../../pos/entities/invoice-item.entity';
-import { InvoiceItemEntity } from '../../../pos/entities/invoice-item.entity';
-import { InvoiceEntity, InvoiceType } from '../../../pos/entities/invoice.entity';
+import { InvoiceType } from '../../../pos/entities/invoice.entity';
 import { RbacService } from '../../../rbac/rbac.service';
-import {
-  applyBranchScope,
-  PROFIT_CONSOLIDATED,
-  resolveReportBranchIds,
-} from '../../report-core/report-query.util';
+import { PROFIT_CONSOLIDATED, resolveReportBranchIds } from '../../report-core/report-query.util';
 import {
   BusinessResultsRawValues,
   buildBusinessResultsRows,
   OtherLineCategory,
 } from '../business-results.aggregator';
 import { BUSINESS_RESULTS_COLUMNS, isKnownBusinessResultsColumn } from '../business-results.columns';
+import {
+  BusinessResultsScope,
+  BusinessResultsSource,
+  OtherLineDirection,
+  VOUCHER_KINDS_BY_DIRECTION,
+} from '../business-results.source';
 import { ProfitReportSearchDto } from '../dto/profit-report-search.dto';
 import { enrichHeader } from '../report-column.util';
 import { ReportDefinition } from '../report-definition';
 
-// voucher_date/doc_date are plain `date` columns ("Ngày thu/chi"), so calendar
-// bounds compare inclusively with no timezone shift; postedAt is only the
-// moment the voucher was booked and can fall in a later period.
-function applyVoucherDateRange<T extends ObjectLiteral>(
-  qb: SelectQueryBuilder<T>,
-  col: string,
-  fromDate: string,
-  toDate: string,
-): void {
-  qb.andWhere(`${col} >= :voucherFrom`, { voucherFrom: fromDate.slice(0, 10) })
-    .andWhere(`${col} <= :voucherTo`, { voucherTo: toDate.slice(0, 10) });
-}
+type OtherLines = { byCategory: Record<string, number>; uncategorized: number };
 
 /**
  * "Kết quả kinh doanh" — fixed P&L statement (2.2 "Thu khác" and 3.2 "Chi phí
@@ -68,26 +39,16 @@ function applyVoucherDateRange<T extends ObjectLiteral>(
  * period, current period) and merged into a change-comparison table. Unlike
  * `profit-by-item`/`gross-profit-by-invoice`, rows are NOT DB entities — they
  * are a catalog of line items (see business-results.aggregator.ts).
+ *
+ * Every figure is summed over a row set from `BusinessResultsSource`, which the
+ * drill-down detail reports list from too.
  */
 @Injectable()
 export class BusinessResultsReport implements ReportDefinition {
   readonly key = 'business-results';
 
   constructor(
-    @InjectRepository(InvoiceEntity)
-    private readonly invoices: Repository<InvoiceEntity>,
-    @InjectRepository(InvoiceItemEntity)
-    private readonly lineItems: Repository<InvoiceItemEntity>,
-    @InjectRepository(CashPaymentEntity)
-    private readonly cashPayments: Repository<CashPaymentEntity>,
-    @InjectRepository(CashPaymentLineEntity)
-    private readonly cashPaymentLines: Repository<CashPaymentLineEntity>,
-    @InjectRepository(CashReceiptLineEntity)
-    private readonly cashReceiptLines: Repository<CashReceiptLineEntity>,
-    @InjectRepository(BankReceiptLineEntity)
-    private readonly bankReceiptLines: Repository<BankReceiptLineEntity>,
-    @InjectRepository(BankPaymentLineEntity)
-    private readonly bankPaymentLines: Repository<BankPaymentLineEntity>,
+    private readonly source: BusinessResultsSource,
     @InjectRepository(CashVoucherCategoryEntity)
     private readonly cashVoucherCategories: Repository<CashVoucherCategoryEntity>,
     private readonly rbac: RbacService,
@@ -136,12 +97,18 @@ export class BusinessResultsReport implements ReportDefinition {
       dto.filters.branchId,
       actor,
     );
+    const scope = (period: { from: string; to: string }): BusinessResultsScope => ({
+      organizationId: actor.organizationId,
+      branchIds,
+      from: period.from,
+      to: period.to,
+    });
 
     const [incomeCategories, expenseCategories, previousRaw, currentRaw] = await Promise.all([
       this.queryOtherCategories(actor.organizationId, CashVoucherCategoryDirection.IN),
       this.queryOtherCategories(actor.organizationId, CashVoucherCategoryDirection.OUT),
-      this.queryPeriodRawValues(actor.organizationId, branchIds, previous.from, previous.to),
-      this.queryPeriodRawValues(actor.organizationId, branchIds, current.from, current.to),
+      this.queryPeriodRawValues(scope({ from: previous.from, to: previous.to })),
+      this.queryPeriodRawValues(scope({ from: current.from, to: current.to })),
     ]);
 
     const rows = buildBusinessResultsRows(previousRaw, currentRaw, incomeCategories, expenseCategories);
@@ -153,31 +120,13 @@ export class BusinessResultsReport implements ReportDefinition {
     };
   }
 
-  private async queryPeriodRawValues(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
-  ): Promise<BusinessResultsRawValues> {
-    const [
-      goodsAndCogs,
-      headerPromo,
-      cashIncome,
-      cashExpense,
-      depositIncome,
-      depositExpense,
-    ] = await Promise.all([
-      this.queryGoodsAndCogs(organizationId, branchIds, fromDate, toDate),
-      this.queryHeaderPromo(organizationId, branchIds, fromDate, toDate),
-      this.queryOtherIncomeByCategory(organizationId, branchIds, fromDate, toDate),
-      this.queryOtherExpenseByCategory(organizationId, branchIds, fromDate, toDate),
-      this.queryDepositOtherIncomeByCategory(organizationId, branchIds, fromDate, toDate),
-      this.queryDepositOtherExpenseByCategory(organizationId, branchIds, fromDate, toDate),
+  private async queryPeriodRawValues(scope: BusinessResultsScope): Promise<BusinessResultsRawValues> {
+    const [goodsAndCogs, headerPromo, otherIncome, otherExpense] = await Promise.all([
+      this.queryGoodsAndCogs(scope),
+      this.queryHeaderPromo(scope),
+      this.queryOtherLines('in', scope),
+      this.queryOtherLines('out', scope),
     ]);
-    // "Thu khác"/"Chi khác" gộp cả tiền mặt (phiếu thu/chi) lẫn tiền gửi (NTTK/UNC);
-    // cùng dùng cash_voucher_categories nên trộn theo categoryId là khớp dòng.
-    const otherIncome = this.mergeOtherLines(cashIncome, depositIncome);
-    const otherExpense = this.mergeOtherLines(cashExpense, depositExpense);
     return {
       goodsSoldOut: goodsAndCogs.goodsSoldOut,
       goodsReturnedIn: goodsAndCogs.goodsReturnedIn,
@@ -208,12 +157,7 @@ export class BusinessResultsReport implements ReportDefinition {
    * the old lineTotal-based formula produced — this only re-attributes money
    * between 2.1.1 and 2.1.3, the I/II/III/IV totals are unaffected.
    */
-  private async queryGoodsAndCogs(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
-  ): Promise<{
+  private async queryGoodsAndCogs(scope: BusinessResultsScope): Promise<{
     goodsSoldOut: number;
     goodsReturnedIn: number;
     lineDiscountOut: number;
@@ -221,14 +165,8 @@ export class BusinessResultsReport implements ReportDefinition {
     cogsOut: number;
     cogsReturnedIn: number;
   }> {
-    const qb = this.lineItems
-      .createQueryBuilder('li')
-      .innerJoin(InvoiceEntity, 'invoice', 'invoice.id = li.invoiceId')
-      .where('invoice.organizationId = :orgId', { orgId: organizationId });
-    applyBranchScope(qb, 'invoice', branchIds);
-    new FilterBuilder(qb).applyDateRange('invoice.issuedAt', { from: fromDate, to: toDate });
-
-    const rows = await qb
+    const rows = await this.source
+      .invoiceLineQuery(scope)
       .select('li.direction', 'direction')
       .addSelect('COALESCE(SUM(li.quantity * li.unitPrice), 0)', 'grossSum')
       .addSelect('COALESCE(SUM(li.lineDiscount), 0)', 'lineDiscountSum')
@@ -263,18 +201,10 @@ export class BusinessResultsReport implements ReportDefinition {
    * new sale), per confirmed product decision (TKT-PRF-04).
    */
   private async queryHeaderPromo(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
+    scope: BusinessResultsScope,
   ): Promise<{ headerSaleAndExchange: number; headerReturn: number }> {
-    const qb = this.invoices
-      .createQueryBuilder('invoice')
-      .where('invoice.organizationId = :orgId', { orgId: organizationId });
-    applyBranchScope(qb, 'invoice', branchIds);
-    new FilterBuilder(qb).applyDateRange('invoice.issuedAt', { from: fromDate, to: toDate });
-
-    const rows = await qb
+    const rows = await this.source
+      .invoiceQuery(scope)
       .select('invoice.type', 'type')
       .addSelect(
         'COALESCE(SUM(invoice.discountAmount + invoice.pointsDiscountAmount), 0)',
@@ -294,241 +224,36 @@ export class BusinessResultsReport implements ReportDefinition {
   }
 
   /**
-   * 3.2.{i} — Σ CashPaymentLineEntity.amount for POSTED cash payments in the
-   * period, GROUPED by category. A line counts toward its own category
-   * (including one explicitly categorized "Chi khác"/CHI_KHAC) when set, or
-   * toward the separate `uncategorized` bucket when the line has no category
-   * at all. Lines whose category direction isn't OUT are excluded (shouldn't
-   * happen for a "chi" voucher, but scoped explicitly for safety). REVERSED
-   * vouchers are excluded (not an effective transaction).
-   *
-   * Excludes payments whose `referenceType` is already recognized elsewhere
-   * in the P&L, to avoid double-counting:
-   * - REFUND: cash refunded on a return invoice — that return already hits
-   *   2.1.1.b/3.1.2 via invoice_items.
-   * - GOODS_RECEIPT: paying a supplier for purchased inventory — an asset/AP
-   *   event, not an accrual expense (COGS is recognized separately, at sale
-   *   time, via 3.1).
-   * - INVOICE_DEBT: settling a supplier payable — the expense was already
-   *   recognized when the goods were received, not when the debt is paid.
-   * - REVERSAL: a reversal voucher COPIES the original payment's lines with
-   *   status=POSTED while the original flips to REVERSED (excluded by the
-   *   status filter) — including it would re-add the very expense the
-   *   reversal was meant to cancel.
+   * 2.2.{i} / 3.2.{i} — Σ voucher-line amounts per category, cash and deposit
+   * vouchers combined (they share cash_voucher_categories, so merging by
+   * categoryId lines up rows). `null` category = the uncategorized bucket.
    */
-  private async queryOtherExpenseByCategory(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
-  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
-    const qb = this.cashPaymentLines
-      .createQueryBuilder('line')
-      .innerJoin(CashPaymentEntity, 'payment', 'payment.id = line.cashPaymentId')
-      .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
-      .where('payment.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('payment.status = :status', { status: CashVoucherStatus.POSTED })
-      .andWhere('(line.categoryId IS NULL OR category.direction = :outDirection)', {
-        outDirection: CashVoucherCategoryDirection.OUT,
-      })
-      .andWhere(
-        '(payment.referenceType IS NULL OR payment.referenceType NOT IN (:...excludedRefTypes))',
-        {
-          excludedRefTypes: [
-            CashPaymentReferenceType.REFUND,
-            CashPaymentReferenceType.GOODS_RECEIPT,
-            CashPaymentReferenceType.INVOICE_DEBT,
-            CashPaymentReferenceType.REVERSAL,
-          ],
-        },
-      );
-    applyBranchScope(qb, 'payment', branchIds);
-    applyVoucherDateRange(qb, 'payment.voucherDate', fromDate, toDate);
-
-    const rows = await qb
-      .select('line.categoryId', 'categoryId')
-      .addSelect('COALESCE(SUM(line.amount), 0)', 'total')
-      .groupBy('line.categoryId')
-      .getRawMany<{ categoryId: string | null; total: string }>();
+  private async queryOtherLines(
+    direction: OtherLineDirection,
+    scope: BusinessResultsScope,
+  ): Promise<OtherLines> {
+    const perKind = await Promise.all(
+      VOUCHER_KINDS_BY_DIRECTION[direction].map((kind) =>
+        this.source
+          .voucherLineQuery(kind, scope)
+          .select('line.categoryId', 'categoryId')
+          .addSelect('COALESCE(SUM(line.amount), 0)', 'total')
+          .groupBy('line.categoryId')
+          .getRawMany<{ categoryId: string | null; total: string }>(),
+      ),
+    );
 
     const byCategory: Record<string, number> = {};
     let uncategorized = 0;
-    for (const r of rows) {
+    for (const r of perKind.flat()) {
+      const amount = Number(r.total ?? 0);
       if (r.categoryId === null) {
-        uncategorized += Number(r.total ?? 0);
+        uncategorized += amount;
       } else {
-        byCategory[r.categoryId] = Number(r.total ?? 0);
+        byCategory[r.categoryId] = (byCategory[r.categoryId] ?? 0) + amount;
       }
     }
     return { byCategory, uncategorized };
-  }
-
-  /**
-   * 2.2.{i} — Σ CashReceiptLineEntity.amount for POSTED cash receipts in the
-   * period, GROUPED by category. Same shape as `queryOtherExpenseByCategory`,
-   * mirrored on the "phiếu thu" side.
-   *
-   * Excludes receipts whose `referenceType` is already recognized elsewhere
-   * in the P&L, to avoid double-counting revenue/cash-conversion that isn't
-   * genuinely NEW income:
-   * - INVOICE: a POS sale payment — that revenue is already counted via
-   *   invoice_items in 2.1.1.
-   * - INVOICE_DEBT / RECEIVABLE: collecting an existing debt/receivable —
-   *   cash converting from AR, not new revenue.
-   * - REVERSAL: same reasoning as the expense side — a reversal receipt
-   *   copies the original's lines with status=POSTED while the original
-   *   flips to REVERSED, so including it would re-add income that was
-   *   cancelled.
-   */
-  private async queryOtherIncomeByCategory(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
-  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
-    const qb = this.cashReceiptLines
-      .createQueryBuilder('line')
-      .innerJoin(CashReceiptEntity, 'receipt', 'receipt.id = line.cashReceiptId')
-      .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
-      .where('receipt.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('receipt.status = :status', { status: CashVoucherStatus.POSTED })
-      .andWhere('(line.categoryId IS NULL OR category.direction = :inDirection)', {
-        inDirection: CashVoucherCategoryDirection.IN,
-      })
-      .andWhere(
-        '(receipt.referenceType IS NULL OR receipt.referenceType NOT IN (:...excludedRefTypes))',
-        {
-          excludedRefTypes: [
-            CashReceiptReferenceType.INVOICE,
-            CashReceiptReferenceType.INVOICE_DEBT,
-            CashReceiptReferenceType.RECEIVABLE,
-            CashReceiptReferenceType.REVERSAL,
-          ],
-        },
-      );
-    applyBranchScope(qb, 'receipt', branchIds);
-    applyVoucherDateRange(qb, 'receipt.voucherDate', fromDate, toDate);
-
-    const rows = await qb
-      .select('line.categoryId', 'categoryId')
-      .addSelect('COALESCE(SUM(line.amount), 0)', 'total')
-      .groupBy('line.categoryId')
-      .getRawMany<{ categoryId: string | null; total: string }>();
-
-    const byCategory: Record<string, number> = {};
-    let uncategorized = 0;
-    for (const r of rows) {
-      if (r.categoryId === null) {
-        uncategorized += Number(r.total ?? 0);
-      } else {
-        byCategory[r.categoryId] = Number(r.total ?? 0);
-      }
-    }
-    return { byCategory, uncategorized };
-  }
-
-  /**
-   * 2.2 (tiền gửi) — Σ BankReceiptLineEntity.amount for POSTED bank receipts
-   * (phiếu thu tiền gửi, NTTK) in the period, GROUPED by category, mirroring
-   * `queryOtherIncomeByCategory` on the deposit-fund side. Bank receipt lines
-   * reference the SAME cash_voucher_categories rows, so a deposit line's amount
-   * lands in the exact same 2.2 category row as its cash counterpart.
-   *
-   * Gated by `affectRevenue = true` — the deposit domain's explicit P&L intent
-   * flag (system vouchers: transfers, fund swaps, supplier payments are all
-   * `false`, so only genuine other-income manual receipts pass). REVERSAL is
-   * excluded: a reversal voucher copies the original's `affectRevenue` and posts
-   * with status POSTED while the original flips to REVERSED (dropped by the
-   * status filter) — counting it would re-add the income the reversal cancelled.
-   */
-  private async queryDepositOtherIncomeByCategory(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
-  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
-    const qb = this.bankReceiptLines
-      .createQueryBuilder('line')
-      .innerJoin(BankReceiptEntity, 'receipt', 'receipt.id = line.bankReceiptId')
-      .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
-      .where('receipt.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('receipt.status = :status', { status: BankVoucherStatus.POSTED })
-      .andWhere('receipt.affectRevenue = true')
-      .andWhere('(line.categoryId IS NULL OR category.direction = :inDirection)', {
-        inDirection: CashVoucherCategoryDirection.IN,
-      })
-      .andWhere('(receipt.referenceType IS NULL OR receipt.referenceType != :reversal)', {
-        reversal: BankReceiptReferenceType.REVERSAL,
-      });
-    applyBranchScope(qb, 'receipt', branchIds);
-    applyVoucherDateRange(qb, 'receipt.docDate', fromDate, toDate);
-
-    return this.collectByCategory(qb);
-  }
-
-  /**
-   * 3.2 (tiền gửi) — Σ BankPaymentLineEntity.amount for POSTED bank payments
-   * (phiếu chi tiền gửi, UNC) in the period, GROUPED by category. Mirror of
-   * `queryDepositOtherIncomeByCategory` on the "phiếu chi" side; gated by
-   * `affectExpense = true`, REVERSAL excluded for the same reason.
-   */
-  private async queryDepositOtherExpenseByCategory(
-    organizationId: string,
-    branchIds: string[] | null,
-    fromDate: string,
-    toDate: string,
-  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
-    const qb = this.bankPaymentLines
-      .createQueryBuilder('line')
-      .innerJoin(BankPaymentEntity, 'payment', 'payment.id = line.bankPaymentId')
-      .leftJoin(CashVoucherCategoryEntity, 'category', 'category.id = line.categoryId')
-      .where('payment.organizationId = :orgId', { orgId: organizationId })
-      .andWhere('payment.status = :status', { status: BankVoucherStatus.POSTED })
-      .andWhere('payment.affectExpense = true')
-      .andWhere('(line.categoryId IS NULL OR category.direction = :outDirection)', {
-        outDirection: CashVoucherCategoryDirection.OUT,
-      })
-      .andWhere('(payment.referenceType IS NULL OR payment.referenceType != :reversal)', {
-        reversal: BankPaymentReferenceType.REVERSAL,
-      });
-    applyBranchScope(qb, 'payment', branchIds);
-    applyVoucherDateRange(qb, 'payment.docDate', fromDate, toDate);
-
-    return this.collectByCategory(qb);
-  }
-
-  /** Run a `(categoryId, Σ amount)` grouped query and split into by-category + uncategorized buckets. */
-  private async collectByCategory<T extends ObjectLiteral>(
-    qb: SelectQueryBuilder<T>,
-  ): Promise<{ byCategory: Record<string, number>; uncategorized: number }> {
-    const rows = await qb
-      .select('line.categoryId', 'categoryId')
-      .addSelect('COALESCE(SUM(line.amount), 0)', 'total')
-      .groupBy('line.categoryId')
-      .getRawMany<{ categoryId: string | null; total: string }>();
-
-    const byCategory: Record<string, number> = {};
-    let uncategorized = 0;
-    for (const r of rows) {
-      if (r.categoryId === null) {
-        uncategorized += Number(r.total ?? 0);
-      } else {
-        byCategory[r.categoryId] = Number(r.total ?? 0);
-      }
-    }
-    return { byCategory, uncategorized };
-  }
-
-  /** Sum two `{ byCategory, uncategorized }` results per category id (cash + tiền gửi). */
-  private mergeOtherLines(
-    a: { byCategory: Record<string, number>; uncategorized: number },
-    b: { byCategory: Record<string, number>; uncategorized: number },
-  ): { byCategory: Record<string, number>; uncategorized: number } {
-    const byCategory: Record<string, number> = { ...a.byCategory };
-    for (const [categoryId, amount] of Object.entries(b.byCategory)) {
-      byCategory[categoryId] = (byCategory[categoryId] ?? 0) + amount;
-    }
-    return { byCategory, uncategorized: a.uncategorized + b.uncategorized };
   }
 
   /** Every active cash-voucher category of the given direction for the org — drives 2.2's/3.2's dynamic row set. */

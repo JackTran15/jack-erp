@@ -20,6 +20,7 @@ import { chain_filterRegistryReportReceivablesDetailByProduct, chain_tableRegist
 import { chain_filterRegistryReportSupplierDebts, chain_tableRegistryReportSupplierDebts, single_filterRegistryReportSupplierDebts, single_tableRegistryReportSupplierDebts } from "./report-registry/report-supplier-debts.registry";
 import { chain_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, chain_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct, single_filterRegistryReportSupplierDebtsDetailByDocumentAndProduct, single_tableRegistryReportSupplierDebtsDetailByDocumentAndProduct } from "./report-registry/report-supplier-debts-detail-by-document-and-product.registry";
 import { chain_filterRegistryReportProfitByItem, chain_tableRegistryReportProfitByItem, single_filterRegistryReportProfitByItem, single_tableRegistryReportProfitByItem } from "./report-registry/report-profit-by-item.registry";
+import { chain_filterRegistryReportBusinessResultsDetail, chain_tableRegistryReportBusinessResultsDetail, single_filterRegistryReportBusinessResultsDetail, single_tableRegistryReportBusinessResultsDetail } from "./report-registry/report-business-results-detail.registry";
 import { chain_filterRegistryReportGrossProfitByInvoice, chain_tableRegistryReportGrossProfitByInvoice, single_filterRegistryReportGrossProfitByInvoice, single_tableRegistryReportGrossProfitByInvoice } from "./report-registry/report-gross-profit-by-invoice.registry";
 import { chain_filterRegistryReportBusinessResults, chain_tableRegistryReportBusinessResults, single_filterRegistryReportBusinessResults, single_tableRegistryReportBusinessResults } from "./report-registry/report-business-results.registry";
 import { chain_filterRegistryReportCashInOutSituation, chain_tableRegistryReportCashInOutSituation, single_filterRegistryReportCashInOutSituation, single_tableRegistryReportCashInOutSituation } from "./report-registry/report-cash-in-out-situation.registry";
@@ -183,6 +184,10 @@ export enum REPORT_TYPE_PROFIT {
   BUSINESS_RESULTS_BY_BRANCH = 'business_results_by_branch',
   PROFIT_BY_PRODUCT = 'profit_by_product',
   GROSS_PROFIT_BY_INVOICE = 'gross_profit_by_invoice',
+  /** Dialog-only — mở từ ô 3.1.x của "Kết quả kinh doanh". KHÔNG thêm vào PROFIT_REPORTS. */
+  BUSINESS_RESULTS_COGS = 'business_results_cogs',
+  /** Dialog-only — mở từ ô 2.2.x / 3.2.x của "Kết quả kinh doanh". KHÔNG thêm vào PROFIT_REPORTS. */
+  BUSINESS_RESULTS_VOUCHERS = 'business_results_vouchers',
 }
 
 
@@ -214,6 +219,32 @@ export const REPORT_TYPE_PROFIT_METADATA = {
     tableConfig: {
       [STORE_TYPE.SINGLE]: single_tableRegistryReportProfitByItem,
       [STORE_TYPE.CHAIN]: chain_tableRegistryReportProfitByItem,
+    },
+  },
+  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS_COGS]: {
+    label: 'Chi tiết chi phí giá vốn hàng hóa',
+    backendKey: 'business-results-cogs',
+    backendSource: 'profit' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportBusinessResultsDetail,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportBusinessResultsDetail,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportBusinessResultsDetail,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportBusinessResultsDetail,
+    },
+  },
+  [REPORT_TYPE_PROFIT.BUSINESS_RESULTS_VOUCHERS]: {
+    label: 'Chi tiết thu chi tiền theo mục',
+    backendKey: 'business-results-vouchers',
+    backendSource: 'profit' as const,
+    filterConfig: {
+      [STORE_TYPE.SINGLE]: single_filterRegistryReportBusinessResultsDetail,
+      [STORE_TYPE.CHAIN]: chain_filterRegistryReportBusinessResultsDetail,
+    },
+    tableConfig: {
+      [STORE_TYPE.SINGLE]: single_tableRegistryReportBusinessResultsDetail,
+      [STORE_TYPE.CHAIN]: chain_tableRegistryReportBusinessResultsDetail,
     },
   },
   [REPORT_TYPE_PROFIT.GROSS_PROFIT_BY_INVOICE]: {

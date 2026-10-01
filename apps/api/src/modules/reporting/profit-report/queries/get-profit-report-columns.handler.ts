@@ -14,6 +14,7 @@ export class GetProfitReportColumnsHandler
     reportType,
     actor,
     statBy,
+    otherLineDirection,
   }: GetProfitReportColumnsQuery): Promise<InvoiceReportColumnsResult> {
     const def = this.registry.get(reportType);
     if (!def) {
@@ -26,7 +27,7 @@ export class GetProfitReportColumnsHandler
       // reads as falsy on the FE, which skips rendering <tfoot> entirely.
       summaryLabel:
         reportType === PROFIT_REPORT_KEYS.BUSINESS_RESULTS ? '' : 'Tổng',
-      columns: await def.buildColumns(actor, statBy ? { statBy } : undefined),
+      columns: await def.buildColumns(actor, { statBy, otherLineDirection }),
     };
   }
 }

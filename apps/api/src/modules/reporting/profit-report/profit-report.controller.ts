@@ -70,9 +70,15 @@ export class ProfitReportController {
     @Query('reportType') reportType: string,
     @Actor() actor: ActorContext,
     @Query('statBy') statBy?: ReportGroupBy,
+    @Query('otherLineDirection') otherLineDirection?: string,
   ) {
     return this.queryBus.execute(
-      new GetProfitReportColumnsQuery(reportType, actor, statBy),
+      new GetProfitReportColumnsQuery(
+        reportType,
+        actor,
+        statBy,
+        otherLineDirection === 'in' || otherLineDirection === 'out' ? otherLineDirection : undefined,
+      ),
     );
   }
 

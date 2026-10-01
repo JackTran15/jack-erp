@@ -6,6 +6,10 @@ export const PROFIT_REPORT_KEYS = {
   PROFIT_BY_ITEM: 'profit-by-item',
   GROSS_PROFIT_BY_INVOICE: 'gross-profit-by-invoice',
   BUSINESS_RESULTS: 'business-results',
+  /** Drill-down of "Kết quả kinh doanh" 3.1.x — not in the report picker. */
+  BUSINESS_RESULTS_COGS: 'business-results-cogs',
+  /** Drill-down of "Kết quả kinh doanh" 2.2.x / 3.2.x — not in the report picker. */
+  BUSINESS_RESULTS_VOUCHERS: 'business-results-vouchers',
 } as const;
 
 export type ProfitReportKey =
@@ -15,6 +19,8 @@ export const PROFIT_REPORT_TYPE_LABELS_VI: Record<ProfitReportKey, string> = {
   [PROFIT_REPORT_KEYS.PROFIT_BY_ITEM]: 'Lợi nhuận theo mặt hàng',
   [PROFIT_REPORT_KEYS.GROSS_PROFIT_BY_INVOICE]: 'Báo cáo lợi nhuận gộp theo hoá đơn',
   [PROFIT_REPORT_KEYS.BUSINESS_RESULTS]: 'Kết quả kinh doanh',
+  [PROFIT_REPORT_KEYS.BUSINESS_RESULTS_COGS]: 'Chi tiết chi phí giá vốn hàng hóa',
+  [PROFIT_REPORT_KEYS.BUSINESS_RESULTS_VOUCHERS]: 'Chi tiết thu chi tiền theo mục',
 };
 
 /**

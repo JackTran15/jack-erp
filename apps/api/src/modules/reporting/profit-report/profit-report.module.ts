@@ -33,6 +33,11 @@ import { ListProfitReportTemplatesHandler } from './queries/list-profit-report-t
 import { SearchProfitReportHandler } from './queries/search-profit-report.handler';
 import { ReportRegistry } from './report-definition';
 import { BusinessResultsReport } from './reports/business-results.report';
+import { BusinessResultsCogsReport } from './reports/business-results-cogs.report';
+import { BusinessResultsVouchersReport } from './reports/business-results-vouchers.report';
+import { BusinessResultsSource } from './business-results.source';
+import { DepositAccountEntity } from '../../accounting/deposit/deposit-account.entity';
+import { UserEntity } from '../../auth/user.entity';
 import { GrossProfitByInvoiceReport } from './reports/gross-profit-by-invoice.report';
 import { ProfitByItemReport } from './reports/profit-by-item.report';
 import { ReportExportService } from '../report-core/report-export.service';
@@ -64,6 +69,8 @@ import { GetProfitReportDocumentHandler } from './queries/get-profit-report-docu
       BankReceiptLineEntity,
       BankPaymentEntity,
       BankPaymentLineEntity,
+      DepositAccountEntity,
+      UserEntity,
     ]),
   ],
   controllers: [ProfitReportController],
@@ -75,15 +82,32 @@ import { GetProfitReportDocumentHandler } from './queries/get-profit-report-docu
     ProfitByItemReport,
     GrossProfitByInvoiceReport,
     BusinessResultsReport,
+    BusinessResultsSource,
+    BusinessResultsCogsReport,
+    BusinessResultsVouchersReport,
     {
       provide: ReportRegistry,
       useFactory: (
         profitByItem: ProfitByItemReport,
         grossProfitByInvoice: GrossProfitByInvoiceReport,
         businessResults: BusinessResultsReport,
+        businessResultsCogs: BusinessResultsCogsReport,
+        businessResultsVouchers: BusinessResultsVouchersReport,
       ) =>
-        new ReportRegistry([profitByItem, grossProfitByInvoice, businessResults]),
-      inject: [ProfitByItemReport, GrossProfitByInvoiceReport, BusinessResultsReport],
+        new ReportRegistry([
+          profitByItem,
+          grossProfitByInvoice,
+          businessResults,
+          businessResultsCogs,
+          businessResultsVouchers,
+        ]),
+      inject: [
+        ProfitByItemReport,
+        GrossProfitByInvoiceReport,
+        BusinessResultsReport,
+        BusinessResultsCogsReport,
+        BusinessResultsVouchersReport,
+      ],
     },
     // Handlers (search/columns/templates dispatch generically via ReportRegistry — no new handler per report type)
     GetProfitReportColumnsHandler,

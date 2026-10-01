@@ -260,5 +260,6 @@ export function buildBusinessResultsRows(
   let merged = insertAfter(staticRows, BUSINESS_RESULTS_LINE_KEYS.OTHER_INCOME, incomeDynamicRows);
   merged = insertAfter(merged, BUSINESS_RESULTS_LINE_KEYS.OTHER_EXPENSE_GROUP, expenseDynamicRows);
 
-  return merged.map(({ key: _key, ...row }) => row);
+  // `lineKey` is not a column: the FE reads it to pick each cell's drill-down.
+  return merged.map(({ key, ...row }) => ({ ...row, lineKey: key }));
 }
