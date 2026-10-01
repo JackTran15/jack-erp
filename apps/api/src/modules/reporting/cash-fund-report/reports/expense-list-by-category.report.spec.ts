@@ -9,6 +9,7 @@ import { DataSource } from 'typeorm';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { RbacService } from '../../../rbac/rbac.service';
 import { CashFundReportSearchDto } from '../dto/cash-fund-report-search.dto';
+import { ReportDefinition } from '../report-definition';
 import { ExpenseLinesQuery } from '../services/expense-lines.query';
 import {
   EXPENSE_LIST_BY_CATEGORY_COLUMNS,
@@ -584,56 +585,29 @@ describe('ExpenseListByCategoryReport', () => {
   });
 
   describe('countRows', () => {
-    it('counts the detail lines of the filtered set', async () => {
-      await expect(build().countRows(dto(), actor)).resolves.toEqual({ total: 4, subject: 'dòng chi' });
+    it('counts the flat rows of the filtered set: group headers + lines, like `total`', async () => {
+      await expect(build().countRows(dto(), actor)).resolves.toEqual({ total: 7, subject: 'dòng' });
     });
   });
 
-  describe('exportSource — keyset over the lines, newest first', () => {
-    it('declares the period range, descending order and the summable amount', () => {
-      const { exportSource } = build();
-      expect(exportSource.order).toBe('desc');
-      expect(exportSource.range(dto())).toEqual({ from: '2026-09-01', to: '2026-09-30' });
-      expect(exportSource.summable(['docDate', 'amount', 'reason'])).toEqual(['amount']);
+  describe('export — one shot over buildData, so the file reads like the screen', () => {
+    it('declares no keyset source: a (doc_date, line_id) cursor would drop TỔNG CHI and the group rows', () => {
+      expect((build() as ReportDefinition).exportSource).toBeUndefined();
     });
 
-    it('pages lines by (doc_date DESC, line_id DESC) with no group / TỔNG CHI rows and the category as a column', async () => {
-      const { exportSource } = build();
-      const first = await exportSource.page(dto(), actor, { partition: {}, cursor: null, size: 3 });
+    it('keeps the mục chi in "Diễn giải" on bold group rows and in categoryName on every line', async () => {
+      const { rows } = await build().buildData({ ...dto(), page: 1, limit: 50_000 }, actor);
 
-      expect(kinds(first.rows)).toEqual(['detail', 'detail', 'detail']);
-      expect(first.rows.map((r) => [r.documentNumber, r[LINE_ID_KEY], r.categoryName, r.amount])).toEqual([
-        ['PC-04', 'l-04', 'Chi khác', 40000],
-        ['PC-03', 'l-03', 'Tiền điện', 60000],
-        ['PC-02', 'l-02b', 'Tiền nước', 10000],
+      expect(rows.map((r) => [r[CASH_FUND_ROW_KEYS.ROW_KIND], r[CASH_FUND_ROW_KEYS.BOLD], r.reason, r.categoryName])).toEqual([
+        ['grandTotal', 1, GRAND_TOTAL_LABEL, null],
+        ['group', 1, 'Chi khác', null],
+        ['detail', 0, 'Hoàn tiền', 'Chi khác'],
+        ['group', 1, 'Tiền điện', null],
+        ['detail', 0, 'Tiền điện kho', 'Tiền điện'],
+        ['detail', 0, 'Tiền điện nước tháng 9', 'Tiền điện'],
+        ['group', 1, 'Tiền nước', null],
+        ['detail', 0, 'Tiền điện nước tháng 9', 'Tiền nước'],
       ]);
-      expect(first.hasMore).toBe(true);
-      expect(first.nextCursor).toEqual({ at: '2026-09-08', id: 'l-02b' });
-      expect(sqlOf(query)[0]).toContain('ORDER BY doc_date DESC, line_id DESC');
-
-      const second = await exportSource.page(dto(), actor, {
-        partition: {},
-        cursor: first.nextCursor,
-        size: 3,
-      });
-      expect(second.rows.map((r) => [r.documentNumber, r[LINE_ID_KEY]])).toEqual([['PC-02', 'l-02a']]);
-      expect(second.hasMore).toBe(false);
-      expect(sqlOf(query)[1]).toContain('doc_date < $');
-      expect(sqlOf(query)[1]).toContain('line_id < $');
-    });
-
-    it('applies the time partition as a half-open window on the voucher date', async () => {
-      const { exportSource } = build();
-      await exportSource.page(dto(), actor, {
-        partition: { from: new Date('2026-09-08T00:00:00Z'), to: new Date('2026-09-10T00:00:00Z') },
-        cursor: null,
-        size: 10,
-      });
-      const [sql, params] = callsOf(query)[0];
-      expect(sql).toContain('v.doc_date::timestamp >= $5::timestamp');
-      expect(sql).toContain('v.doc_date::timestamp < $6::timestamp');
-      expect(params[4]).toBe('2026-09-08T00:00:00.000Z');
-      expect(params[5]).toBe('2026-09-10T00:00:00.000Z');
     });
   });
 });

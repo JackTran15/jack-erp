@@ -19,8 +19,7 @@ import {
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { RbacService } from '../../../rbac/rbac.service';
 import { hasTextOperator } from '../../report-core/column-filter.util';
-import { FetchPageArgs, FetchPageResult } from '../../report-core/export/export.types';
-import { CountedRows, ReportExportSource } from '../../report-core/report-definition';
+import { CountedRows } from '../../report-core/report-definition';
 import { resolveReportBranchIds } from '../../report-core/report-query.util';
 import { CashFundReportSearchDto } from '../dto/cash-fund-report-search.dto';
 import { CASH_CONSOLIDATED, ReportDefinition, cashFundColumn } from '../report-definition';
@@ -79,8 +78,6 @@ const GROUP_ORDER =
   '(category_id IS NULL) DESC, category_order ASC NULLS LAST, category_name ASC NULLS LAST, category_id ASC';
 // Detail order inside a group; `line_id` last so the order is total.
 const DETAIL_ORDER = 'doc_date DESC, document_number DESC, line_id ASC';
-// The export order (keyset cursor = (doc_date, line_id) descending, see `exportSource`).
-const KEYSET_ORDER = 'ORDER BY doc_date DESC, line_id DESC';
 
 /**
  * Column key → the SQL column of the `rows` relation it filters on, and how.
@@ -101,8 +98,8 @@ const FILTERABLE: Record<string, { column: string; kind: 'text' | 'number' | 'da
   branchCode: { column: 'branch_code', kind: 'text' },
   branchName: { column: 'branch_name', kind: 'text' },
   invoiceNumber: { column: 'invoice_number', kind: 'text' },
-  // 14th column: the grouping, so an exported file (detail rows only) keeps
-  // its meaning. The FE registry hides it on screen where the group row shows it.
+  // 14th column: the grouping as a column. The FE registry hides it by
+  // default — the group row already names it — but "Sửa mẫu" can show it.
   categoryName: { column: 'category_name', kind: 'text' },
 };
 
@@ -135,8 +132,6 @@ interface RawRow {
   flat_pos?: unknown;
   /** Only selected by the page query: this is the first detail of its group. */
   first_of_group?: boolean;
-  /** Only selected by the export page query. */
-  cursor_at?: string;
 }
 
 interface RawGroup {
@@ -157,9 +152,6 @@ interface ListScope {
   staffIds?: string[];
   columnFilters: ColumnFilter[];
 }
-
-/** Which slice of the voucher date line a query reads. */
-type DateWindow = { kind: 'period' } | { kind: 'partition'; from?: Date; to?: Date };
 
 const num = (v: unknown): number => {
   const n = Number(v ?? 0);
@@ -278,55 +270,21 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
     return { rows, totals: total ? { amount: grandTotal } : null, total };
   }
 
-  /** Payment lines the request would list; the row cap is checked on this before anything is fetched. */
+  /**
+   * The flat rows the request would list (group headers + lines, like `total`);
+   * the row cap is checked on this before anything is fetched.
+   *
+   * The export runs on `buildData` in one shot (no `exportSource`): the file
+   * has to read like the screen — TỔNG CHI, then each mục chi as a bold group
+   * row with its subtotal in "Diễn giải" / "Số tiền chi", then its lines —
+   * and a keyset over `(doc_date, line_id)` cannot produce that order.
+   */
   async countRows(dto: CashFundReportSearchDto, actor: ActorContext): Promise<CountedRows> {
     const scope = await this.resolveScope(dto, actor);
     const groups = await this.groups(scope);
-    return { total: groups.reduce((s, g) => s + num(g.line_count), 0), subject: 'dòng chi' };
-  }
-
-  /**
-   * Keyset export (ADR-07) on `(doc_date, line_id)`, newest first. The file
-   * carries the detail lines only — no group or "TỔNG CHI" rows — and each
-   * line also carries its `categoryName` so the grouping survives as a column
-   * (the export projects `dto.columns`, so it lands in the file only when
-   * requested). The cursor's `at` is the voucher date as `yyyy-MM-dd` text — a
-   * `date` has no sub-day precision to lose.
-   */
-  readonly exportSource: ReportExportSource<CashFundReportSearchDto> = {
-    order: 'desc',
-    range: (dto) => {
-      const period = dto.filters?.period;
-      return period?.from && period?.to ? { from: period.from, to: period.to } : null;
-    },
-    summable: (columns) => columns.filter((c) => c === 'amount'),
-    page: (dto, actor, args) => this.exportPage(dto, actor, args),
-  };
-
-  private async exportPage(
-    dto: CashFundReportSearchDto,
-    actor: ActorContext,
-    { partition, cursor, size }: FetchPageArgs,
-  ): Promise<FetchPageResult> {
-    const scope = await this.resolveScope(dto, actor);
-    const window: DateWindow = { kind: 'partition', from: partition.from, to: partition.to };
-    const { sql, params, p } = this.rowsSql(scope, window);
-    let cursorWhere = '';
-    if (cursor) {
-      const at = p(cursor.at);
-      cursorWhere = ` WHERE (doc_date < ${at}::date OR (doc_date = ${at}::date AND line_id < ${p(cursor.id)}::uuid))`;
-    }
-    const raw = (await this.dataSource.query(
-      `SELECT r.*, r.doc_date::text AS cursor_at FROM (${sql}) r${cursorWhere} ${KEYSET_ORDER} LIMIT ${p(size)}`,
-      params,
-    )) as RawRow[];
-
-    const rows = raw.map((r) => ({ ...this.toRow(r), categoryName: this.groupName(r) }));
-    const last = raw[raw.length - 1];
     return {
-      rows,
-      nextCursor: last ? { at: last.cursor_at ?? isoDate(last.doc_date), id: last.line_id } : null,
-      hasMore: raw.length === size,
+      total: groups.length + groups.reduce((s, g) => s + num(g.line_count), 0),
+      subject: 'dòng',
     };
   }
 
@@ -373,10 +331,7 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
    * on the voucher id for the display columns; the category is joined for the
    * group name and order.
    */
-  private rowsSql(
-    scope: ListScope,
-    window: DateWindow,
-  ): { sql: string; params: unknown[]; p: (value: unknown) => string } {
+  private rowsSql(scope: ListScope): { sql: string; params: unknown[]; p: (value: unknown) => string } {
     const lines = this.lines.whereClause(scope, scope.from, scope.to, scope.categoryIds);
     const params: unknown[] = [...lines.params];
     const p = (value: unknown): string => {
@@ -385,17 +340,6 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
     };
 
     const where: string[] = [lines.where];
-    if (window.kind === 'partition') {
-      // Windows are half-open instants on the UTC day line (`splitIntoWindows`
-      // starts from `new Date('yyyy-MM-dd')`), so the date is compared as a
-      // timezone-less midnight against the window's UTC wall clock.
-      if (window.from) {
-        where.push(`v.doc_date::timestamp >= ${p(window.from.toISOString())}::timestamp`);
-      }
-      if (window.to) {
-        where.push(`v.doc_date::timestamp < ${p(window.to.toISOString())}::timestamp`);
-      }
-    }
     if (scope.fund) where.push(`v.fund = ${p(scope.fund)}`);
     if (scope.staffIds) where.push(`h.staff_id = ANY(${p(scope.staffIds)}::text[])`);
 
@@ -425,7 +369,7 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
       WHERE ${where.join('\n        AND ')}`;
 
     // Column filters target derived columns, so they wrap the base query — and
-    // every caller (groups, page, export) wraps the same fragment, which is
+    // every caller (groups, page) wraps the same fragment, which is
     // what makes them agree.
     const outer: string[] = [];
     for (const f of scope.columnFilters) outer.push(...this.columnFilterSql(f, p));
@@ -472,7 +416,7 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
 
   /** One row per group of the whole filtered set: its line count and Σ amount — the subtotals, the total and TỔNG CHI. */
   private async groups(scope: ListScope): Promise<RawGroup[]> {
-    const { sql, params } = this.rowsSql(scope, { kind: 'period' });
+    const { sql, params } = this.rowsSql(scope);
     return (await this.dataSource.query(
       `SELECT r.category_id, r.category_name,
               COUNT(*)::int AS line_count,
@@ -485,7 +429,7 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
 
   /** The lines whose flat position lies in `[offset, offset + limit]` — see the class comment for the inclusive bound. */
   private async pageRows(scope: ListScope, limit: number, offset: number): Promise<RawRow[]> {
-    const { sql, params, p } = this.rowsSql(scope, { kind: 'period' });
+    const { sql, params, p } = this.rowsSql(scope);
     return (await this.dataSource.query(
       `SELECT f.* FROM (
          SELECT r.*,
@@ -525,6 +469,7 @@ export class ExpenseListByCategoryReport implements ReportDefinition {
       branchCode: r.branch_code ?? null,
       branchName: r.branch_name ?? null,
       invoiceNumber: r.invoice_number ?? null,
+      categoryName: this.groupName(r),
       [REPORT_ROW_INVOICE_ID]: r.invoice_id ?? null,
       [CASH_FUND_ROW_KEYS.ROW_KIND]: 'detail',
       [CASH_FUND_ROW_KEYS.CATEGORY_ID]: groupKey(r.category_id),
