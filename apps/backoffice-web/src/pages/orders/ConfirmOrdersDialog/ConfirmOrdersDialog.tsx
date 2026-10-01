@@ -121,7 +121,7 @@ export function ConfirmOrdersDialog({
                 ) : null}
               </header>
 
-              <table className="w-full border-collapse text-sm">
+              <table className="erp-data-table w-full border-collapse text-sm">
                 <tbody>
                   {order.lines.map((line) => {
                     const short = line.shortBy > 0;

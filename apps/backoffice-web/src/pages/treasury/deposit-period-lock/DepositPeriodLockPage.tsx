@@ -243,7 +243,7 @@ export function DepositPeriodLockPage() {
           showFooter={false}
         >
           <div className="overflow-hidden rounded-md border border-border">
-            <table className="w-full text-sm">
+            <table className="erp-data-table w-full text-sm">
               <thead className="bg-muted">
                 <tr>
                   <th className="px-2 py-1.5 text-left font-semibold">Tài khoản</th>

@@ -949,7 +949,7 @@ export function TransferLocationDialog({
               : "Chọn kho, vị trí hiện tại và vị trí chuyển đến để bắt đầu."}
           </div>
         ) : (
-          <table className="w-full min-w-[1360px] table-fixed border-collapse text-sm">
+          <table className="erp-data-table w-full min-w-[1360px] table-fixed border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 <th className="w-8 border-b px-2 py-2 text-center text-xs font-medium text-muted-foreground">#</th>
@@ -981,7 +981,7 @@ export function TransferLocationDialog({
                 const hasSource = Boolean(row.sourceLocationId);
                 const isOverQty = qty > 0 && qty > row.quantityOnHand;
                 return (
-                  <tr key={row.uid} className={idx % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                  <tr key={row.uid}>
                     <td className="border-b px-2 py-2 text-center text-xs text-muted-foreground">
                       {idx + 1}
                     </td>

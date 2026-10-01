@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppModal, Button } from "@erp/ui";
-import type { UserDetail } from "@erp/shared-interfaces";
+import type { UserListItem } from "@erp/shared-interfaces";
 import { X } from "lucide-react";
 import {
   BaseDataTable,
@@ -11,7 +11,7 @@ import { joinFullName, userDisplayCode } from "../../../lib/iam";
 interface RoleEmployeePickerModalProps {
   open: boolean;
   roleName: string;
-  users: UserDetail[];
+  users: UserListItem[];
   assignedUserIds: string[];
   loading?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +44,7 @@ export function RoleEmployeePickerModal({
     });
   };
 
-  const columns: TableColumn<UserDetail>[] = useMemo(
+  const columns: TableColumn<UserListItem>[] = useMemo(
     () => [
       {
         key: "code",
@@ -96,6 +96,7 @@ export function RoleEmployeePickerModal({
         loading={loading}
         emptyLabel="Chưa có người dùng."
         getRowKey={(row) => row.id}
+        isRowSelected={(row) => pendingIds.includes(row.id)}
         leadingColumn={{
           width: 40,
           header: <span className="sr-only">Chọn</span>,

@@ -654,9 +654,7 @@ export function StockTakesPage() {
           emptyLabel="Chưa có phiếu kiểm kê trong khoảng thời gian này."
           getRowKey={(r) => r.id}
           onRowClick={(r) => void selectStockTake(r.id)}
-          rowClassName={(r) =>
-            r.id === selectedId ? "bg-info/15" : undefined
-          }
+          isRowSelected={(r) => r.id === selectedId}
           columnFilterControl={{
             filters: columnFilters,
             onModeChange: setColumnFilterMode,

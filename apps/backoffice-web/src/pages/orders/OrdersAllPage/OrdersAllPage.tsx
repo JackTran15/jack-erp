@@ -65,14 +65,6 @@ interface OrdersAllResult {
   linesByOrderId: Record<string, OrderLineRow[]>;
 }
 
-// Ô của cột ghim đè lên phần lưới cuộn ngang nên nền phải ĐỤC — màu có alpha sẽ
-// để lộ nội dung chạy bên dưới. Giống `OrdersPageTable`, vốn không nhận được
-// cột thêm từ ngoài vào (xem ghi chú ở `columns` bên dưới).
-const FOCUSED_ROW_BG =
-  "[&>td]:!bg-[color-mix(in_srgb,hsl(var(--info))_18%,hsl(var(--background)))]";
-const HOVER_ROW_BG =
-  "[&:hover>td]:!bg-[color-mix(in_srgb,hsl(var(--info))_10%,hsl(var(--background)))]";
-
 /**
  * Màn TẤT CẢ ĐƠN: lưới tra cứu toàn chuỗi (A-19, AC-14, AC-15).
  *
@@ -274,12 +266,8 @@ export function OrdersAllPage() {
         emptyLabel="Không có dữ liệu."
         getRowKey={(row) => row.id}
         onRowClick={(row) => setFocusedOrderId(row.id)}
-        rowClassName={(row) =>
-          [
-            "[&>td]:h-[46px] [&>td]:align-top [&>td]:py-2",
-            row.id === focusedOrderId ? FOCUSED_ROW_BG : HOVER_ROW_BG,
-          ].join(" ")
-        }
+        rowClassName={() => "[&>td]:h-[46px] [&>td]:align-top [&>td]:py-2"}
+        isRowSelected={(row) => row.id === focusedOrderId}
         columnFilterControl={control}
       />
     </DocumentListShell>

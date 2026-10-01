@@ -7,6 +7,7 @@ export function useRoles() {
     queryKey: ["iam", "roles"],
     queryFn: async (): Promise<RoleSummary[]> =>
       requireErpData(await erpApi.GET<RoleSummary[]>("/admin/roles")),
+    staleTime: 30_000,
   });
 }
 

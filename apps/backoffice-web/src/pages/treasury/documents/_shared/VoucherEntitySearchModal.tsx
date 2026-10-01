@@ -358,6 +358,7 @@ export function VoucherEntitySearchModal({
             loading={loading}
             emptyLabel="Không có dữ liệu."
             getRowKey={(row) => row.lookupKey}
+            isRowSelected={(row) => row.lookupKey === selectedKey}
             onRowClick={(row) => {
               setSelectedKey(row.lookupKey);
               persistSession({ selectedKey: row.lookupKey });

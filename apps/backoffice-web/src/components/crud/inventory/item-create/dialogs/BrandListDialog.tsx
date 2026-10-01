@@ -80,7 +80,7 @@ export function BrandListDialog({ open, onOpenChange, onPick }: Props) {
           placeholder="Tìm thương hiệu…"
         />
         <div className="min-h-0 flex-1 overflow-y-auto rounded-md border">
-          <table className="w-full text-sm">
+          <table className="erp-data-table w-full text-sm">
             <thead className="sticky top-0 z-10 bg-muted [&_th]:bg-muted">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">Tên thương hiệu</th>
@@ -102,7 +102,7 @@ export function BrandListDialog({ open, onOpenChange, onPick }: Props) {
                 </tr>
               ) : (
                 rows.map((b) => (
-                  <tr key={b.id} className="border-t border-border hover:bg-accent/50">
+                  <tr key={b.id} className="border-t border-border">
                     <td className="px-3 py-2">
                       <button
                         type="button"

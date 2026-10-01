@@ -255,19 +255,34 @@ export class UsersService {
     rows: UserEntity[],
     actor: ActorContext,
   ): Promise<UserListItem[]> {
-    const [profiles, unmanageable] = await Promise.all([
+    const userIds = rows.map((u) => u.id);
+    const [profiles, unmanageable, userRoles] = await Promise.all([
       rows.length
         ? this.profileRepo.find({
             where: {
-              userId: In(rows.map((u) => u.id)),
+              userId: In(userIds),
               organizationId: actor.organizationId,
             },
             relations: ["jobPosition"],
           })
         : Promise.resolve([]),
       this.unmanageableUserIds(actor),
+      // `roleIds` lets the role-management page filter users by role without
+      // fetching every user's detail (one query for the whole page).
+      rows.length
+        ? this.userRoleRepo.find({
+            where: { userId: In(userIds), organizationId: actor.organizationId },
+            select: { userId: true, roleId: true },
+          })
+        : Promise.resolve([]),
     ]);
     const profileByUser = new Map(profiles.map((p) => [p.userId, p]));
+    const roleIdsByUser = new Map<string, string[]>();
+    for (const ur of userRoles) {
+      const list = roleIdsByUser.get(ur.userId);
+      if (list) list.push(ur.roleId);
+      else roleIdsByUser.set(ur.userId, [ur.roleId]);
+    }
     const photosByProfile = await this.loadProfilePhotos(
       profiles.map((p) => p.id),
       actor.organizationId,
@@ -277,6 +292,7 @@ export class UsersService {
       const photo = (profile && photosByProfile.get(profile.id)) ?? EMPTY_PROFILE_PHOTO;
       return {
         ...this.toListItem(u, profile, photo),
+        roleIds: roleIdsByUser.get(u.id) ?? [],
         canEdit: !unmanageable.has(u.id),
       };
     });
@@ -1236,7 +1252,7 @@ export class UsersService {
     u: UserEntity,
     p: EmployeeProfileEntity | undefined,
     photo: EmployeeProfilePhoto,
-  ): UserListItem {
+  ): Omit<UserListItem, "roleIds"> {
     return {
       ...this.toView(u, p),
       code: p?.code ?? null,

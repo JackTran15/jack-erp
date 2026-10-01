@@ -552,7 +552,7 @@ export function LookupField<T>({
                 style={{ maxHeight: rect.maxHeight }}
               >
                 {columns && columns.length > 0 ? (
-                  <table id={listboxId} role="listbox" className="w-full border-collapse text-sm">
+                  <table id={listboxId} role="listbox" className="erp-data-table w-full border-collapse text-sm">
                     <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
                       <tr>
                         {columns.map((col) => (
@@ -578,11 +578,11 @@ export function LookupField<T>({
                           id={`${listboxId}-${idx}`}
                           role="option"
                           aria-selected={idx === highlightIdx}
+                          data-selected={idx === highlightIdx}
                           className={cn(
                             "cursor-pointer scroll-mt-8",
-                            idx === highlightIdx
-                              ? "bg-accent font-medium text-accent-foreground [&>td:first-child]:shadow-[inset_3px_0_0_0_hsl(var(--ring))]"
-                              : "hover:bg-muted/60",
+                            idx === highlightIdx &&
+                              "font-medium [&>td:first-child]:shadow-[inset_3px_0_0_0_hsl(var(--ring))]",
                           )}
                           onMouseDown={(e) => {
                             e.preventDefault();

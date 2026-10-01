@@ -1483,6 +1483,38 @@ export interface paths {
         patch: operations["CustomerController_updateCard"];
         trace?: never;
     };
+    "/customers/{id}/point-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_getPointHistoryByCustomer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/membership-card/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["CustomerController_setPointsBalance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/branches": {
         parameters: {
             query?: never;
@@ -11415,6 +11447,34 @@ export interface components {
             expiresAt?: string;
             lomasCardNumber?: string;
             lomasTier?: string;
+        };
+        /** @enum {string} */
+        PointType: "earn" | "redeem" | "adjust";
+        PointHistoryItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            type: components["schemas"]["PointType"];
+            /** @description Số điểm cộng (+) hoặc trừ (−) */
+            delta: number;
+            /** Format: uuid */
+            invoiceId: string | null;
+            invoiceCode: string | null;
+            note: string | null;
+            createdByName: string | null;
+        };
+        PointHistoryPageDto: {
+            data: components["schemas"]["PointHistoryItemDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        SetPointsBalanceDto: {
+            /** @description Số dư điểm mới (số nguyên ≥ 0) */
+            points: number;
+            /** @description Lý do điều chỉnh, lưu vào ghi chú sổ cái điểm */
+            note: string;
         };
         CreateBranchDto: {
             name: string;
@@ -23183,6 +23243,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MembershipCardEntity"];
                 };
+            };
+        };
+    };
+    CustomerController_getPointHistoryByCustomer: {
+        parameters: {
+            query: {
+                page: number;
+                limit: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PointHistoryPageDto"];
+                };
+            };
+        };
+    };
+    CustomerController_setPointsBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPointsBalanceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

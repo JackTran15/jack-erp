@@ -1,0 +1,431 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: customer-points-ui-fixes
+slug: 2026100101-customer-points-ui-fixes
+profile: none
+created: 2026-10-01T09:48:09
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-10-01T10:24:24
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-10-01T10:24:24
+    by: Akenzy
+    evidence: 17 assumptions, none blocking-and-pending; 21 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-10-01T10:24:24
+    by: Akenzy
+    evidence: 4 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-10-01T10:24:24
+    by: Akenzy
+    evidence: graph valid - 4 UoW, 13 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:24:33
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:25:46
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:25:46
+    by: Akenzy
+    ticket: T-04-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:26:10
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:26:30
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:26:30
+    by: Akenzy
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:26:35
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:33:29
+    by: Akenzy
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:33:34
+    by: Akenzy
+    reason: index.css + tailwind.config.js are T-02-01's uncommitted changes (done earlier); agent may not commit in this repo
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:33:34
+    by: Akenzy
+    reason: index.css + tailwind.config.js are T-02-01's uncommitted changes (done earlier); agent may not commit in this repo
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:33:38
+    by: Akenzy
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:35:44
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets T-02-01/T-02-02/T-04-01 and the feature's evidence script; agent may not commit
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:35:44
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets T-02-01/T-02-02/T-04-01 and the feature's evidence script; agent may not commit
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:35:47
+    by: Akenzy
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:38:29
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets T-02-01..03/T-04-01 and the feature's evidence script; agent may not commit
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:38:29
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets T-02-01..03/T-04-01 and the feature's evidence script; agent may not commit
+    ticket: T-02-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:38:52
+    by: Akenzy
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:47:36
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets T-02-01..04/T-04-01 and the feature's evidence script; agent may not commit
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:47:36
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets T-02-01..04/T-04-01 and the feature's evidence script; agent may not commit
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:47:42
+    by: Akenzy
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:49:15
+    by: Akenzy
+    reason: RoleManagementPage/RoleUsersTab/RoleEmployeePickerModal/RoleDetailPanel - type-only UserDetail->UserListItem as the ticket anticipated; rest is uncommitted files of done tickets
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:49:15
+    by: Akenzy
+    reason: RoleManagementPage/RoleUsersTab/RoleEmployeePickerModal/RoleDetailPanel - type-only UserDetail->UserListItem as the ticket anticipated; rest is uncommitted files of done tickets
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:49:20
+    by: Akenzy
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-10-01T10:54:12
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets (UOW-02/03/04) and the feature's evidence scripts; agent may not commit
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T10:54:12
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets (UOW-02/03/04) and the feature's evidence scripts; agent may not commit
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T10:54:15
+    by: Akenzy
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:10:57
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets (T-01-01, UOW-02/03/04) and evidence scripts; agent may not commit
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:10:57
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets (T-01-01, UOW-02/03/04) and evidence scripts; agent may not commit
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:11:02
+    by: Akenzy
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:15:18
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:15:18
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:15:27
+    by: Akenzy
+    ticket: T-01-04
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:15:44
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:15:44
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:15:48
+    by: Akenzy
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:20:15
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:20:15
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:20:20
+    by: Akenzy
+    ticket: T-01-06
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:21:28
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:21:28
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets and evidence scripts; agent may not commit
+    ticket: T-01-06
+  - gate: G3
+    action: reopened
+    at: 2026-10-01T11:41:03
+    by: Akenzy
+    reason: Akenzy 2026-10-01 - mở rộng UOW-02 ra mọi bảng backoffice (báo cáo ReportPageTableView, dòng tick CrudListPage, ~53 file <table> tự viết), trừ pos-web và mẫu in
+  - gate: G3
+    action: passed
+    at: 2026-10-01T11:43:26
+    by: Akenzy
+    evidence: graph valid - 5 UoW, 23 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:43:32
+    by: Akenzy
+    ticket: T-05-01
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:44:21
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets (UOW-01..04) and evidence scripts; agent may not commit
+    ticket: T-05-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:44:21
+    by: Akenzy
+    reason: only drift is uncommitted files of done tickets (UOW-01..04) and evidence scripts; agent may not commit
+    ticket: T-05-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:44:28
+    by: Akenzy
+    ticket: T-05-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:44:28
+    by: Akenzy
+    ticket: T-05-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:44:28
+    by: Akenzy
+    ticket: T-05-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:44:28
+    by: Akenzy
+    ticket: T-05-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:46:39
+    by: Akenzy
+    ticket: T-05-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:46:39
+    by: Akenzy
+    ticket: T-05-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:46:39
+    by: Akenzy
+    ticket: T-05-08
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:48:34
+    by: Akenzy
+    reason: drift = uncommitted files of done tickets and of in-progress T-05-03..08 run by parallel agents; agent may not commit
+    ticket: T-05-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:48:34
+    by: Akenzy
+    reason: drift = uncommitted files of done tickets and of in-progress T-05-03..08 run by parallel agents; agent may not commit
+    ticket: T-05-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T11:48:35
+    by: Akenzy
+    ticket: T-05-09
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:56:36
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:56:36
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-03
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:56:37
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:56:37
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-04
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:56:38
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:56:38
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-05
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:56:38
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:56:39
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-06
+  - gate: G4
+    action: scope
+    at: 2026-10-01T11:56:39
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-08
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T11:56:39
+    by: Akenzy
+    reason: drift = uncommitted files of other done/in-progress tickets (parallel agents); agent may not commit
+    ticket: T-05-08
+  - gate: G4
+    action: scope
+    at: 2026-10-01T12:00:32
+    by: Akenzy
+    reason: drift = uncommitted files of other done tickets (parallel agents); agent may not commit
+    ticket: T-05-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T12:00:32
+    by: Akenzy
+    reason: drift = uncommitted files of other done tickets (parallel agents); agent may not commit
+    ticket: T-05-07
+  - gate: G4
+    action: scope
+    at: 2026-10-01T12:00:32
+    by: Akenzy
+    reason: drift = uncommitted files of other done tickets (parallel agents); agent may not commit
+    ticket: T-05-09
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T12:00:32
+    by: Akenzy
+    reason: drift = uncommitted files of other done tickets (parallel agents); agent may not commit
+    ticket: T-05-09
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-01T12:00:33
+    by: Akenzy
+    ticket: T-05-10
+  - gate: G4
+    action: scope
+    at: 2026-10-01T12:03:20
+    by: Akenzy
+    reason: drift = uncommitted files of other done tickets; agent may not commit
+    ticket: T-05-10
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-01T12:03:20
+    by: Akenzy
+    reason: drift = uncommitted files of other done tickets; agent may not commit
+    ticket: T-05-10

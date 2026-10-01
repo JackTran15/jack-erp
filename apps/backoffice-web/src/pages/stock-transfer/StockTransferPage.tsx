@@ -640,12 +640,7 @@ export function StockTransferPage() {
           emptyLabel="Chưa có phiếu chuyển kho."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
-          rowClassName={(row) =>
-            // `bg-info-subtle` là token của badge, lightness 98% — trên nền trắng của
-            // bảng nó vô hình. Dòng đang xem cần nhìn thấy được, nên dùng `bg-info`
-            // pha loãng.
-            row.id === selectedId ? "bg-info/15" : undefined
-          }
+          isRowSelected={(row) => row.id === selectedId}
           leadingColumn={{
             width: 36,
             header: (
@@ -774,7 +769,7 @@ function DetailPanel({ transferId }: { transferId: string | null }) {
       ) : lines.length === 0 ? (
         <p className="text-sm text-muted-foreground">Phiếu này chưa có dòng hàng.</p>
       ) : (
-        <table className="w-full border-collapse text-sm">
+        <table className="erp-data-table w-full border-collapse text-sm">
           <thead className="bg-muted/40">
             <tr className="border-b">
               <th className="border-r px-2 py-1.5 text-left font-medium">Mã SKU</th>

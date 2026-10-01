@@ -283,7 +283,7 @@ function OrdersReturnDialog({
           </span>
         </div>
 
-        <table className="w-full border-collapse text-sm">
+        <table className="erp-data-table w-full border-collapse text-sm">
           <thead>
             <tr className="bg-muted">
               <th className="border border-border px-2 py-1 text-left font-semibold">

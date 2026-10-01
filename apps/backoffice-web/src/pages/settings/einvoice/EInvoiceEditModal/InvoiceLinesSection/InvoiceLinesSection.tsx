@@ -48,7 +48,7 @@ export function InvoiceLinesSection({ lines, promotionTotal, total, expanded, on
           expanded ? "min-h-0 flex-1" : "max-h-[112px]",
         )}
       >
-        <table className="w-full table-fixed border-collapse text-[13px] leading-5">
+        <table className="erp-data-table w-full table-fixed border-collapse text-[13px] leading-5">
           <thead className="sticky top-0 bg-muted">
             <tr>
               {HEADERS.map((h) => (
@@ -60,7 +60,7 @@ export function InvoiceLinesSection({ lines, promotionTotal, total, expanded, on
           </thead>
           <tbody>
             {lines.map((l, i) => (
-              <tr key={`${l.sku}-${i}`} className="even:bg-muted/50">
+              <tr key={`${l.sku}-${i}`}>
                 <td className={cn(CELL, "text-center")}>{i + 1}</td>
                 <td className={CELL}>{l.sku}</td>
                 <td className={cn(CELL, "truncate")}>{l.name}</td>

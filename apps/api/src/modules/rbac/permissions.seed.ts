@@ -17,6 +17,8 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "customer.read", module: "customer" },
   { key: "customer.write", module: "customer" },
   { key: "customer.merge", module: "customer" },
+  { key: "customer.points.adjust", module: "customer" },
+  { key: "customer.points.history.read", module: "customer" },
 
   // Branch
   { key: "branch.read", module: "branch" },

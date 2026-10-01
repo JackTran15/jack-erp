@@ -184,7 +184,7 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
         </div>
 
         <div className="max-h-[360px] overflow-auto rounded-md border border-border">
-          <table className="w-full text-sm">
+          <table className="erp-data-table w-full text-sm">
             <thead className="sticky top-0 z-10 bg-muted text-muted-foreground [&_th]:bg-muted">
               <tr>
                 <th className="w-10 p-2" />
@@ -216,7 +216,8 @@ export function SelectTransferOrderDialog({ open, onClose, onSelect }: Props) {
                 rows.map((r) => (
                   <tr
                     key={r.id}
-                    className="cursor-pointer border-t border-border hover:bg-muted/40"
+                    className="cursor-pointer border-t border-border"
+                    data-selected={selectedId === r.id}
                     onClick={() => setSelectedId(r.id)}
                   >
                     <td className="p-2 text-center">

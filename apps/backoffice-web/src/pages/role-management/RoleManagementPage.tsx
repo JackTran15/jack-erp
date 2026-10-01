@@ -1,7 +1,7 @@
 import {
   IAM_PERMISSION_KEYS,
   type RoleSummary,
-  type UserDetail,
+  type UserListItem,
 } from "@erp/shared-interfaces";
 import {
   Badge,
@@ -82,7 +82,7 @@ export function RoleManagementPage() {
   >([]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [confirmRemove, setConfirmRemove] = useState<UserDetail | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<UserListItem | null>(null);
   const [confirmDeleteRole, setConfirmDeleteRole] = useState(false);
 
   const { data: editRoleDetail } = useRole(
@@ -130,7 +130,7 @@ export function RoleManagementPage() {
   // Viewing a role only needs iam.role.read; editing needs iam.role.write.
   const roleReadOnly = !canWrite || !editingAssignable;
 
-  const roleUsers = useMemo((): UserDetail[] => {
+  const roleUsers = useMemo((): UserListItem[] => {
     if (!selectedRoleId) return [];
     return allUserDetails.filter((u) => u.roleIds.includes(selectedRoleId));
   }, [allUserDetails, selectedRoleId]);
@@ -378,6 +378,7 @@ export function RoleManagementPage() {
           emptyLabel="Chưa có vai trò."
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedRoleId(row.id)}
+          isRowSelected={(row) => row.id === selectedRoleId}
           leadingColumn={{
             width: 36,
             header: <span className="sr-only">Chọn</span>,

@@ -391,6 +391,7 @@ export function DebtRepaymentPickDialog({
         loading={loading}
         emptyLabel="Chọn nhà cung cấp và bấm Lấy dữ liệu."
         getRowKey={(r) => r.debtId ?? r.documentNo}
+        isRowSelected={(r) => r.selected}
         leadingColumn={{
           width: 40,
           header: (

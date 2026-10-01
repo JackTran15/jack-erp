@@ -353,7 +353,7 @@ export function LocationStockItemsDialog({
         </div>
 
         <div className="flex-1 overflow-auto">
-          <table className="w-full min-w-[1400px] border-collapse text-sm">
+          <table className="erp-data-table w-full min-w-[1400px] border-collapse text-sm">
             <thead className="bg-muted/40">
               <tr>
                 {columns.map((c) => (

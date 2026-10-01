@@ -179,6 +179,7 @@ export function VouchersTable({
       emptyLabel="Không có dữ liệu."
       getRowKey={(row) => row.id}
       onRowClick={(row) => onToggleRow(row.id)}
+      isRowSelected={(row) => selectedIds.has(row.id)}
       columnFilterControl={{
         filters: columnFilters,
         onModeChange: onFilterModeChange,

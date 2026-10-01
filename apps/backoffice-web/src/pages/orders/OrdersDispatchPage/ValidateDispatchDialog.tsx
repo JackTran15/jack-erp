@@ -78,7 +78,7 @@ export function ValidateDispatchDialog({ open, onOpenChange, checks }: Props) {
                 )}
               </header>
 
-              <table className="w-full border-collapse text-sm">
+              <table className="erp-data-table w-full border-collapse text-sm">
                 <tbody>
                   {order.lines.map((line) => (
                     <LineRow key={line.itemId} line={line} branch={branch} />

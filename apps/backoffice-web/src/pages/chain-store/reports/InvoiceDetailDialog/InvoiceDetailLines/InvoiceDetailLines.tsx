@@ -12,7 +12,7 @@ export function InvoiceDetailLines({ detail }: Props) {
   const totalQty = detail.lines.reduce((sum, l) => sum + Number(l.quantity ?? 0), 0);
 
   return (
-    <table className="w-full border-collapse text-[13px]">
+    <table className="erp-data-table w-full border-collapse text-[13px]">
       <thead>
         <tr className="text-foreground">
           <th className={`${TH} w-12 text-center`}>STT</th>
@@ -39,7 +39,7 @@ export function InvoiceDetailLines({ detail }: Props) {
           </tr>
         ) : (
           detail.lines.map((l, idx) => (
-            <tr key={`${l.sku}-${idx}`} className={idx % 2 === 1 ? "bg-muted/30" : ""}>
+            <tr key={`${l.sku}-${idx}`}>
               <td className={`${TD} text-center`}>{idx + 1}</td>
               <td className={`${TD} text-left`}>{l.sku}</td>
               <td className={`${TD} text-left`}>{l.name}</td>

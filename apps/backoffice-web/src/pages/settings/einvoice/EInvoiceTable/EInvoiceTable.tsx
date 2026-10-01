@@ -93,6 +93,7 @@ export function EInvoiceTable({ tab, rows, totalAmount, loading, columnFilterCon
       loading={loading}
       emptyLabel="Không có dữ liệu."
       getRowKey={(row) => row.id}
+      isRowSelected={(row) => checkedIds.includes(row.id)}
       sortBy={tab === "unissued" ? "invoiceDate" : "issuedDate"}
       sortOrder="desc"
       leadingColumn={{

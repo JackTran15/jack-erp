@@ -9,6 +9,7 @@ import { CrudFieldInput } from "./CrudFieldInput";
 import { InventoryItemCreateForm } from "./inventory/InventoryItemCreateForm";
 import type { InventoryItemSaveMode } from "./inventory/item-create/InventoryItemActionBar";
 import { SupplierCreateForm } from "./inventory/SupplierCreateForm";
+import { MembershipCardPanel } from "../../pages/customers/_components/MembershipCardPanel";
 import { AdminPageShell } from "../layout/AdminPageShell";
 import { PageHeader } from "../layout/PageHeader";
 import { resolveBackofficeBreadcrumbs } from "../layout/breadcrumbs";
@@ -213,6 +214,13 @@ export function CrudEditPage() {
           </div>
         )}
       </div>
+
+      {/* Điểm và mã thẻ nằm ở bảng thẻ thành viên, không đi qua PATCH CRUD (A-02). */}
+      {entityKey === "customers" && id ? (
+        <div className="mb-4">
+          <MembershipCardPanel customerId={id} />
+        </div>
+      ) : null}
 
       <div className="rounded-lg border border-border bg-background p-4 sm:p-6">
         <form id="crud-edit-form" ref={formRef} onSubmit={(e) => void handleSubmit(e)}>

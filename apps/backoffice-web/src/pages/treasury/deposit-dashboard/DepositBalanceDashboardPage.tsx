@@ -59,7 +59,7 @@ export function DepositBalanceDashboardPage() {
         </div>
 
         <div className="overflow-hidden rounded-md border border-border">
-          <table className="w-full text-sm">
+          <table className="erp-data-table w-full text-sm">
             <thead className="bg-muted">
               <tr>
                 <th className="px-2 py-1.5 text-left font-semibold">Chi nhánh / Tài khoản</th>
@@ -84,7 +84,7 @@ export function DepositBalanceDashboardPage() {
                 dashboard.data?.branches.map((branch) => (
                   <Fragment key={branch.branchId}>
                     <tr
-                      className="cursor-pointer border-t border-border hover:bg-muted/40"
+                      className="cursor-pointer border-t border-border"
                       onClick={() => toggle(branch.branchId)}
                     >
                       <td className="px-2 py-1.5 font-medium">
@@ -104,7 +104,7 @@ export function DepositBalanceDashboardPage() {
                     </tr>
                     {expanded.has(branch.branchId)
                       ? branch.accounts.map((account) => (
-                          <tr key={account.accountId} className="border-t border-border bg-muted/20">
+                          <tr key={account.accountId} className="border-t border-border">
                             <td className="py-1.5 pl-8 pr-2 text-muted-foreground">{account.name}</td>
                             <td className="px-2 py-1.5 text-muted-foreground">{account.type}</td>
                             <td className="px-2 py-1.5 text-right tabular-nums">

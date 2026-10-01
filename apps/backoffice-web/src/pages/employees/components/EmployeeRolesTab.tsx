@@ -14,7 +14,7 @@ export function EmployeeRolesTab({ roles }: EmployeeRolesTabProps) {
   }
 
   return (
-    <table className="w-full border-collapse text-sm">
+    <table className="erp-data-table w-full border-collapse text-sm">
       <thead className="bg-muted/40">
         <tr className="border-b">
           <th className="border-r px-2 py-1.5 text-left font-medium">Tên vai trò</th>

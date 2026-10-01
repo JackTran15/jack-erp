@@ -233,6 +233,7 @@ export function RegistrationDetailPage() {
               Dữ liệu đăng ký
             </h2>
             <div className="mt-3 overflow-hidden border border-border">
+              {/* table-contrast: exempt — bảng thuộc tính khoá/giá trị (cột nhãn nền riêng), không phải danh sách dữ liệu */}
               <table className="w-full border-collapse text-sm">
                 <tbody>
                   {requestDataEntries.map(([key, value]) => (

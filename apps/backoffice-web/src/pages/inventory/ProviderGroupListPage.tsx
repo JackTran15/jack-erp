@@ -240,7 +240,7 @@ export function ProviderGroupListPage() {
       />
 
       <div className="mt-0 flex-1 overflow-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="erp-data-table w-full border-collapse text-sm">
           <thead>
             <tr className="border-b bg-background">
               <th className="px-3 py-2 text-left font-medium text-foreground">
@@ -299,14 +299,8 @@ export function ProviderGroupListPage() {
                 <tr
                   key={node.id}
                   onClick={() => setSelected(isSelected ? null : node.id)}
-                  className={[
-                    "cursor-pointer border-b transition-colors",
-                    isSelected
-                      ? "bg-primary/10"
-                      : hasChildren
-                        ? "bg-muted/40 hover:bg-muted/60"
-                        : "hover:bg-muted/30",
-                  ].join(" ")}
+                  data-selected={isSelected}
+                  className="cursor-pointer border-b transition-colors"
                 >
                   {/* Code column with expand toggle + indentation */}
                   <td className="px-3 py-2">

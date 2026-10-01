@@ -263,7 +263,7 @@ export function ApprovalQueuePage() {
             </div>
           ) : (
             <div className="overflow-auto">
-              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+              <table className="erp-data-table w-full min-w-[760px] border-collapse text-left text-sm">
                 <thead className="bg-muted/60 text-xs font-semibold uppercase text-muted-foreground">
                   <tr className="border-b border-border">
                     <th className="px-4 py-3">Loại</th>
@@ -283,7 +283,7 @@ export function ApprovalQueuePage() {
                     return (
                       <tr
                         key={row.id}
-                        className="cursor-pointer border-b border-border transition-colors hover:bg-muted/40"
+                        className="cursor-pointer border-b border-border transition-colors"
                         onClick={() =>
                           navigate(`/onboarding/approvals/${row.id}`, {
                             state: row,

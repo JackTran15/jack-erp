@@ -145,6 +145,65 @@ describe("promotion.mapper round-trip", () => {
     expect(staleForm.accruePoints).toBe(false);
   });
 
+  it("ITEM_DISCOUNT: save drops blank rows and unresolved legacy rows, sortOrder stays contiguous (AC-21)", () => {
+    // l2 mô phỏng dòng cũ lưu nhầm PRODUCT trỏ id item: server không phân giải được nên không có mã/tên.
+    const detail = baseDetail({
+      type: PromotionProgramType.ITEM_DISCOUNT,
+      groups: [
+        {
+          id: "g0",
+          ordinal: 0,
+          lines: [
+            {
+              id: "l1",
+              role: PromotionLineRole.REWARD,
+              targetType: PromotionTargetType.ITEM,
+              targetId: "item-1",
+              targetCode: "SKU1",
+              targetName: "Item 1",
+              discountMode: PromotionDiscountMode.PERCENT,
+              discountValue: 30,
+              sortOrder: 0,
+            },
+            {
+              id: "l2",
+              role: PromotionLineRole.REWARD,
+              targetType: PromotionTargetType.PRODUCT,
+              targetId: "item-legacy",
+              discountMode: PromotionDiscountMode.PERCENT,
+              discountValue: 30,
+              sortOrder: 1,
+            },
+            {
+              id: "l3",
+              role: PromotionLineRole.REWARD,
+              targetType: PromotionTargetType.PRODUCT,
+              targetId: "prod-1",
+              targetCode: "P1",
+              targetName: "Product 1",
+              discountMode: PromotionDiscountMode.PERCENT,
+              discountValue: 30,
+              sortOrder: 2,
+            },
+          ],
+          tiers: [],
+        },
+      ],
+    });
+
+    const form = toFormState(detail);
+    expect(form.goodsDiscountRows).toHaveLength(3);
+    expect(form.goodsDiscountRows[1]).toMatchObject({ targetId: "item-legacy", code: "" });
+    // Dòng người dùng gõ dở mà không chọn hàng: có mã nhưng không có id.
+    form.goodsDiscountRows.push({ ...form.goodsDiscountRows[0], id: "typed", targetId: "", code: "SKU9" });
+
+    const dto = toCreateDto(form, PromotionProgramType.ITEM_DISCOUNT);
+    const rewardLines = dto.groups[0].lines?.filter((l) => l.role === PromotionLineRole.REWARD) ?? [];
+    expect(rewardLines.map((l) => l.targetId)).toEqual(["item-1", "prod-1"]);
+    expect(rewardLines.map((l) => l.sortOrder)).toEqual([0, 1]);
+    expect(rewardLines.map((l) => l.targetType)).toEqual([PromotionTargetType.ITEM, PromotionTargetType.PRODUCT]);
+  });
+
   it("ITEM_DISCOUNT: PRODUCT-scope reward lines + PRODUCT_GROUP condition", () => {
     const detail = baseDetail({
       type: PromotionProgramType.ITEM_DISCOUNT,

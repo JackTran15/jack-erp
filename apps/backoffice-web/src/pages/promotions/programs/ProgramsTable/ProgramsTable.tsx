@@ -172,6 +172,7 @@ export function ProgramsTable({
       emptyLabel="Không có chương trình khuyến mãi."
       getRowKey={(row) => row.id}
       onRowClick={(row) => onToggleRow(row.id)}
+      isRowSelected={(row) => selectedIds.has(row.id)}
       sortBy={sortBy}
       sortOrder={sortOrder}
       onSort={onSort}

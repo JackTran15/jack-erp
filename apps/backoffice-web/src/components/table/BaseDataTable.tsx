@@ -102,6 +102,11 @@ interface BaseDataTableProps<T> {
    * danh sách chứng từ tô dòng đang xem.
    */
   rowClassName?: (row: T, index: number) => string | undefined;
+  /**
+   * Dòng đang chọn: tô tím (token `--table-row-selected`) cả dòng lẫn cột ghim,
+   * thắng màu hover. Dùng thay cho việc tự tô nền qua `rowClassName`.
+   */
+  isRowSelected?: (row: T) => boolean;
   leadingColumn?: LeadingColumn<T>;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
@@ -159,10 +164,9 @@ const HEADER_ROW_HEIGHT = 32;
 /** Box-shadow used to draw a clean right edge on the rightmost frozen column. */
 const FROZEN_EDGE_SHADOW = "1px 0 0 0 hsl(var(--border))";
 
-const frozenBodyBackground = (striped: boolean): string =>
-  striped
-    ? "color-mix(in srgb, hsl(var(--muted)) 20%, hsl(var(--background)))"
-    : "hsl(var(--background))";
+/** Nền ô ghim đọc `--row-bg` của `<tr>`, nên sọc/hover/chọn tô được cả cột ghim. */
+const FROZEN_BODY_BG = "hsl(var(--row-bg))";
+const SELECTED_EDGE_SHADOW = "inset 3px 0 0 0 hsl(var(--table-row-selected-edge))";
 
 export function BaseDataTable<T>({
   columns,
@@ -177,6 +181,7 @@ export function BaseDataTable<T>({
   onRowClick,
   onRowDoubleClick,
   rowClassName,
+  isRowSelected,
   leadingColumn,
   sortBy,
   sortOrder = "desc",
@@ -621,12 +626,23 @@ export function BaseDataTable<T>({
               </tr>
             ) : null}
             {!loading
-              ? rows.map((row, index) => (
+              ? rows.map((row, index) => {
+                const selected = isRowSelected?.(row) ?? false;
+                // Ô đầu tiên của dòng chọn mang viền trái tím; ghép với bóng mép cột ghim nếu có.
+                const edgeShadow = (existing?: React.CSSProperties["boxShadow"]) =>
+                  selected ? [SELECTED_EDGE_SHADOW, existing].filter(Boolean).join(", ") : existing;
+                return (
                 <tr
                   key={getRowKey(row, index)}
                   className={cn(
-                    index % 2 === 0 ? "bg-background" : "bg-muted/20",
-                    onRowClick || onRowDoubleClick ? "cursor-pointer hover:bg-info-subtle/70" : null,
+                    "bg-[hsl(var(--row-bg))]",
+                    index % 2 === 0 ? "[--row-bg:var(--table-row-even)]" : "[--row-bg:var(--table-row-odd)]",
+                    onRowClick || onRowDoubleClick ? "cursor-pointer" : null,
+                    selected
+                      ? "[--row-bg:var(--table-row-selected)]"
+                      : onRowClick || onRowDoubleClick
+                        ? "hover:[--row-bg:var(--table-row-hover)]"
+                        : null,
                     rowClassName?.(row, index),
                   )}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
@@ -644,16 +660,20 @@ export function BaseDataTable<T>({
                           ? {
                               ...leadingFrozenStyle,
                               zIndex: 5,
-                              backgroundColor: frozenBodyBackground(index % 2 !== 0),
+                              backgroundColor: FROZEN_BODY_BG,
+                              boxShadow: edgeShadow(leadingFrozenStyle.boxShadow),
                             }
-                          : undefined
+                          : selected
+                            ? { boxShadow: SELECTED_EDGE_SHADOW }
+                            : undefined
                       }
                     >
                       {leadingColumn.cell(row, index)}
                     </td>
                   ) : null}
-                  {columns.map((column) => {
+                  {columns.map((column, colIndex) => {
                     const fStyle = frozenStyle(column);
+                    const isFirstCell = !leadingColumn && colIndex === 0;
                     return (
                       <td
                         key={column.key}
@@ -667,9 +687,12 @@ export function BaseDataTable<T>({
                             ? {
                                 ...fStyle,
                                 zIndex: 5,
-                                backgroundColor: frozenBodyBackground(index % 2 !== 0),
+                                backgroundColor: FROZEN_BODY_BG,
+                                boxShadow: isFirstCell ? edgeShadow(fStyle.boxShadow) : fStyle.boxShadow,
                               }
-                            : undefined
+                            : isFirstCell && selected
+                              ? { boxShadow: SELECTED_EDGE_SHADOW }
+                              : undefined
                         }
                       >
                         {column.render(row)}
@@ -680,7 +703,8 @@ export function BaseDataTable<T>({
                     <td className="h-8 px-2 py-0 align-middle">{renderActions(row)}</td>
                   ) : null}
                 </tr>
-              ))
+                );
+              })
               : null}
           </tbody>
           {columns.some((c) => c.footer != null) ? (

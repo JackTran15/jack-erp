@@ -47,3 +47,6 @@ graphify-out
 apps/api/logs/
 # cURL/Postman cases for the Geo API — local only
 docs/geo-api-curls/
+
+# deploy/package.sh output
+release/

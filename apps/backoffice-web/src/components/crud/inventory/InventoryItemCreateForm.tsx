@@ -1317,7 +1317,7 @@ export function InventoryItemCreateForm({
   const commissionTab = (
     <section className="rounded-md border border-border bg-background p-4">
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
+        <table className="erp-data-table w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase">
             <tr>
               <th className="px-3 py-2 text-left">Vị trí công việc</th>

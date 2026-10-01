@@ -436,6 +436,7 @@ export function EmployeesPage() {
           loading={isLoading}
           emptyLabel="Chưa có nhân viên."
           getRowKey={(row) => row.id}
+          isRowSelected={(row) => row.id === selectedId}
           onRowClick={(row) => setSelectedId(row.id)}
           columnFilterControl={columnFilterControl}
           leadingColumn={{

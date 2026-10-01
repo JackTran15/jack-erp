@@ -32,7 +32,7 @@ export function OverstockConfirmDialog({
         Bạn đang xuất quá số lượng tồn của những hàng hoá sau:
       </p>
       <div className="overflow-hidden rounded border">
-        <table className="w-full border-collapse text-sm">
+        <table className="erp-data-table w-full border-collapse text-sm">
           <thead className="bg-muted/60">
             <tr>
               <th className="border-r px-3 py-2 text-left font-medium">

@@ -210,6 +210,7 @@ export function CustomerSelectDialog({
         getRowKey={(row) => cellText(row, "id")}
         scrollContainerClassName="max-h-[min(56vh,440px)]"
         onRowClick={(row) => toggleRow(cellText(row, "id"))}
+        isRowSelected={(row) => selectedIds.has(cellText(row, "id"))}
         leadingColumn={{
           width: 40,
           header: (

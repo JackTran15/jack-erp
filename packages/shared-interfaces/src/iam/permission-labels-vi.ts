@@ -25,6 +25,8 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'customer.read': 'Xem khách hàng',
   'customer.write': 'Thêm/sửa khách hàng',
   'customer.merge': 'Gộp khách hàng trùng',
+  'customer.points.adjust': 'Điều chỉnh điểm thành viên',
+  'customer.points.history.read': 'Xem lịch sử điểm thành viên',
 
   // Chi nhánh
   'branch.read': 'Xem chi nhánh',

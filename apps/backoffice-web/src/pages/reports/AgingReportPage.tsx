@@ -75,7 +75,7 @@ export function AgingReportPage() {
 
       {data && (
         <div style={styles.tableWrap}>
-          <table style={styles.table}>
+          <table className="erp-data-table" style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>Kỳ nợ</th>

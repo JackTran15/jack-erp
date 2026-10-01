@@ -55,7 +55,7 @@ export function ProductVariantsTable({
 
   return (
     <div className="overflow-x-auto rounded-md border border-border">
-      <table className="w-full min-w-[1280px] table-fixed border-collapse text-xs">
+      <table className="erp-data-table w-full min-w-[1280px] table-fixed border-collapse text-xs">
         <thead className="bg-muted/50 uppercase">
           <tr>
             <th className="w-20 px-2 py-2 text-center font-semibold">Ảnh</th>

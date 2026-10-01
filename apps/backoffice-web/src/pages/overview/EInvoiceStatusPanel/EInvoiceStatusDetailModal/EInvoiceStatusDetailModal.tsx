@@ -39,7 +39,7 @@ export function EInvoiceStatusDetailModal({ open, branches, onClose }: Props) {
         </div>
       }
     >
-      <table className="w-full table-fixed border-collapse text-[13px] leading-5">
+      <table className="erp-data-table w-full table-fixed border-collapse text-[13px] leading-5">
         <colgroup>
           <col className="w-[250px]" />
           <col />
@@ -60,7 +60,7 @@ export function EInvoiceStatusDetailModal({ open, branches, onClose }: Props) {
         </thead>
         <tbody>
           {branches.map((branch) => (
-            <tr key={branch.branchId} className="even:bg-[#F5F5F5]">
+            <tr key={branch.branchId}>
               <td className={`${TD} truncate`}>{branch.branchName}</td>
               {NUMBER_COLUMNS.map((col) => (
                 <td key={col.key} className={`${TD} text-right tabular-nums`}>
