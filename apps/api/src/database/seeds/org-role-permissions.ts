@@ -200,8 +200,10 @@ export const SALES_PERMISSION_KEYS: string[] = [
   // POS Báo cáo theo ngày: /reports/pos/daily-summary* + /reports/invoices/*
   'reporting.invoice.branch.read',
   // …and the one report of that group pos-web actually runs: tab "Doanh thu
-  // theo mặt hàng". The other three sales reports stay in the back office.
+  // theo mặt hàng", plus "Chi tiết doanh thu theo hóa đơn và mặt hàng". The
+  // other sales reports stay in the back office.
   REPORT_PERMISSION_KEYS['revenue-by-item']!,
+  REPORT_PERMISSION_KEYS['invoice-item-revenue-detail']!,
   // POS Checkout + Fast stock transfer: GET /branches/:id/salesmen
   'sales-hierarchy.read',
   // "Yêu cầu điều chuyển": POST /inventory/transfer-orders raises the request,
@@ -267,6 +269,7 @@ export const CASHIER_PERMISSION_KEYS: string[] = [
   'accounting.cash_voucher_category.read',
   'reporting.invoice.branch.read',
   REPORT_PERMISSION_KEYS['revenue-by-item']!,
+  REPORT_PERMISSION_KEYS['invoice-item-revenue-detail']!,
   'sales-hierarchy.read',
 ];
 
@@ -326,5 +329,6 @@ export const WAREHOUSE_PERMISSION_KEYS: string[] = [
   // Báo cáo bán hàng theo mặt hàng
   'reporting.invoice.branch.read',
   REPORT_PERMISSION_KEYS['revenue-by-item']!,
+  REPORT_PERMISSION_KEYS['invoice-item-revenue-detail']!,
   'sales-hierarchy.read',
 ];
