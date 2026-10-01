@@ -186,6 +186,7 @@ function MatrixTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
+      {/* table-contrast: exempt — ma trận 2 trục thuộc tính (dòng × cột), ô = giao điểm, cột đầu là tiêu đề dòng; không phải danh sách bản ghi */}
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr>
@@ -257,7 +258,7 @@ function FlatTable({
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full min-w-[760px] table-fixed border-collapse text-sm">
+      <table className="erp-data-table w-full min-w-[760px] table-fixed border-collapse text-sm">
         <thead>
           <tr>
             <th className="w-44 border-b-2 border-border bg-muted/60 px-3 py-2.5 text-left text-xs font-semibold">

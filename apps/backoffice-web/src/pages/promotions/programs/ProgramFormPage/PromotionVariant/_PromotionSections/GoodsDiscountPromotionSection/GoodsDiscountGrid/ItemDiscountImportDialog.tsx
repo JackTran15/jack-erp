@@ -125,7 +125,7 @@ export function ItemDiscountImportDialog({ method, onOpenChange, onApply }: Prop
           </p>
           {result.errors.length ? (
             <div className="min-h-0 flex-1 overflow-auto rounded border border-border">
-              <table className="w-full text-sm" aria-label="Dòng lỗi">
+              <table className="erp-data-table w-full text-sm" aria-label="Dòng lỗi">
                 <thead className="sticky top-0 bg-muted">
                   <tr>
                     <th className="w-20 px-2 py-1.5 text-left font-semibold">Dòng</th>

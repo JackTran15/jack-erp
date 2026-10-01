@@ -545,6 +545,7 @@ export function ItemLocationDetailsPage() {
             loading={isFetching}
             emptyLabel="Vị trí này chưa có hàng hóa nào."
             getRowKey={(r) => r.itemId}
+            isRowSelected={(r) => selectedIds.has(r.itemId)}
             leadingColumn={locationLeadingColumn}
             columnFilterControl={{ filters, onModeChange, onValueChange }}
           />
@@ -555,6 +556,7 @@ export function ItemLocationDetailsPage() {
             loading={isFetching}
             emptyLabel="Không có dữ liệu phù hợp với bộ lọc."
             getRowKey={(r) => r.id}
+            isRowSelected={(r) => selectedIds.has(r.id)}
             leadingColumn={stockLeadingColumn}
             columnFilterControl={{ filters, onModeChange, onValueChange }}
           />

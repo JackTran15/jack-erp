@@ -55,6 +55,7 @@ export function SalesReportPage() {
 
       {data && (
         <div style={styles.tableWrap}>
+          {/* table-contrast: exempt — bảng chỉ tiêu KPI (cặp chỉ tiêu/giá trị khác loại), không phải danh sách dữ liệu */}
           <table style={styles.table}>
             <thead>
               <tr>

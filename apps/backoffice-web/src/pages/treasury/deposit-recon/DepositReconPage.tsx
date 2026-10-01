@@ -575,6 +575,7 @@ export function DepositReconPage() {
           loading={list.isLoading}
           emptyLabel="Không có giao dịch phù hợp."
           getRowKey={(r) => r.id}
+          isRowSelected={(r) => selected.has(r.id)}
           columnFilterControl={columnFilterControl}
           leadingColumn={{
             width: 36,

@@ -267,8 +267,9 @@ const NO_FILTERS: Record<string, string> = {};
 // Row striping is driven by rowIndex rather than the `odd:`/`even:` CSS
 // variants: virtualization inserts spacer rows, which shifts nth-child parity.
 // Module constants so the class string stays referentially stable for memo.
-const ROW_STRIPE_EVEN = "bg-background hover:bg-accent/60";
-const ROW_STRIPE_ODD = "bg-muted/15 hover:bg-accent/60";
+// Colours come from the app's `--table-row-*` tokens, shared with BaseDataTable.
+const ROW_STRIPE_EVEN = "bg-table-row-even hover:bg-table-row-hover";
+const ROW_STRIPE_ODD = "bg-table-row-odd hover:bg-table-row-hover";
 
 interface LineItemRowProps<R> {
   row: R;

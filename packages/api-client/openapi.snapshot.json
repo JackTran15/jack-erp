@@ -4449,6 +4449,85 @@
         ]
       }
     },
+    "/customers/{id}/point-history": {
+      "get": {
+        "operationId": "CustomerController_getPointHistoryByCustomer",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PointHistoryPageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Customer"
+        ]
+      }
+    },
+    "/customers/{id}/membership-card/points": {
+      "put": {
+        "operationId": "CustomerController_setPointsBalance",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPointsBalanceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Customer"
+        ]
+      }
+    },
     "/branches": {
       "post": {
         "operationId": "BranchController_create",
@@ -33691,6 +33770,111 @@
           "issuedAt"
         ]
       },
+      "PointType": {
+        "type": "string",
+        "enum": [
+          "earn",
+          "redeem",
+          "adjust"
+        ]
+      },
+      "PointHistoryItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PointType"
+              }
+            ]
+          },
+          "delta": {
+            "type": "number",
+            "description": "Số điểm cộng (+) hoặc trừ (−)"
+          },
+          "invoiceId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "invoiceCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "type",
+          "delta",
+          "invoiceId",
+          "invoiceCode",
+          "note",
+          "createdByName"
+        ]
+      },
+      "PointHistoryPageDto": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PointHistoryItemDto"
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          },
+          "limit": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit"
+        ]
+      },
+      "SetPointsBalanceDto": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000000,
+            "description": "Số dư điểm mới (số nguyên ≥ 0)"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Lý do điều chỉnh, lưu vào ghi chú sổ cái điểm"
+          }
+        },
+        "required": [
+          "points",
+          "note"
+        ]
+      },
       "CreateBranchDto": {
         "type": "object",
         "properties": {
@@ -55376,6 +55560,12 @@
             "type": "string",
             "nullable": true,
             "description": "URL công khai của ảnh ĐẦU TIÊN, hoặc `null` khi hàng chưa có ảnh — và `null` là ca THƯỜNG GẶP, phần lớn danh mục chưa gắn ảnh. Biến thể dùng chung ảnh của mẫu mã cha (A-08 của `media-storage`), nên hai biến thể của cùng một mẫu mã luôn trả cùng URL. URL là tuyệt đối, công khai và KHÔNG hết hạn."
+          },
+          "productId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid",
+            "description": "`products.id` của MẪU MÃ chứa dòng này, để app mở màn Chi tiết mẫu mã từ một dòng biến thể (erp-sales-consultant-catalog, AC-163). Với `type=model` bằng chính `id`; với hàng LẺ (không thuộc mẫu mã nào) là `null`. Trường THÊM — client cũ bỏ qua được."
           }
         },
         "required": [
@@ -55600,6 +55790,28 @@
           "storages"
         ]
       },
+      "MobileLocationStockDto": {
+        "type": "object",
+        "properties": {
+          "locationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Tên vị trí như backoffice đặt — vd `Kệ A1`."
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Tồn tại vị trí này. CÓ THỂ ≤ 0 — app tự lọc khi bày."
+          }
+        },
+        "required": [
+          "locationId",
+          "name",
+          "quantity"
+        ]
+      },
       "MobileVariantStockDto": {
         "type": "object",
         "properties": {
@@ -55624,13 +55836,21 @@
             "items": {
               "$ref": "#/components/schemas/MobileBranchStockDto"
             }
+          },
+          "locations": {
+            "description": "Tồn theo VỊ TRÍ tại chi nhánh đang làm việc, sắp số lượng GIẢM dần — cùng mảng mà POS tính (`loadBranchStock`), đã bỏ vị trí ngừng hoạt động, vị trí **Mặc định** (`is_default`), **Chưa xếp** (`is_unassigned`) và mọi vị trí thuộc kho **showroom**. Số lượng có thể ≤ 0. Trường THÊM, client cũ bỏ qua được.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileLocationStockDto"
+            }
           }
         },
         "required": [
           "itemId",
           "quantity",
           "storages",
-          "otherBranches"
+          "otherBranches",
+          "locations"
         ]
       },
       "MobileSalesModelStockDto": {

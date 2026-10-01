@@ -93,7 +93,7 @@ export function ItemProvidersTable({ rows, setRows }: Props) {
         />
       </div>
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
+        <table className="erp-data-table w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase">
             <tr>
               <th className="w-12 px-2 py-2 text-center">STT</th>

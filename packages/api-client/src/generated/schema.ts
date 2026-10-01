@@ -1483,6 +1483,38 @@ export interface paths {
         patch: operations["CustomerController_updateCard"];
         trace?: never;
     };
+    "/customers/{id}/point-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["CustomerController_getPointHistoryByCustomer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/membership-card/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["CustomerController_setPointsBalance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/branches": {
         parameters: {
             query?: never;
@@ -11416,6 +11448,34 @@ export interface components {
             lomasCardNumber?: string;
             lomasTier?: string;
         };
+        /** @enum {string} */
+        PointType: "earn" | "redeem" | "adjust";
+        PointHistoryItemDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+            type: components["schemas"]["PointType"];
+            /** @description Số điểm cộng (+) hoặc trừ (−) */
+            delta: number;
+            /** Format: uuid */
+            invoiceId: string | null;
+            invoiceCode: string | null;
+            note: string | null;
+            createdByName: string | null;
+        };
+        PointHistoryPageDto: {
+            data: components["schemas"]["PointHistoryItemDto"][];
+            total: number;
+            page: number;
+            limit: number;
+        };
+        SetPointsBalanceDto: {
+            /** @description Số dư điểm mới (số nguyên ≥ 0) */
+            points: number;
+            /** @description Lý do điều chỉnh, lưu vào ghi chú sổ cái điểm */
+            note: string;
+        };
         CreateBranchDto: {
             name: string;
             code?: string;
@@ -19163,6 +19223,11 @@ export interface components {
             variantCount: number;
             /** @description URL công khai của ảnh ĐẦU TIÊN, hoặc `null` khi hàng chưa có ảnh — và `null` là ca THƯỜNG GẶP, phần lớn danh mục chưa gắn ảnh. Biến thể dùng chung ảnh của mẫu mã cha (A-08 của `media-storage`), nên hai biến thể của cùng một mẫu mã luôn trả cùng URL. URL là tuyệt đối, công khai và KHÔNG hết hạn. */
             thumbnailUrl?: string | null;
+            /**
+             * Format: uuid
+             * @description `products.id` của MẪU MÃ chứa dòng này, để app mở màn Chi tiết mẫu mã từ một dòng biến thể (erp-sales-consultant-catalog, AC-163). Với `type=model` bằng chính `id`; với hàng LẺ (không thuộc mẫu mã nào) là `null`. Trường THÊM — client cũ bỏ qua được.
+             */
+            productId?: string | null;
         };
         MobileSalesItemPageDto: {
             data: components["schemas"]["MobileSalesItemResponseDto"][];
@@ -19229,6 +19294,14 @@ export interface components {
             quantity: number;
             storages: components["schemas"]["MobileStorageStockDto"][];
         };
+        MobileLocationStockDto: {
+            /** Format: uuid */
+            locationId: string;
+            /** @description Tên vị trí như backoffice đặt — vd `Kệ A1`. */
+            name: string;
+            /** @description Tồn tại vị trí này. CÓ THỂ ≤ 0 — app tự lọc khi bày. */
+            quantity: number;
+        };
         MobileVariantStockDto: {
             /**
              * Format: uuid
@@ -19240,6 +19313,8 @@ export interface components {
             /** @description Mọi kho đang hoạt động của chi nhánh hiện tại, **kể cả kho tồn 0** — vắng mặt đọc thành "không có kho đó". Kho chính đứng đầu. */
             storages: components["schemas"]["MobileStorageStockDto"][];
             otherBranches: components["schemas"]["MobileBranchStockDto"][];
+            /** @description Tồn theo VỊ TRÍ tại chi nhánh đang làm việc, sắp số lượng GIẢM dần — cùng mảng mà POS tính (`loadBranchStock`), đã bỏ vị trí ngừng hoạt động, vị trí **Mặc định** (`is_default`), **Chưa xếp** (`is_unassigned`) và mọi vị trí thuộc kho **showroom**. Số lượng có thể ≤ 0. Trường THÊM, client cũ bỏ qua được. */
+            locations: components["schemas"]["MobileLocationStockDto"][];
         };
         MobileSalesModelStockDto: {
             /**
@@ -23156,6 +23231,53 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MembershipCardEntity"];
                 };
+            };
+        };
+    };
+    CustomerController_getPointHistoryByCustomer: {
+        parameters: {
+            query: {
+                page: number;
+                limit: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PointHistoryPageDto"];
+                };
+            };
+        };
+    };
+    CustomerController_setPointsBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPointsBalanceDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

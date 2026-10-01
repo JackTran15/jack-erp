@@ -52,7 +52,7 @@ export function ColumnConfigTable({
   onTogglePinned,
 }: Props) {
   return (
-    <table className="w-full border-collapse">
+    <table className="erp-data-table w-full border-collapse">
       <colgroup>
         <col style={{ width: "42%" }} />
         <col style={{ width: "34%" }} />
@@ -90,13 +90,13 @@ export function ColumnConfigTable({
       <tbody>
         {rows.map((row) => {
           const key = row.kind === "group" ? `group:${row.label}` : `col:${row.id}`;
-          const rowBg = row.selected ? "bg-primary/10" : "bg-background hover:bg-muted/30";
           const visible = row.kind === "group" ? row.visibility : row.visible ? "checked" : "unchecked";
           const pinned = row.kind === "group" ? row.pinned : row.pinned ? "checked" : "unchecked";
           return (
             <tr
               key={key}
-              className={`cursor-pointer ${rowBg}`}
+              data-selected={row.selected}
+              className="cursor-pointer"
               onClick={() => onSelectRow(row)}
             >
               <td className="border border-border px-3 py-2 text-[13px]">

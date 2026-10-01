@@ -557,8 +557,10 @@ function itemDiscountToDto(form: ProgramFormState): Partial<CreatePromotionReque
   const isGroup = form.goodsDiscountScope === GoodsDiscountScope.GROUP;
   const isFixedPrice = form.goodsDiscountMethod === GoodsDiscountMethod.FIXED_PRICE;
 
+  // Lọc cả dòng có id mà không có mã: dòng cũ lưu nhầm loại (PRODUCT trỏ id item)
+  // không phân giải được, hiện trống trên lưới và nếu không lọc sẽ bị lưu lại mãi.
   const rewardLines: PromotionLineInput[] = form.goodsDiscountRows
-    .filter((r) => r.targetId)
+    .filter((r) => r.targetId && r.code.trim() !== "")
     .map((r, i) => ({
       role: PromotionLineRole.REWARD,
       targetType: isGroup ? PromotionTargetType.CATEGORY : r.targetType,

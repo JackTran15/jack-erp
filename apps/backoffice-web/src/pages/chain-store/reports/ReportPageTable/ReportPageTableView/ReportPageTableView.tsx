@@ -453,9 +453,8 @@ export function ReportPageTableView({ rows, totals }: Props) {
                 ...row.getCenterVisibleCells(),
                 ...row.getRightVisibleCells(),
               ];
-              const rowBg = rowIndex % 2 === 0 ? "bg-background" : "bg-muted/20";
-              // Nền đục cho cột cố định (cùng màu với dòng): bg-muted/20 là nền trong suốt,
-              // khi cuộn ngang nội dung cột khác sẽ lộ chồng lên — dùng màu đặc để che.
+              // Nền dòng và nền đục của cột cố định cùng đọc --row-bg (token `--table-row-*`
+              // dùng chung với BaseDataTable): sọc trắng/xám, hover xanh, kể cả cột ghim.
               // Giá trị gốc của --row-bg PHẢI đặt bằng class (không inline style):
               // inline style luôn thắng mọi CSS class kể cả :hover trên cùng property/
               // element, nên nếu đặt --row-bg gốc bằng inline thì class hover bên dưới
@@ -463,8 +462,8 @@ export function ReportPageTableView({ rows, totals }: Props) {
               // class + :hover) có specificity cao hơn base (1 lớp), luôn thắng đúng như ý.
               const rowBgVarClass =
                 rowIndex % 2 === 0
-                  ? "[--row-bg:hsl(var(--background))]"
-                  : "[--row-bg:color-mix(in_srgb,hsl(var(--muted))_20%,hsl(var(--background)))]";
+                  ? "[--row-bg:hsl(var(--table-row-even))]"
+                  : "[--row-bg:hsl(var(--table-row-odd))]";
               const pinnedBg = "var(--row-bg)";
               // "Kết quả kinh doanh": rows là danh mục "Khoản mục" cố định do BE
               // tính, không phải 1 dòng/1 entity — BE gửi kèm `indentLevel`/`bold`
@@ -476,7 +475,7 @@ export function ReportPageTableView({ rows, totals }: Props) {
               return (
                 <tr
                   key={row.id}
-                  className={`${rowBg} ${rowBgVarClass} ${isBold ? "font-semibold" : ""} hover:bg-info-subtle/70 hover:[--row-bg:theme(colors.info.subtle)]`}
+                  className={`bg-[var(--row-bg)] ${rowBgVarClass} ${isBold ? "font-semibold" : ""} hover:[--row-bg:hsl(var(--table-row-hover))]`}
                 >
                   {cells.map((cell, cellIndex) => {
                     const col = configById.get(cell.column.id);

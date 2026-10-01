@@ -66,6 +66,13 @@
     --destructive-foreground: 0 0% 100%;
     --destructive-subtle: 4 70% 95%;
 
+    /* Dòng bảng (BaseDataTable, LineItemGrid): sọc trắng/xám, hover xanh, chọn tím */
+    --table-row-even: 0 0% 100%;
+    --table-row-odd: 220 14% 93%;
+    --table-row-hover: 214 95% 93%;
+    --table-row-selected: 262 83% 92%;
+    --table-row-selected-edge: 262 70% 55%;
+
     --sidebar-background: 227 50% 26%; /* #223065 */
     --sidebar-foreground: 0 0% 100%;
     --sidebar-muted-foreground: 228 22% 76%;
@@ -117,6 +124,12 @@
     --destructive: 2 68% 66%;
     --destructive-foreground: 2 40% 10%;
     --destructive-subtle: 2 30% 19%;
+
+    --table-row-even: 230 35% 12%;
+    --table-row-odd: 230 28% 16%;
+    --table-row-hover: 214 55% 24%;
+    --table-row-selected: 262 40% 28%;
+    --table-row-selected-edge: 262 80% 72%;
 
     --sidebar-background: 228 52% 15%;
     --sidebar-foreground: 225 18% 86%;
@@ -170,6 +183,12 @@
     --destructive-foreground: 210 40% 98%;
     --destructive-subtle: 0 90% 95%;
 
+    --table-row-even: 0 0% 100%;
+    --table-row-odd: 220 14% 93%;
+    --table-row-hover: 214 95% 93%;
+    --table-row-selected: 262 83% 92%;
+    --table-row-selected-edge: 262 70% 55%;
+
     --sidebar-background: 221 39% 11%;
     --sidebar-foreground: 0 0% 100%;
     --sidebar-muted-foreground: 218 11% 65%;
@@ -199,6 +218,34 @@
     @apply bg-background text-foreground;
     font-family: "Roboto", roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   }
+}
+
+/* Bảng tự viết (`<table className="erp-data-table">`): cùng token dòng với BaseDataTable.
+   `:where()` giữ specificity 0 nên class trạng thái trên <tr> (vd `bg-destructive-subtle`)
+   vẫn thắng sọc. Ô ghim / ô nền đục trong tbody dùng `hsl(var(--row-bg))`.
+   Không bọc @layer: Tailwind loại rule trong layer nếu chưa thấy class trong content. */
+:where(.erp-data-table > tbody > tr) {
+  --row-bg: var(--table-row-even);
+  background-color: hsl(var(--row-bg));
+}
+:where(.erp-data-table > tbody > tr:nth-child(even)) {
+  --row-bg: var(--table-row-odd);
+}
+:where(.erp-data-table > tbody > tr:hover) {
+  --row-bg: var(--table-row-hover);
+}
+:where(.erp-data-table > tbody > tr[data-selected="true"]),
+:where(.erp-data-table > tbody > tr[aria-selected="true"]) {
+  --row-bg: var(--table-row-selected);
+}
+:where(.erp-data-table > tbody > tr[data-selected="true"], .erp-data-table > tbody > tr[aria-selected="true"]) > td:first-child {
+  box-shadow: inset 3px 0 0 0 hsl(var(--table-row-selected-edge));
+}
+/* Ô nhập trong dòng bảng mang nền mặc định `bg-background` (vd `@erp/ui` Input) thì
+   trong suốt để thấy sọc/hover/chọn — như LineItemGrid (`bg-transparent`). Specificity
+   phải cao hơn utility `.bg-background`; input disabled hoặc có màu trạng thái khác giữ nguyên. */
+.erp-data-table > tbody > tr > td :is(input, select, textarea).bg-background:not(:disabled) {
+  background-color: transparent;
 }
 
 @layer utilities {

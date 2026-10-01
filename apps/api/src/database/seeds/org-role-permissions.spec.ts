@@ -1,4 +1,4 @@
-import { reportPermissionsOfDomain } from '@erp/shared-interfaces';
+import { PERMISSION_LABELS_VI, reportPermissionsOfDomain } from '@erp/shared-interfaces';
 import { PERMISSION_SEEDS } from '../../modules/rbac/permissions.seed';
 import {
   BRANCH_MANAGER_PERMISSION_KEYS,
@@ -591,6 +591,29 @@ describe('cash-fund report grants', () => {
     for (const keys of [WAREHOUSE_PERMISSION_KEYS, SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS]) {
       expect(keys).not.toContain('reporting.cash.read');
       for (const key of reportPermissionsOfDomain('cash')) expect(keys).not.toContain(key);
+    }
+  });
+});
+
+describe('member points permission seeds (2026100101 T-01-01)', () => {
+  const POINT_KEYS = ['customer.points.adjust', 'customer.points.history.read'];
+
+  it('registers both keys under the customer module with a Vietnamese label (AC-14)', () => {
+    for (const key of POINT_KEYS) {
+      expect(PERMISSION_SEEDS.find((p) => p.key === key)?.module).toBe('customer');
+      expect(PERMISSION_LABELS_VI[key]).toBeTruthy();
+    }
+  });
+
+  it('gives both keys to SYSTEM_ADMIN, GENERAL_MANAGER and BRANCH_MANAGER', () => {
+    for (const keys of [SYSTEM_ADMIN_PERMISSION_KEYS, GENERAL_MANAGER_PERMISSION_KEYS, BRANCH_MANAGER_PERMISSION_KEYS]) {
+      for (const key of POINT_KEYS) expect(keys).toContain(key);
+    }
+  });
+
+  it('keeps both keys off SALES, CASHIER and WAREHOUSE (A-06)', () => {
+    for (const keys of [SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS, WAREHOUSE_PERMISSION_KEYS]) {
+      for (const key of POINT_KEYS) expect(keys).not.toContain(key);
     }
   });
 });

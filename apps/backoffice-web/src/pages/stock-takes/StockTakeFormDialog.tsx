@@ -1945,7 +1945,7 @@ export function StockTakeFormDialog({
               </>
             ) : (
               <div className="min-h-[190px] flex-1 overflow-auto border-b">
-                <table className="w-full border-collapse text-sm">
+                <table className="erp-data-table w-full border-collapse text-sm">
                   <thead className="bg-muted/50">
                     <tr className="border-b">
                       <th className="border-r px-3 py-2 text-center font-semibold">
@@ -1964,7 +1964,7 @@ export function StockTakeFormDialog({
                     {members.map((member, memberIndex) => (
                       <tr
                         key={member.id ?? `member-${memberIndex}`}
-                        className="h-10 border-b bg-info-subtle/40"
+                        className="h-10 border-b"
                       >
                         {(["fullName", "title", "representative"] as const).map(
                           (key) => (

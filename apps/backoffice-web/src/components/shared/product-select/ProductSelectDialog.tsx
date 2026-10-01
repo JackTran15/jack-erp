@@ -623,7 +623,7 @@ export function ProductSelectDialog({
         {/* Table */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
           <div className="min-h-0 flex-1 overflow-auto">
-            <table className="w-full text-sm">
+            <table className="erp-data-table w-full text-sm">
               <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground [&_th]:bg-muted">
                 <tr>
                   <th className="w-8 px-2 py-2" />
@@ -896,7 +896,7 @@ function ProductOrOrphanRow({
 }: ProductOrOrphanRowProps) {
   if (row.type === "orphan") {
     return (
-      <tr className="hover:bg-muted/40">
+      <tr data-selected={selectedItemIds.has(row.id)}>
         <td className="w-8 px-2 py-2 text-muted-foreground/40 text-center select-none">
           —
         </td>
@@ -940,7 +940,7 @@ function ProductOrOrphanRow({
 
   return (
     <>
-      <tr className="bg-background hover:bg-muted/20 font-medium">
+      <tr className="font-medium" data-selected={checked}>
         <td className="w-8 px-2 py-2 text-center">
           <button
             type="button"
@@ -1109,7 +1109,7 @@ function VariantRowsWithCache({
   return (
     <>
       {rows.map((v) => (
-        <tr key={v.id} className="bg-muted/20 hover:bg-muted/40">
+        <tr key={v.id} data-selected={selectedItemIds.has(v.id)}>
           <td className="w-8 px-2" />
           <td className="w-8 px-2 py-1.5">
             <input

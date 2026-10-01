@@ -897,6 +897,9 @@ export function CrudListPage({
         emptyLabel="Không có bản ghi."
         getRowKey={(row) => String(row[config.idField])}
         onRowClick={handleRowClick}
+        isRowSelected={(row) =>
+          selectedRecordIds.has(String(row[config.idField]))
+        }
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSort={v2 ? undefined : handleSort}

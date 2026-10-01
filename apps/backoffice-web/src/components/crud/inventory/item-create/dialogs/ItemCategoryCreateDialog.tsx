@@ -173,7 +173,7 @@ export function ItemCategoryCreateDialog({
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-auto rounded-md border">
-              <table className="w-full text-sm">
+              <table className="erp-data-table w-full text-sm">
                 <thead className="bg-muted/50 text-xs uppercase">
                   <tr>
                     <th className="px-3 py-2 text-left">Vị trí công việc</th>

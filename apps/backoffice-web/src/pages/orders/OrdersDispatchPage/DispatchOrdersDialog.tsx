@@ -225,7 +225,7 @@ export function DispatchOrdersDialog({
         autoHeight
       >
         <div className="max-h-[60vh] overflow-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="erp-data-table w-full border-collapse text-sm">
             <thead>
               <tr className="bg-muted">
                 <th className={cn(HEAD_CLASS, "w-36")}>Mã đơn</th>

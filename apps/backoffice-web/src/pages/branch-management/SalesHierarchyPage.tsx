@@ -201,7 +201,7 @@ export function SalesHierarchyPage() {
             {salesmen.length === 0 ? (
               <p style={styles.empty}>Chưa có nhân viên kinh doanh tại chi nhánh này.</p>
             ) : (
-              <table style={styles.table}>
+              <table className="erp-data-table" style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.th}>ID người dùng</th>
@@ -260,7 +260,7 @@ export function SalesHierarchyPage() {
                 Chưa có quản lý kinh doanh tại chi nhánh này.
               </p>
             ) : (
-              <table style={styles.table}>
+              <table className="erp-data-table" style={styles.table}>
                 <thead>
                   <tr>
                     <th style={styles.th}>ID người dùng</th>

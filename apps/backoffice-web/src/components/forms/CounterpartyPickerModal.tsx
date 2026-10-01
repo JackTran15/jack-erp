@@ -217,6 +217,7 @@ export function CounterpartyPickerModal({
             loading={loading}
             emptyLabel="Không có dữ liệu."
             getRowKey={(row) => counterpartyKey(row)}
+            isRowSelected={(row) => counterpartyKey(row) === selectedKey}
             onRowClick={(row) => setSelectedKey(counterpartyKey(row))}
             onRowDoubleClick={(row) => {
               onSelect(row);

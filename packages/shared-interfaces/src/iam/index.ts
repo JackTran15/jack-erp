@@ -68,6 +68,8 @@ export interface EmployeeProfileSummary {
 export interface UserListItem extends UserSummary {
   code: string | null;
   profile: EmployeeProfileSummary | null;
+  /** Roles held in the caller's organization. */
+  roleIds: string[];
   /**
    * False when the row holds permissions the caller does not — a chain manager
    * or admin seen by a branch manager. The server rejects writes on those rows

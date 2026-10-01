@@ -64,7 +64,7 @@ export function ProductSelectionGrid({ value, onChange, target }: Props) {
   return (
     <div className="rounded border border-border">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse text-sm">
+        <table className="erp-data-table w-full min-w-[640px] border-collapse text-sm">
           <thead>
             <tr className="bg-muted text-center font-bold text-foreground">
               <th className="w-[22%] border-b border-r border-border px-3 py-2">

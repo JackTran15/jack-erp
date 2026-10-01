@@ -708,6 +708,7 @@ export function TreasuryCashReceiptsPage() {
           loading={isLoading}
           emptyLabel="Không có chứng từ thu chi tiền mặt trong kỳ đã chọn."
           getRowKey={(row) => `${row.kind}-${row.id}`}
+          isRowSelected={(row) => row.id === selectedId}
           onRowClick={(row) => setSelectedId(row.id)}
           columnFilterControl={columnFilterControl}
           leadingColumn={{

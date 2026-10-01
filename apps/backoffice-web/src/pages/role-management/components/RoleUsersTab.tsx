@@ -1,5 +1,5 @@
 import { Button } from "@erp/ui";
-import type { UserDetail } from "@erp/shared-interfaces";
+import type { UserListItem } from "@erp/shared-interfaces";
 import { Check, Trash2 } from "lucide-react";
 import {
   BaseDataTable,
@@ -8,11 +8,11 @@ import {
 import { joinFullName, userDisplayCode } from "../../../lib/iam";
 
 interface RoleUsersTabProps {
-  users: UserDetail[];
+  users: UserListItem[];
   loading?: boolean;
   canAssign?: boolean;
   onChoose: () => void;
-  onRemove: (user: UserDetail) => void;
+  onRemove: (user: UserListItem) => void;
 }
 
 export function RoleUsersTab({
@@ -22,7 +22,7 @@ export function RoleUsersTab({
   onChoose,
   onRemove,
 }: RoleUsersTabProps) {
-  const columns: TableColumn<UserDetail>[] = [
+  const columns: TableColumn<UserListItem>[] = [
     {
       key: "code",
       label: "Mã / email",

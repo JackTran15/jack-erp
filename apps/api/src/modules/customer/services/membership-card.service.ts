@@ -11,6 +11,9 @@ import { MembershipCardEntity, MembershipTier } from '../membership-card.entity'
 import { PointHistoryEntity, PointType } from '../point-history.entity';
 import { IssueMembershipCardDto } from '../dto/issue-membership-card.dto';
 import { AdjustPointsDto } from '../dto/adjust-points.dto';
+import { SetPointsBalanceDto } from '../dto/set-points-balance.dto';
+import { PointHistoryPageDto } from '../dto/point-history.response.dto';
+import { CustomerEntity } from '../customer.entity';
 import { POINT_EARN_VND_PER_POINT } from '../loyalty.constants';
 import { generateMembershipCardNumber } from '../membership-card.utils';
 
@@ -119,6 +122,46 @@ export class MembershipCardService {
 
     const updated = await this.cardRepo.findOne({ where: { id: cardId } });
     return updated!;
+  }
+
+  /**
+   * Đặt số dư điểm của khách về `dto.points` (ADR-01). Chênh lệch được ghi thành một
+   * dòng ADJUST trong sổ cái; thẻ bị khoá dòng nên không đua với tích/dùng điểm từ POS.
+   * Số dư không đổi thì không ghi gì.
+   */
+  async setBalance(
+    customerId: string,
+    dto: SetPointsBalanceDto,
+    actor: ActorContext,
+  ): Promise<{ cardId: string; points: number }> {
+    return this.dataSource.transaction(async (manager) => {
+      const customer = await manager.findOne(CustomerEntity, {
+        where: { id: customerId, organizationId: actor.organizationId },
+        select: { id: true },
+      });
+      if (!customer) throw new NotFoundException('Không tìm thấy khách hàng');
+
+      const card = await manager.findOne(MembershipCardEntity, {
+        where: { customerId, organizationId: actor.organizationId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!card) throw new NotFoundException('Khách hàng chưa có thẻ thành viên');
+
+      const delta = dto.points - card.points;
+      if (delta === 0) return { cardId: card.id, points: card.points };
+
+      await manager.update(MembershipCardEntity, { id: card.id }, { points: dto.points });
+      await manager.insert(PointHistoryEntity, {
+        cardId: card.id,
+        type: PointType.ADJUST,
+        delta,
+        note: dto.note,
+        organizationId: actor.organizationId,
+        branchId: actor.branchId,
+        createdBy: actor.userId,
+      });
+      return { cardId: card.id, points: dto.points };
+    });
   }
 
   async awardPointsForInvoice(
@@ -336,6 +379,62 @@ export class MembershipCardService {
       createdBy: actor.userId,
     });
     return applied;
+  }
+
+  /**
+   * Lịch sử điểm theo khách hàng, mới nhất trước, kèm mã hóa đơn và tên người thực
+   * hiện. Khách chưa có thẻ trả trang rỗng để tab lịch sử không báo lỗi.
+   */
+  async getHistoryByCustomer(
+    customerId: string,
+    actor: ActorContext,
+    page = 1,
+    limit = 20,
+  ): Promise<PointHistoryPageDto> {
+    page = Math.max(1, page);
+    limit = Math.min(Math.max(1, limit), 100);
+    const qb = this.historyRepo
+      .createQueryBuilder('ph')
+      .innerJoin(
+        MembershipCardEntity,
+        'mc',
+        'mc.id = ph.card_id AND mc.customer_id = :customerId AND mc.organization_id = :org',
+        { customerId, org: actor.organizationId },
+      )
+      .leftJoin('invoices', 'i', 'i.id = ph.invoice_id')
+      .leftJoin('users', 'u', 'u.id::text = ph.created_by');
+
+    const [total, rows] = await Promise.all([
+      qb.clone().getCount(),
+      qb
+        .clone()
+        .select([
+          'ph.id AS id',
+          'ph.created_at AS "createdAt"',
+          'ph.type AS type',
+          'ph.delta AS delta',
+          'ph.invoice_id AS "invoiceId"',
+          'i.code AS "invoiceCode"',
+          'ph.note AS note',
+          `NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS "createdByName"`,
+        ])
+        .orderBy('ph.created_at', 'DESC')
+        .addOrderBy('ph.id', 'DESC')
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .getRawMany(),
+    ]);
+
+    return {
+      data: rows.map((r) => ({
+        ...r,
+        createdAt: new Date(r.createdAt).toISOString(),
+        delta: Number(r.delta),
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   async getPointHistory(

@@ -1,14 +1,14 @@
 import { cn } from "@erp/ui";
-import type { RoleSummary, UserDetail } from "@erp/shared-interfaces";
+import type { RoleSummary, UserListItem } from "@erp/shared-interfaces";
 import { RoleUsersTab } from "./RoleUsersTab";
 
 interface RoleDetailPanelProps {
   role: RoleSummary | null;
-  users: UserDetail[];
+  users: UserListItem[];
   usersLoading?: boolean;
   canAssign?: boolean;
   onChoose: () => void;
-  onRemoveUser: (user: UserDetail) => void;
+  onRemoveUser: (user: UserListItem) => void;
 }
 
 export function RoleDetailPanel({

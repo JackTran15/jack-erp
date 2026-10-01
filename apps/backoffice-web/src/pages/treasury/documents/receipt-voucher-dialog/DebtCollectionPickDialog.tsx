@@ -434,6 +434,7 @@ export function DebtCollectionPickDialog({
         loading={loading}
         emptyLabel="Chưa có dữ liệu — chọn đối tượng và bấm Lấy dữ liệu."
         getRowKey={(r) => r.debtId ?? r.documentNo}
+        isRowSelected={(r) => r.selected}
         leadingColumn={{
           width: 40,
           header: (

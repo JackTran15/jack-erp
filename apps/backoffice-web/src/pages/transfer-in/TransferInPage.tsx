@@ -559,6 +559,7 @@ export function TransferInPage() {
         emptyLabel="Không có phiếu điều chuyển phù hợp."
         getRowKey={(row) => row.id}
         onRowClick={selectOnlyRow}
+        isRowSelected={(row) => selectedIds.has(row.id) || row.id === selectedId}
         onRowDoubleClick={(row) => {
           if (isReceivableTransfer(row)) openReceiptFor(row);
         }}

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Delete,
   Param,
   Body,
@@ -29,6 +30,8 @@ import { CreateCustomerDto, UpdateCustomerDto, MergeCustomerDto } from './dto';
 import { CreateCustomerGroupDto } from './dto/create-customer-group.dto';
 import { IssueMembershipCardDto } from './dto/issue-membership-card.dto';
 import { AdjustPointsDto } from './dto/adjust-points.dto';
+import { SetPointsBalanceDto } from './dto/set-points-balance.dto';
+import { PointHistoryPageDto } from './dto/point-history.response.dto';
 
 @Controller('customers')
 @UseInterceptors(AuditInterceptor)
@@ -221,6 +224,27 @@ export class CustomerController {
     @Actor() actor: ActorContext,
   ) {
     return this.membershipCardService.updateCard(customerId, dto, actor);
+  }
+
+  @Get(':id/point-history')
+  @RequirePermission('customer.points.history.read')
+  getPointHistoryByCustomer(
+    @Param('id', ParseUUIDPipe) customerId: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Actor() actor: ActorContext,
+  ): Promise<PointHistoryPageDto> {
+    return this.membershipCardService.getHistoryByCustomer(customerId, actor, page, limit);
+  }
+
+  @Put(':id/membership-card/points')
+  @RequirePermission('customer.points.adjust')
+  setPointsBalance(
+    @Param('id', ParseUUIDPipe) customerId: string,
+    @Body() dto: SetPointsBalanceDto,
+    @Actor() actor: ActorContext,
+  ) {
+    return this.membershipCardService.setBalance(customerId, dto, actor);
   }
 
   private parseFilters(raw: string): Record<string, any> {

@@ -166,6 +166,7 @@ export function BranchManagementPage() {
           loading={query.isFetching}
           emptyLabel="Không có cửa hàng nào phù hợp với bộ lọc."
           getRowKey={(r) => r.id}
+          isRowSelected={(r) => r.id === selectedId}
           leadingColumn={{
             width: 44,
             header: null,

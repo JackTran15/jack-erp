@@ -569,6 +569,7 @@ export function ItemLocationsPage() {
           emptyLabel="Không có dữ liệu"
           getRowKey={(row) => row.id}
           onRowClick={(row) => setSelectedId(row.id)}
+          isRowSelected={(row) => row.id === selectedId}
           onRowDoubleClick={(row) =>
             setDialogState({ mode: "edit", initial: row })
           }

@@ -60,7 +60,7 @@ export function ConversionUnitsTable({ rows, setRows }: Props) {
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="erp-data-table w-full text-xs">
           <thead className="bg-muted/50 uppercase">
             <tr>
               <th className="px-2 py-2 text-left">Tên đơn vị tính</th>

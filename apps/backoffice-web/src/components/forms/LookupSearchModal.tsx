@@ -260,7 +260,7 @@ export function LookupSearchModal<T>({
 
         {/* Table */}
         <div className="relative min-h-0 flex-1 overflow-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="erp-data-table w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
               <tr>
                 {columns.map((col) => (
@@ -283,10 +283,8 @@ export function LookupSearchModal<T>({
                 return (
                   <tr
                     key={k}
-                    className={cn(
-                      "cursor-pointer border-b",
-                      isSelected ? "bg-primary/10" : "hover:bg-muted/40",
-                    )}
+                    data-selected={isSelected}
+                    className="cursor-pointer border-b"
                     onClick={() => setSelectedKey(k)}
                     onDoubleClick={() => {
                       onSelect(item);

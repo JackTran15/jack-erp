@@ -55,7 +55,7 @@ export function ProductImageTable({
   const showSkeleton = loading && rows.length === 0;
 
   return (
-    <table className="w-full border-collapse text-sm">
+    <table className="erp-data-table w-full border-collapse text-sm">
       <thead className="sticky top-0 z-10 bg-muted text-left [&_th]:bg-muted">
         <tr>
           <th className={`w-48 ${HEADER_CELL}`}>Mã SKU</th>

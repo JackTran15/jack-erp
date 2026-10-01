@@ -58,7 +58,7 @@ export function InventoryReportPage() {
 
       {data.length > 0 && (
         <div style={styles.tableWrap}>
-          <table style={styles.table}>
+          <table className="erp-data-table" style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>ID mặt hàng</th>

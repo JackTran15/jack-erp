@@ -49,7 +49,7 @@ export function CashCountDetailPanel({ record }: Props) {
         </div>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full border-collapse text-sm">
+          <table className="erp-data-table w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-muted [&_th]:bg-muted">
               <tr>
                 <th className="border-b border-r px-3 py-2 text-left font-medium">

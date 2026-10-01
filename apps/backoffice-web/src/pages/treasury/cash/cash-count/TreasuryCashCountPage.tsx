@@ -376,6 +376,7 @@ export function TreasuryCashCountPage() {
           loading={isLoading}
           emptyLabel="Không có phiếu kiểm kê trong kỳ đã chọn."
           getRowKey={(r) => r.id}
+          isRowSelected={(r) => r.id === selectedId}
           onRowClick={(r) => setSelectedId(r.id)}
           columnFilterControl={columnFilterControl}
           leadingColumn={{
