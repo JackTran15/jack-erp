@@ -1,7 +1,7 @@
 /**
  * Test double for the `invoice_items` repository, covering only what
- * `loadSignedLineDiscounts` asks of it: a grouped, `direction`-signed sum of
- * `lineDiscount + promotionDiscount` per invoice.
+ * `loadSignedLineMoney` asks of it: grouped, `direction`-signed sums of
+ * `quantity × unitPrice` and `lineDiscount + promotionDiscount` per invoice.
  *
  * Lives beside the production code rather than under a spec so the four report
  * specs that need it share one definition. It is not imported by anything that
@@ -16,6 +16,8 @@ import {
 export interface FakeLine {
   invoiceId: string;
   direction?: ItemDirection;
+  quantity?: number;
+  unitPrice?: number;
   lineDiscount?: number;
   promotionDiscount?: number;
 }
@@ -36,18 +38,21 @@ export function fakeLineItemsRepo(
         setParameter: () => qb,
         groupBy: () => qb,
         getRawMany: () => {
-          const sums = new Map<string, number>();
+          const sums = new Map<string, { gross: number; amount: number }>();
           for (const l of lines) {
             if (!ids.includes(l.invoiceId)) continue;
             const sign = l.direction === ItemDirection.IN ? -1 : 1;
-            const amount =
-              Number(l.lineDiscount ?? 0) + Number(l.promotionDiscount ?? 0);
-            sums.set(l.invoiceId, (sums.get(l.invoiceId) ?? 0) + sign * amount);
+            const cur = sums.get(l.invoiceId) ?? { gross: 0, amount: 0 };
+            cur.gross += sign * Number(l.quantity ?? 0) * Number(l.unitPrice ?? 0);
+            cur.amount +=
+              sign * (Number(l.lineDiscount ?? 0) + Number(l.promotionDiscount ?? 0));
+            sums.set(l.invoiceId, cur);
           }
           return Promise.resolve(
-            [...sums].map(([invoiceId, amount]) => ({
+            [...sums].map(([invoiceId, v]) => ({
               invoiceId,
-              amount: String(amount),
+              gross: String(v.gross),
+              amount: String(v.amount),
             })),
           );
         },

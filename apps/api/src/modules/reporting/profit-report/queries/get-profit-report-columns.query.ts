@@ -7,5 +7,7 @@ export class GetProfitReportColumnsQuery {
     public readonly actor: ActorContext,
     /** Only used by profit-by-item ("Thống kê theo": item | parent | group). */
     public readonly statBy?: ReportGroupBy,
+    /** Only used by business-results-vouchers (thu vs chi labels). */
+    public readonly otherLineDirection?: 'in' | 'out',
   ) {}
 }

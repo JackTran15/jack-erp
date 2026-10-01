@@ -63,6 +63,9 @@ export enum REPORT_FILTERS_LINE {
     // "Thống kê theo" của #6 — bucket thời gian Ngày/Tuần/Tháng/Quý/Năm (A-13).
     // Không dùng lại STATISTIC_BY: nó map `statBy` (nhóm hàng), không phải `timeBucket`.
     TIME_BUCKET = 'time_bucket',
+    // Phạm vi của dialog chi tiết "Kết quả kinh doanh" (dòng vừa click): chiều
+    // thu/chi + mục, hoặc chiều giá vốn. Chỉ drill-down set; không báo cáo nào vẽ nó.
+    PROFIT_DRILL_SCOPE = 'profit_drill_scope',
 }
 
 /**
@@ -245,5 +248,9 @@ export const REPORT_FILTERS_LINE_METADATA = {
     [REPORT_FILTERS_LINE.TIME_BUCKET]: {
         label: 'thống kê theo',
         backendField: 'timeBucket',
+    },
+    [REPORT_FILTERS_LINE.PROFIT_DRILL_SCOPE]: {
+        label: 'phạm vi chi tiết',
+        backendField: 'otherLineDirection',
     },
 }

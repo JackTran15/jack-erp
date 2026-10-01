@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { STORE_TYPE } from "../../../../constants/store.constant";
 import { useBranchStore } from "../../../../store/common/branch/branch.store";
 import { useTableStore } from "../../../../store/common/table-store/table.context";
 import { useReportStore } from "../../../../store/page-stores/report/report.context";
@@ -13,7 +14,10 @@ export function ReportPageTable() {
   const appliedRequest = useReportStore((s) => s.appliedRequest);
   const reloadNonce = useReportStore((s) => s.reloadNonce);
   const branch = useReportStore((s) => s.branch);
-  const activeBranchId = useBranchStore((s) => s.branchId);
+  // Chuỗi cửa hàng: không có chi nhánh header — `branchId` của store vẫn giữ
+  // chi nhánh chọn trước đó, gửi nó đi sẽ thu báo cáo chuỗi về một chi nhánh.
+  const headerBranchId = useBranchStore((s) => s.branchId);
+  const activeBranchId = branch === STORE_TYPE.CHAIN ? null : headerBranchId;
 
   const columnIds = useMemo(
     () => config.columns.map((c) => c.column),

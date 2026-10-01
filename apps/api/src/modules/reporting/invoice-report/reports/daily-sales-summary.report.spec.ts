@@ -68,6 +68,13 @@ function makeReport(opts: {
     invoiceId: i.id,
     direction: i.type === InvoiceType.RETURN ? ItemDirection.IN : ItemDirection.OUT,
     promotionDiscount: Number(i.discountAmount ?? 0),
+    // One line carrying the whole goods value. No lineDiscount, so gross equals
+    // the header subtotal (Σ lineTotal) — the report's "Tiền hàng".
+    quantity: 1,
+    unitPrice:
+      i.type === InvoiceType.EXCHANGE
+        ? Number(i.netAmount ?? 0)
+        : Number(i.subtotal ?? 0),
   }));
   return new DailySalesSummaryReport(
     invoicesRepo,

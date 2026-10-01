@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolvePeriodRange } from "@erp/ui";
 import { REPORT_CATEGORY } from "../../../constants/reports/report-category.constant";
 import { REPORT_FILTERS_LINE } from "../../../constants/reports/report-filters.constant";
 import {
@@ -152,6 +153,79 @@ describe("setReportType prunes the filter bar", () => {
     store.getState().actions.setReportType(WITHOUT_BRAND);
 
     expect(store.getState().appliedRequest).toBeNull();
+  });
+});
+
+describe("picking a comparison preset moves its dates", () => {
+  function profitStore() {
+    return createReportStore(
+      buildInitialReportState({
+        category: REPORT_CATEGORY.PROFIT,
+        branch: STORE_TYPE.SINGLE,
+        configs: { listReport: [REPORT_TYPE_PROFIT.BUSINESS_RESULTS] },
+        reportType: REPORT_TYPE_PROFIT.BUSINESS_RESULTS,
+      }),
+    );
+  }
+
+  it.each([
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS, REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE],
+    [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT, REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE],
+  ])("%s drives %s", (presetLine, rangeLine) => {
+    const store = profitStore();
+    store.getState().actions.setFilterValue(presetLine, "this_year");
+
+    const year = new Date().getFullYear();
+    expect(store.getState().filters[rangeLine]).toEqual({
+      fromDate: `${year}-01-01`,
+      toDate: `${year}-12-31`,
+    });
+  });
+
+  it("switches the preset to Khác when hand-edited dates match none", () => {
+    const store = profitStore();
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE, {
+        fromDate: "2001-08-01",
+        toDate: "2001-08-31",
+      });
+
+    expect(
+      store.getState().filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS],
+    ).toBe("custom");
+  });
+
+  it("picks the preset whose dates were typed in by hand", () => {
+    const store = profitStore();
+    const lastMonth = resolvePeriodRange("last_month");
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT, "this_year");
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE, {
+        fromDate: lastMonth.from,
+        toDate: lastMonth.to,
+      });
+
+    expect(
+      store.getState().filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT],
+    ).toBe("last_month");
+  });
+
+  it("leaves the dates alone on custom", () => {
+    const store = profitStore();
+    const before =
+      store.getState().filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE];
+
+    store
+      .getState()
+      .actions.setFilterValue(REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT, "custom");
+
+    expect(
+      store.getState().filters[REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE],
+    ).toEqual(before);
   });
 });
 

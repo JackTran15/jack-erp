@@ -1,5 +1,9 @@
 import { createStore, type StoreApi } from "zustand";
-import { resolvePeriodRange, type PeriodPreset } from "@erp/ui";
+import {
+  PERIOD_PRESET_OPTIONS,
+  resolvePeriodRange,
+  type PeriodPreset,
+} from "@erp/ui";
 import {
   ALWAYS_KEPT_FILTER_LINES,
   REPORT_FILTERS_LINE,
@@ -12,6 +16,55 @@ import type {
 } from "./report.interface";
 
 export type ReportStoreApi = StoreApi<ReportState>;
+
+/** Preset line -> range line it drives. */
+type PeriodRangeLine =
+  | typeof REPORT_FILTERS_LINE.RANGE_DATE
+  | typeof REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE
+  | typeof REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE;
+
+type PeriodPresetLine =
+  | typeof REPORT_FILTERS_LINE.REPORT_PERIOD
+  | typeof REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS
+  | typeof REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT;
+
+const PERIOD_RANGE_LINE: Partial<Record<string, PeriodRangeLine>> = {
+  [REPORT_FILTERS_LINE.REPORT_PERIOD]: REPORT_FILTERS_LINE.RANGE_DATE,
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS]:
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE,
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT]:
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE,
+};
+
+const RANGE_PERIOD_LINE: Partial<Record<string, PeriodPresetLine>> = {
+  [REPORT_FILTERS_LINE.RANGE_DATE]: REPORT_FILTERS_LINE.REPORT_PERIOD,
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE]:
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS,
+  [REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE]:
+    REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT,
+};
+
+/**
+ * Preset a hand-edited range still stands for: the current one if it still
+ * matches (several presets can share a range), else the first match, else
+ * "custom" ("Khác").
+ */
+function presetForRange(
+  range: { fromDate: string; toDate: string },
+  currentPreset: string | undefined,
+): PeriodPreset {
+  const matches = (preset: PeriodPreset) => {
+    const r = resolvePeriodRange(preset);
+    return r.from === range.fromDate && r.to === range.toDate;
+  };
+  if (currentPreset && currentPreset !== "custom" && matches(currentPreset as PeriodPreset)) {
+    return currentPreset as PeriodPreset;
+  }
+  const match = PERIOD_PRESET_OPTIONS.find(
+    (o) => o.value !== "custom" && matches(o.value),
+  );
+  return match?.value ?? "custom";
+}
 
 /**
  * Bộ lọc còn lại sau khi đổi sang `reportType`: những dòng báo cáo mới khai,
@@ -66,15 +119,18 @@ export function createReportStore(
         set((s) => {
           const filters = { ...s.filters, [line]: value };
           // Đổi kỳ báo cáo (preset khác "custom") -> tự cập nhật khoảng ngày.
-          if (
-            line === REPORT_FILTERS_LINE.REPORT_PERIOD &&
-            value !== "custom"
-          ) {
+          const rangeLine = PERIOD_RANGE_LINE[line];
+          if (rangeLine && value && value !== "custom") {
             const range = resolvePeriodRange(value as PeriodPreset);
-            filters[REPORT_FILTERS_LINE.RANGE_DATE] = {
-              fromDate: range.from,
-              toDate: range.to,
-            };
+            filters[rangeLine] = { fromDate: range.from, toDate: range.to };
+          }
+          // Sửa tay Từ ngày/Đến ngày -> kỳ theo khoảng ngày mới, không khớp thì "Khác".
+          const presetLine = RANGE_PERIOD_LINE[line];
+          if (presetLine) {
+            filters[presetLine] = presetForRange(
+              value as { fromDate: string; toDate: string },
+              s.filters[presetLine],
+            );
           }
           // Đổi cửa hàng -> kho đã chọn có thể thuộc cửa hàng khác: reset.
           if (line === REPORT_FILTERS_LINE.STORE) {

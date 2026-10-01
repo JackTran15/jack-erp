@@ -18,6 +18,9 @@ export interface ProfitReportFilterPayload {
   branchId?: string;
   categoryId?: string;
   statBy?: "item" | "parent" | "group";
+  otherLineDirection?: "in" | "out";
+  voucherCategoryId?: string;
+  cogsDirection?: "in" | "out";
 }
 
 export interface ProfitReportSearchPayload {
@@ -34,10 +37,11 @@ export interface ProfitReportSearchPayload {
 export async function fetchProfitReportColumns(
   reportType: string,
   statBy?: "item" | "parent" | "group",
+  otherLineDirection?: "in" | "out",
 ): Promise<InvoiceReportColumnsResult> {
   return requireErpData(
     await erpApi.GET<InvoiceReportColumnsResult>("/reports/profit/columns", {
-      params: { query: { reportType, statBy } },
+      params: { query: { reportType, statBy, otherLineDirection } },
     }),
   );
 }
@@ -78,6 +82,10 @@ export function buildProfitSearchFilters(
   if (notAll(statBy)) payload.statBy = statBy as "item" | "parent" | "group";
   if (notAll(storeInChain)) payload.branchId = storeInChain;
   else if (opts.activeBranchId) payload.branchId = opts.activeBranchId;
+  const drill = filters[REPORT_FILTERS_LINE.PROFIT_DRILL_SCOPE];
+  if (drill?.otherLineDirection) payload.otherLineDirection = drill.otherLineDirection;
+  if (drill?.voucherCategoryId) payload.voucherCategoryId = drill.voucherCategoryId;
+  if (drill?.cogsDirection) payload.cogsDirection = drill.cogsDirection;
   return payload;
 }
 

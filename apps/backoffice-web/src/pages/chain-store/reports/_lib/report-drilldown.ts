@@ -23,6 +23,7 @@ import { REPORT_FILTERS_LINE } from "../../../../constants/reports/report-filter
 import {
   REPORT_TYPE_CASH_FUND,
   REPORT_TYPE_INVENTORY,
+  REPORT_TYPE_PROFIT,
   REPORT_TYPE_SALES,
 } from "../../../../constants/reports/report-type.constant";
 import type {
@@ -466,6 +467,122 @@ const expenseListForBucket: DrillDownResolver = ({ row, filters }) => {
   };
 };
 
+/**
+ * Ô "Kỳ trước" / "Kỳ hiện tại" của "Kết quả kinh doanh" → báo cáo chi tiết của
+ * đúng dòng đó, trong đúng kỳ của cột vừa click.
+ *
+ * - 2.1 "Thu từ bán hàng" → "Bảng kê hóa đơn" (cần quyền báo cáo bán hàng —
+ *   dialog gọi API báo cáo bán hàng; thiếu quyền thì ô là text).
+ * - 3.1 / 3.1.1 / 3.1.2 → "Chi tiết chi phí giá vốn hàng hóa" (cả hai chiều /
+ *   xuất bán / nhập trả).
+ * - 2.2 / 3.2 và từng mục con → "Chi tiết thu/chi tiền theo mục".
+ *
+ * Hai báo cáo chi tiết đọc cùng tập dòng với báo cáo cha ở BE
+ * (`BusinessResultsSource`), nên dòng tổng của dialog bằng ô vừa click.
+ * Ô bằng 0 không mở — dialog sẽ trống.
+ */
+const BUSINESS_RESULTS_COGS_LINES: Record<string, "in" | "out" | undefined> = {
+  cogs: undefined,
+  cogsOut: "out",
+  cogsReturnedIn: "in",
+};
+
+const OTHER_LINE_GROUPS: Record<string, "in" | "out"> = {
+  otherIncome: "in",
+  otherExpenseGroup: "out",
+};
+const OTHER_LINE_CATEGORY = /^(otherIncomeCategory|otherExpenseCategory):(.+)$/;
+
+/** "3.2.5 Tiền thuê cửa hàng" → "Tiền thuê cửa hàng". */
+const lineName = (label: unknown): string =>
+  (text(label) ?? "").replace(/^[IVX]+\.\s*|^[\d.]+\s*/, "").replace(/\s*\(.*\)$/, "");
+
+const businessResultsCell =
+  (period: "previous" | "current"): DrillDownResolver =>
+  ({ raw, row, filters, can }) => {
+    if (!Number(raw)) return null;
+    const lineKey = text(row["lineKey"]);
+    if (!lineKey) return null;
+    const range =
+      filters[
+        period === "previous"
+          ? REPORT_FILTERS_LINE.PERIOD_COMPARE_PREVIOUS_RANGE
+          : REPORT_FILTERS_LINE.PERIOD_COMPARE_CURRENT_RANGE
+      ];
+    if (!range?.fromDate || !range?.toDate) return null;
+
+    const periodText = ` Từ ${formatVnDate(range.fromDate)} đến ${formatVnDate(range.toDate)}`;
+    const storeInChain = filters[REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL];
+    const scoped = {
+      [REPORT_FILTERS_LINE.STORE_IN_CHAIN_OPTIONAL]: storeInChain,
+      [REPORT_FILTERS_LINE.REPORT_PERIOD]: "custom",
+      [REPORT_FILTERS_LINE.RANGE_DATE]: range,
+    };
+
+    if (lineKey === "salesRevenue") {
+      if (!can(REPORT_DOMAIN_PERMISSIONS.sales.floor)) return null;
+      return {
+        kind: "report",
+        drillDown: {
+          reportType: REPORT_TYPE_SALES.INVOICE_AND_ORDER_LIST,
+          title: "BẢNG KÊ HÓA ĐƠN",
+          subtitle: periodText.trim(),
+          filters: {
+            [REPORT_FILTERS_LINE.STORE]:
+              storeInChain && storeInChain !== "all"
+                ? { scope: "group", storeIds: [storeInChain] }
+                : undefined,
+            [REPORT_FILTERS_LINE.REPORT_PERIOD]: "custom",
+            [REPORT_FILTERS_LINE.RANGE_DATE]: range,
+          },
+        },
+      };
+    }
+
+    if (lineKey in BUSINESS_RESULTS_COGS_LINES) {
+      return {
+        kind: "report",
+        drillDown: {
+          reportType: REPORT_TYPE_PROFIT.BUSINESS_RESULTS_COGS,
+          title: "CHI TIẾT CHI PHÍ GIÁ VỐN HÀNG HÓA",
+          subtitle: `${lineName(row["khoanMuc"])}${periodText}`,
+          filters: {
+            ...scoped,
+            [REPORT_FILTERS_LINE.PROFIT_DRILL_SCOPE]: {
+              cogsDirection: BUSINESS_RESULTS_COGS_LINES[lineKey],
+            },
+          },
+        },
+      };
+    }
+
+    const category = OTHER_LINE_CATEGORY.exec(lineKey);
+    const direction =
+      OTHER_LINE_GROUPS[lineKey] ??
+      (category ? (category[1] === "otherIncomeCategory" ? "in" : "out") : undefined);
+    if (!direction) return null;
+    const title =
+      direction === "in" ? "CHI TIẾT THU TIỀN THEO MỤC THU" : "CHI TIẾT CHI TIỀN THEO MỤC CHI";
+    const mucLabel = direction === "in" ? "Mục thu" : "Mục chi";
+    return {
+      kind: "report",
+      drillDown: {
+        reportType: REPORT_TYPE_PROFIT.BUSINESS_RESULTS_VOUCHERS,
+        title,
+        subtitle: category
+          ? `${mucLabel} ${lineName(row["khoanMuc"])}${periodText}`
+          : `${mucLabel} Tất cả${periodText}`,
+        filters: {
+          ...scoped,
+          [REPORT_FILTERS_LINE.PROFIT_DRILL_SCOPE]: {
+            otherLineDirection: direction,
+            voucherCategoryId: category?.[2],
+          },
+        },
+      },
+    };
+  };
+
 const DRILL_DOWNS: Record<string, Record<string, DrillDownResolver>> = {
   // Giữ nguyên hành vi sẵn có: đây là hai báo cáo duy nhất có cột `invoiceCode`.
   "invoice-order-listing": { invoiceCode: invoiceDetail },
@@ -499,6 +616,12 @@ const DRILL_DOWNS: Record<string, Record<string, DrillDownResolver>> = {
     invoiceNumber: cashFundInvoiceDetail,
   },
   "expenses-by-time": { bucket: expenseListForBucket },
+  "business-results": {
+    kyTruoc: businessResultsCell("previous"),
+    kyHienTai: businessResultsCell("current"),
+  },
+  "business-results-cogs": { soHoaDon: cashFundInvoiceDetail },
+  "business-results-vouchers": { soChungTu: voucherDetail },
 };
 
 export function resolveDrillDown(

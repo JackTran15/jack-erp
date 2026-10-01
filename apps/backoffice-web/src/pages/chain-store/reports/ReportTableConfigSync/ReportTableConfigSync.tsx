@@ -40,6 +40,10 @@ export function ReportTableConfigSync() {
   // trí"/"Mã vị trí" chỉ hiện khi BE resolve được đúng 1 cửa hàng (xem BE
   // buildColumns của revenue-by-item); các báo cáo khác bỏ qua giá trị này.
   const store = useReportStore((s) => s.filters[REPORT_FILTERS_LINE.STORE]);
+  // Dialog chi tiết thu/chi của "Kết quả kinh doanh": nhãn cột theo chiều thu/chi.
+  const otherLineDirection = useReportStore(
+    (s) => s.filters[REPORT_FILTERS_LINE.PROFIT_DRILL_SCOPE]?.otherLineDirection,
+  );
   const setConfig = useTableStore((s) => s.setConfig);
   const pruneColumnFilters = useReportStore((s) => s.actions.pruneColumnFilters);
   const columnsActions = useTableStore((s) => s.columnsActions);
@@ -57,6 +61,7 @@ export function ReportTableConfigSync() {
       groupBy,
       statBy,
       store,
+      otherLineDirection,
     ],
     queryFn: () => {
       if (backendSource === "inventory") {
@@ -79,6 +84,7 @@ export function ReportTableConfigSync() {
         return fetchProfitReportColumns(
           backendKey as string,
           statBy as "item" | "parent" | "group" | undefined,
+          otherLineDirection,
         );
       }
       if (backendSource === "cash") {
