@@ -47,14 +47,14 @@ export function InvoiceDetailTotals({ detail }: Props) {
   // Rows that only exist on some invoices (a header promotion, a delivery fee,
   // points, a deposit, a later debt payment, a refund set off) show when they hold money — the rest of the time they
   // would be a column of zeros. They are what make each side add up:
-  // Tiền hàng − Khuyến mại + Phí = Tổng thanh toán, and the tenders = Khách trả.
+  // Tiền hàng − KM theo hoá đơn + Phí = Tổng thanh toán, and the tenders = Khách trả.
   return (
     <div className="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
       <div className="space-y-1">
         <TotalRow label="Tổng thanh toán" value={detail.totalAmount} bold />
         <TotalRow label="Tiền hàng" value={detail.subtotal} />
         {detail.discountAmount ? (
-          <TotalRow label="Khuyến mại" value={detail.discountAmount} />
+          <TotalRow label="KM theo hoá đơn" value={detail.discountAmount} />
         ) : null}
         {detail.shippingFee ? (
           <TotalRow label="Phí giao hàng" value={detail.shippingFee} />

@@ -83,6 +83,10 @@ export interface LedgerCashInvoiceDetail {
   lines: LedgerCashInvoiceLine[];
   totalPayment: number;
   goodsAmount: number;
+  /** Discount on the whole bill ("KM theo hoá đơn"); absent or 0 when there is none. */
+  invoiceDiscount?: number;
+  /** Delivery fee ("Phí giao hàng"); absent or 0 when there is none. */
+  shippingFee?: number;
   customerPaid?: number;
   refundToCustomer?: number;
   changeAmount?: number;

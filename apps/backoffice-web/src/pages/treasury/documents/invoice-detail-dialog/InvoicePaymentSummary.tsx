@@ -21,6 +21,19 @@ export function InvoicePaymentSummary({ detail }: Props) {
           label="Tiền hàng"
           value={formatMoneyInteger(detail.goodsAmount)}
         />
+        {/* What turns "Tiền hàng" into "Tổng thanh toán" — only when present. */}
+        {detail.invoiceDiscount ? (
+          <InvoiceDetailSummaryRow
+            label="KM theo hoá đơn"
+            value={formatMoneyInteger(detail.invoiceDiscount)}
+          />
+        ) : null}
+        {detail.shippingFee ? (
+          <InvoiceDetailSummaryRow
+            label="Phí giao hàng"
+            value={formatMoneyInteger(detail.shippingFee)}
+          />
+        ) : null}
         {isReturn && detail.returnValue != null ? (
           <InvoiceDetailSummaryRow
             label="Giá trị trả lại"

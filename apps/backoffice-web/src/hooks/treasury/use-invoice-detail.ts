@@ -72,6 +72,8 @@ export function toLedgerCashInvoiceDetail(
     })),
     totalPayment: view.totalAmount,
     goodsAmount: view.subtotal,
+    invoiceDiscount: view.discountAmount,
+    shippingFee: view.shippingFee,
     customerPaid: view.totalPaid,
     // Only the payment lines actually tendered in cash — not the whole total,
     // which would mislabel a card/transfer sale as cash.
