@@ -16,6 +16,11 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: "Tiền mặt",
   bank_transfer: "Tiền gửi (chuyển khoản)",
   card: "Thẻ",
+  deposit: "Đặt cọc",
+  points: "Điểm thanh toán",
+  debt_collection: "Thu nợ",
+  offset: "Bù trừ công nợ",
+  store_credit: "Ghi có cho khách",
 };
 
 function toPaymentBreakdown(
@@ -67,13 +72,25 @@ export function toLedgerCashInvoiceDetail(
     })),
     totalPayment: view.totalAmount,
     goodsAmount: view.subtotal,
+    invoiceDiscount: view.discountAmount,
+    shippingFee: view.shippingFee,
     customerPaid: view.totalPaid,
     // Only the payment lines actually tendered in cash — not the whole total,
     // which would mislabel a card/transfer sale as cash.
     cashAmount: view.payments
       .filter((p) => p.method === "cash")
       .reduce((sum, p) => sum + p.amount, 0),
-    payments: toPaymentBreakdown(view.payments),
+    // "Khách trả" counts points, the deposit and later debt payments (see
+    // InvoiceDetailView), so the breakdown under it lists them too or it would
+    // come up short.
+    payments: toPaymentBreakdown([
+      ...(view.depositAmount ? [{ method: "deposit", amount: view.depositAmount }] : []),
+      ...(view.pointsAmount ? [{ method: "points", amount: view.pointsAmount }] : []),
+      ...view.payments,
+      ...(view.debtCollected
+        ? [{ method: "debt_collection", amount: view.debtCollected }]
+        : []),
+    ]),
   };
 }
 

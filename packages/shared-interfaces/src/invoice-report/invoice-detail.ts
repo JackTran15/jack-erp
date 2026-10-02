@@ -27,7 +27,11 @@ export interface InvoiceDetailLine {
   note: string | null;
 }
 
-/** One payment tendered against the invoice. `method` is the raw InvoicePaymentMethod value. */
+/**
+ * One tender against the invoice. `method` is the raw InvoicePaymentMethod value
+ * (`cash`, `bank_transfer`, `card`), or on a refund `store_credit` / `offset`
+ * (set against the customer's debt).
+ */
 export interface InvoiceDetailPayment {
   method: string;
   /** Negative on a RETURN — money refunded out of the drawer. */
@@ -49,14 +53,36 @@ export interface InvoiceDetailView {
   salesChannel: string | null;
   lines: InvoiceDetailLine[];
   /**
-   * Σ line totals before invoice-level discounts ("Tiền hàng"), signed: negative
-   * for a RETURN, and the net (new − returned) for an EXCHANGE.
+   * Σ of the lines' `lineTotal` ("Tiền hàng"), before invoice-level discounts,
+   * signed: negative for a RETURN, and the net (new − returned) for an EXCHANGE.
    */
   subtotal: number;
-  /** Final amount the customer owes ("Tổng thanh toán"); negative on a RETURN. */
+  /**
+   * Discount on the whole bill ("Khuyến mại"): bill-level programmes
+   * (INVOICE_DISCOUNT, TIERED_DISCOUNT), voucher, a manual header discount. An
+   * item-level programme's discount is in that line's "Tiền KM" instead.
+   * Negative on a RETURN.
+   */
+  discountAmount: number;
+  /** Delivery fee ("Phí giao hàng"). Negative on a RETURN. */
+  shippingFee: number;
+  /**
+   * The bill ("Tổng thanh toán") = subtotal − discountAmount + shippingFee, i.e.
+   * BEFORE points and deposit, which settle it like tenders. On a refund it is
+   * minus the amount handed back.
+   */
   totalAmount: number;
-  /** Total collected across all payment lines ("Khách trả"); negative on a RETURN. */
+  /**
+   * What settled the bill ("Khách trả"): payments + debtCollected + pointsAmount
+   * + depositAmount. On a refund it is minus the amount handed back.
+   */
   totalPaid: number;
+  /** Loyalty points redeemed against the bill ("Điểm thanh toán"). Negative on a RETURN. */
+  pointsAmount: number;
+  /** Deposit taken before checkout ("Đặt cọc"). Negative on a RETURN. */
+  depositAmount: number;
+  /** Collected after checkout against the invoice's debt ("Thu nợ"); part of totalPaid. */
+  debtCollected: number;
   /** Outstanding debt = totalAmount − totalPaid ("Công nợ"). */
   debt: number;
   payments: InvoiceDetailPayment[];
