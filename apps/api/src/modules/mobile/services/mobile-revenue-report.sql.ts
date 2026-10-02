@@ -132,43 +132,46 @@ export function revenueLinesSql(params: {
 
 /**
  * Phần điểm KM của hoá đơn [invoiceAlias] rơi vào dòng [lineAlias], đã mang
- * dấu theo LOẠI hoá đơn (RETURN âm) — bản SQL của `allocateInvoicePoints`
- * (`report-core/allocate-points.util.ts`), để Tổng quan/mobile và web chia
- * cùng một cách:
+ * dấu theo LOẠI hoá đơn (RETURN âm) — bản SQL của `allocatePoints`
+ * (`report-core/allocate-points.util.ts`), chia y hệt để Tổng quan/mobile và
+ * web ra cùng từng đồng:
  *
  * - Chia theo tỉ trọng `|line_total|` trên các dòng OUT (điểm trừ vào hàng
  *   BÁN, không vào hàng trả); hoá đơn không có dòng OUT thì chia trên mọi dòng.
+ * - Làm tròn LUỸ KẾ tới đồng theo thứ tự id: dòng k nhận
+ *   ROUND(P × W≤k / W) − ROUND(P × W<k / W). Mỗi phần là số đồng chẵn, tổng
+ *   đúng bằng điểm của hoá đơn.
  * - Mọi dòng được chia đều 0 đồng → dồn cả cho dòng đầu (theo id), để tổng
  *   không mất.
- * - Tỉ trọng tính trên TOÀN BỘ dòng của hoá đơn qua truy vấn con, không qua
- *   window function: CTE `lines` còn lọc theo mặt hàng/nhóm hàng, lọc xong
- *   mới chia là thổi phồng phần của dòng còn lại.
- *
- * Không làm tròn từng dòng như bản TS (bản TS dồn phần lẻ vào dòng cuối);
- * tổng theo hoá đơn vẫn khớp đúng, từng dòng lệch dưới 1 xu.
+ * - Tỉ trọng tính trên TOÀN BỘ dòng của hoá đơn qua truy vấn con: CTE `lines`
+ *   còn lọc theo mặt hàng/nhóm hàng, lọc xong mới chia là thổi phồng phần của
+ *   dòng còn lại.
  *
  * Hoá đơn không dùng điểm (gần như tất cả) đi nhánh `THEN 0`, Postgres không
  * chạy truy vấn con.
  */
 export function pointsShareSql(lineAlias: string, invoiceAlias: string): string {
-  const out = `'${ItemDirection.OUT}'`;
-  return `(CASE WHEN ${invoiceAlias}.points_discount_amount = 0 THEN 0 ELSE
+  const p = `${invoiceAlias}.points_discount_amount`;
+  const upTo = (cmp: '<=' | '<') =>
+    `COALESCE(SUM(e.w) FILTER (WHERE e.eligible AND e.id ${cmp} ${lineAlias}.id), 0)`;
+  const all = 'SUM(e.w) FILTER (WHERE e.eligible)';
+  const rounded = (cmp: '<=' | '<') =>
+    `CASE WHEN ${upTo(cmp)} = ${all} THEN ${p} ELSE ROUND(${p} * ${upTo(cmp)} / ${all}) END`;
+  return `(CASE WHEN ${p} = 0 THEN 0 ELSE
           (CASE WHEN ${invoiceAlias}.type = '${InvoiceType.RETURN}' THEN -1 ELSE 1 END)
-          * ${invoiceAlias}.points_discount_amount
           * (SELECT CASE
-                WHEN bool_or(x.direction = ${out}) AND ${lineAlias}.direction <> ${out} THEN 0
-                WHEN COALESCE(SUM(ABS(x.line_total)) FILTER (WHERE x.direction = ${out}), 0) > 0
-                  THEN ABS(${lineAlias}.line_total)
-                       / SUM(ABS(x.line_total)) FILTER (WHERE x.direction = ${out})
-                WHEN bool_or(x.direction = ${out})
-                  THEN CASE WHEN ${lineAlias}.id = (array_agg(x.id ORDER BY x.id)
-                         FILTER (WHERE x.direction = ${out}))[1] THEN 1 ELSE 0 END
-                WHEN SUM(ABS(x.line_total)) > 0
-                  THEN ABS(${lineAlias}.line_total) / SUM(ABS(x.line_total))
-                ELSE CASE WHEN ${lineAlias}.id = (array_agg(x.id ORDER BY x.id))[1] THEN 1 ELSE 0 END
+                WHEN NOT bool_or(e.eligible AND e.id = ${lineAlias}.id) THEN 0
+                WHEN ${all} = 0
+                  THEN CASE WHEN ${lineAlias}.id = (array_agg(e.id ORDER BY e.id)
+                         FILTER (WHERE e.eligible))[1] THEN ${p} ELSE 0 END
+                ELSE (${rounded('<=')}) - (${rounded('<')})
               END
-             FROM invoice_items x
-             WHERE x.invoice_id = ${lineAlias}.invoice_id)
+             FROM (SELECT x.id,
+                          ABS(x.line_total) AS w,
+                          (x.direction = '${ItemDirection.OUT}'
+                            OR NOT bool_or(x.direction = '${ItemDirection.OUT}') OVER ()) AS eligible
+                     FROM invoice_items x
+                    WHERE x.invoice_id = ${lineAlias}.invoice_id) e)
         END)`;
 }
 

@@ -15,19 +15,30 @@
  *   points are redeemed against what is sold, not against what comes back. A
  *   pure RETURN has no OUT line, so it falls back to its IN lines.
  *
- * Rounding drift lands on the last line, so `Σ allocation === amount` exactly:
- * accountants reconcile this column against the invoice header.
+ * Shares are whole đồng — VND has no smaller unit, and a "Điểm KM" of
+ * 8.487,08 reads as a bug. They are rounded cumulatively: line k gets
+ * round(P × W≤k / W) − round(P × W<k / W), so every share is an integer and
+ * `Σ allocation === amount` exactly (accountants reconcile this column against
+ * the invoice header). Lines are taken in `id` order when they carry one, the
+ * same order `pointsShareSql` (mobile / Tổng quan) uses, so web and SQL give
+ * every line the same đồng.
  */
 import { ItemDirection } from '../../pos/entities/invoice-item.entity';
 import { InvoiceType } from '../../pos/entities/invoice.entity';
 import { invoiceTypeSign } from './report-query.util';
 
 export interface AllocatablePointsLine {
+  /** Orders the cumulative rounding; Postgres orders uuids as their lowercase hex. */
+  id?: string;
   direction: ItemDirection;
   lineTotal: number;
 }
 
-const round2 = (n: number): number => Math.round(n * 100) / 100;
+/** Half away from zero, like Postgres ROUND(numeric), so a RETURN mirrors its sale. */
+const roundDong = (n: number): number => Math.sign(n) * Math.round(Math.abs(n));
+
+const byId = <T extends AllocatablePointsLine>(a: T, b: T): number =>
+  a.id === undefined || b.id === undefined ? 0 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 
 export function allocatePoints<T extends AllocatablePointsLine>(
   amount: number,
@@ -41,26 +52,25 @@ export function allocatePoints<T extends AllocatablePointsLine>(
   if (total === 0) return out;
 
   const sold = lines.filter((l) => l.direction !== ItemDirection.IN);
-  const eligible = sold.length ? sold : lines;
+  const eligible = [...(sold.length ? sold : lines)].sort(byId);
   const weights = eligible.map((l) => Math.abs(Number(l.lineTotal ?? 0)));
   const denominator = weights.reduce((a, b) => a + b, 0);
 
   // Every eligible line free (a 100%-discounted sale, a gift-only invoice):
   // put the whole amount on the first one rather than letting it vanish.
   if (denominator === 0) {
-    out.set(eligible[0], round2(total));
+    out.set(eligible[0], total);
     return out;
   }
 
-  let running = 0;
+  let cumulative = 0;
+  let allocated = 0;
   eligible.forEach((l, i) => {
-    if (i === eligible.length - 1) {
-      out.set(l, round2(total - running));
-      return;
-    }
-    const share = round2((total * weights[i]) / denominator);
-    running = round2(running + share);
-    out.set(l, share);
+    cumulative += weights[i];
+    const upTo =
+      cumulative === denominator ? total : roundDong((total * cumulative) / denominator);
+    out.set(l, upTo - allocated);
+    allocated = upTo;
   });
   return out;
 }

@@ -11,12 +11,38 @@ describe('allocatePoints', () => {
     expect([...allocatePoints(100_000, lines).values()]).toEqual([100_000]);
   });
 
-  it('splits evenly and lands the rounding drift on the last line', () => {
+  it('splits in whole đồng, rounding cumulatively so the shares add up exactly', () => {
     const lines = [out(100), out(100), out(100)];
     const alloc = [...allocatePoints(100_000, lines).values()];
 
-    expect(alloc).toEqual([33_333.33, 33_333.33, 33_333.34]);
+    // round(⅓P)=33.333, round(⅔P)=66.667 → 33.333 / 33.334 / 33.333
+    expect(alloc).toEqual([33_333, 33_334, 33_333]);
     expect(alloc.reduce((a, b) => a + b, 0)).toBe(100_000);
+  });
+
+  it('never yields a fraction of a đồng on uneven lines', () => {
+    // The prod case: 50.000 of points over lines of 460.000, 420.000 and 1.830.000.
+    const lines = [out(460_000), out(420_000), out(1_830_000)];
+    const alloc = [...allocatePoints(50_000, lines).values()];
+
+    expect(alloc.every(Number.isInteger)).toBe(true);
+    expect(alloc).toEqual([8_487, 7_749, 33_764]);
+    expect(alloc.reduce((a, b) => a + b, 0)).toBe(50_000);
+  });
+
+  it('walks lines in id order, the order the SQL twin uses', () => {
+    const a = { id: 'b-2', direction: ItemDirection.OUT, lineTotal: 100 };
+    const b = { id: 'a-1', direction: ItemDirection.OUT, lineTotal: 100 };
+    const alloc = allocatePoints(1, [a, b]);
+
+    // 'a-1' comes first: round(½) = 1 lands on it, 'b-2' gets 0.
+    expect(alloc.get(b)).toBe(1);
+    expect(alloc.get(a)).toBe(0);
+  });
+
+  it('mirrors a sale on a RETURN (half away from zero)', () => {
+    const alloc = [...allocatePoints(-100_000, [inn(100), inn(100), inn(100)]).values()];
+    expect(alloc).toEqual([-33_333, -33_334, -33_333]);
   });
 
   it('weights by line size, not line count', () => {
