@@ -19,6 +19,7 @@ import { InvoiceEntity } from '../../pos/entities/invoice.entity';
 import { InvoiceItemEntity } from '../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../pos/entities/invoice-payment.entity';
 import { InvoicePromotionEntity } from '../../promotion/invoice-promotion.entity';
+import { InvoiceCheckoutPromotionEntity } from '../../pos/checkout-saga/infrastructure/invoice-checkout-promotion.entity';
 import { EmployeeProfileEntity } from '../../rbac/employee/employee-profile.entity';
 import { RbacModule } from '../../rbac/rbac.module';
 import { CreateInvoiceReportTemplateHandler } from './commands/create-invoice-report-template.handler';
@@ -55,6 +56,7 @@ import { RevenueByItemParamsBuilder } from './revenue-by-item-params.builder';
       InvoiceEntity,
       InvoicePaymentEntity,
       InvoicePromotionEntity,
+      InvoiceCheckoutPromotionEntity,
       PaymentAccountEntity,
       CustomerEntity,
       BranchEntity,

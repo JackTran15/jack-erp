@@ -2,16 +2,17 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
-import { InvoiceDetailView } from '@erp/shared-interfaces';
+import { InvoiceDetailView, PromotionProgramType } from '@erp/shared-interfaces';
 import { UserEntity } from '../../../auth/user.entity';
 import { CustomerEntity } from '../../../customer/customer.entity';
 import { CustomerGroupEntity } from '../../../customer/customer-group.entity';
-import { InvoiceEntity } from '../../../pos/entities/invoice.entity';
+import { InvoiceEntity, RefundMethod } from '../../../pos/entities/invoice.entity';
 import {
   InvoiceItemEntity,
   ItemDirection,
 } from '../../../pos/entities/invoice-item.entity';
 import { InvoicePaymentEntity } from '../../../pos/entities/invoice-payment.entity';
+import { InvoiceCheckoutPromotionEntity } from '../../../pos/checkout-saga/infrastructure/invoice-checkout-promotion.entity';
 import {
   invoiceTypeSign,
   signedGoods,
@@ -27,6 +28,27 @@ const signed = (sign: number, value: unknown): number => {
   return n === 0 ? 0 : n;
 };
 
+/**
+ * Programmes that discount particular items — their per-line share belongs in
+ * that line's "Tiền KM". Everything else (INVOICE_DISCOUNT, TIERED_DISCOUNT,
+ * whose ladder may run on the bill total) is a discount on the bill: the engine
+ * still spreads it over the lines, but per item it means nothing, so the dialog
+ * shows it once as the invoice's "Khuyến mại".
+ */
+const ITEM_LEVEL_PROGRAMS = new Set<string>([
+  PromotionProgramType.ITEM_DISCOUNT,
+  PromotionProgramType.GIFT_ITEM,
+  PromotionProgramType.BUY_M_GET_N,
+]);
+
+/** How a refund left the shop, as a tender `method` the dialogs already label. */
+const REFUND_TENDER: Record<RefundMethod, string> = {
+  [RefundMethod.CASH]: 'cash',
+  [RefundMethod.BANK]: 'bank_transfer',
+  [RefundMethod.STORE_CREDIT]: 'store_credit',
+  [RefundMethod.OFFSET]: 'offset',
+};
+
 @QueryHandler(GetInvoiceDetailQuery)
 export class GetInvoiceDetailHandler
   implements IQueryHandler<GetInvoiceDetailQuery>
@@ -38,6 +60,8 @@ export class GetInvoiceDetailHandler
     private readonly items: Repository<InvoiceItemEntity>,
     @InjectRepository(InvoicePaymentEntity)
     private readonly payments: Repository<InvoicePaymentEntity>,
+    @InjectRepository(InvoiceCheckoutPromotionEntity)
+    private readonly appliedPromotions: Repository<InvoiceCheckoutPromotionEntity>,
     @InjectRepository(CustomerEntity)
     private readonly customers: Repository<CustomerEntity>,
     @InjectRepository(CustomerGroupEntity)
@@ -88,7 +112,7 @@ export class GetInvoiceDetailHandler
       throw new NotFoundException(`Invoice not found: ${id ?? code}`);
     }
 
-    const [lines, payments, customer, cashier] = await Promise.all([
+    const [lines, payments, customer, cashier, applied] = await Promise.all([
       this.items.find({
         where: { invoiceId: invoice.id },
         order: { sortOrder: 'ASC' },
@@ -102,7 +126,30 @@ export class GetInvoiceDetailHandler
       this.users.findOne({
         where: { id: invoice.staffId, organizationId: actor.organizationId },
       }),
+      this.appliedPromotions.find({ where: { invoiceId: invoice.id } }),
     ]);
+
+    // Each sold line's share of the item-level programmes. An invoice from
+    // before the snapshot existed has none, so its whole promotion stays on the
+    // bill — the safe reading when we cannot tell which kind it was.
+    const itemPromotionByLine = new Map<string, number>();
+    for (const program of applied) {
+      if (!ITEM_LEVEL_PROGRAMS.has(program.type)) continue;
+      for (const ld of program.lineDiscounts ?? []) {
+        itemPromotionByLine.set(
+          ld.lineId,
+          (itemPromotionByLine.get(ld.lineId) ?? 0) + Number(ld.discountAmount ?? 0),
+        );
+      }
+    }
+    // What the line itself took off: the cashier's manual discount, plus on a
+    // sold line its item-level programmes, on a returned line the part of the
+    // original price the refund keeps back (`promotionDiscount`).
+    const lineOwnDiscount = (l: InvoiceItemEntity): number =>
+      Number(l.lineDiscount ?? 0) +
+      (l.direction === ItemDirection.IN
+        ? Number(l.promotionDiscount ?? 0)
+        : itemPromotionByLine.get(l.id) ?? 0);
 
     const customerGroup =
       customer?.groupId != null
@@ -119,8 +166,59 @@ export class GetInvoiceDetailHandler
     // Same signing the reports use, so this dialog agrees with the "Bảng kê"
     // row it was opened from instead of restating a return as a positive sale.
     const headerSign = invoiceTypeSign(invoice.type);
-    const totalAmount = signed(headerSign, invoice.amountDue);
-    const totalPaid = signed(headerSign, invoice.totalPaid);
+    // Points and a deposit settle the bill the way a tender does (MISA lists
+    // "Điểm thanh toán" under "Khách trả"), but `amountDue` has both already
+    // taken off. Adding them back on both sides is what makes "Tổng thanh toán"
+    // read as Tiền hàng − Khuyến mại + phí instead of a figure 65.000 short of
+    // the lines, while "Công nợ" (the difference) stays exactly what it was.
+    const settledOffTill =
+      Number(invoice.pointsDiscountAmount ?? 0) + Number(invoice.depositAmount ?? 0);
+    const tendered = payments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
+
+    // A return (or an exchange that ends in a refund) owes nothing and collects
+    // nothing — `amountDue` and `totalPaid` are 0 and the money goes back
+    // through `refundedAmount`. Reading the header fields there showed
+    // "Tiền hàng −385.000" over "Tổng thanh toán 0", so a refund is shown as
+    // what it is: a bill of −refunded, settled by handing that much back.
+    const refunded = Number(invoice.refundedAmount ?? 0);
+    let totalAmount: number;
+    let totalPaid: number;
+    let debtCollected = 0;
+    const tenders = payments.map((p) => ({
+      method: p.paymentMethod as string,
+      // Signed with the header: a refund is money leaving the drawer, and the
+      // tender breakdown has to add up to the "Khách trả" above it.
+      amount: signed(headerSign, p.amount),
+    }));
+    if (refunded > 0) {
+      totalAmount = signed(-1, refunded);
+      totalPaid = totalAmount;
+      // `offsetAmount` is the part set against the customer's debt instead of
+      // paid out; an OFFSET refund sets all of it.
+      const offset =
+        invoice.refundMethod === RefundMethod.OFFSET
+          ? refunded
+          : Number(invoice.offsetAmount ?? 0);
+      const paidOut = refunded - offset;
+      if (paidOut > 0) {
+        tenders.push({ method: REFUND_TENDER[invoice.refundMethod ?? RefundMethod.CASH], amount: -paidOut });
+      }
+      if (offset > 0) tenders.push({ method: 'offset', amount: -offset });
+    } else {
+      totalAmount = signed(headerSign, Number(invoice.amountDue ?? 0) + settledOffTill);
+      totalPaid = signed(headerSign, Number(invoice.totalPaid ?? 0) + settledOffTill);
+      // A sale on credit collects the rest later; `totalPaid` grows with every
+      // debt payment but no checkout tender records it.
+      debtCollected = signed(headerSign, Number(invoice.totalPaid ?? 0) - tendered);
+    }
+
+    // The header `discountAmount` is manual + every programme + voucher
+    // (persist-invoice). The item-level programmes now show on their lines, so
+    // "Khuyến mại" under the table is the rest: bill-level programmes, voucher,
+    // a manual discount on the whole bill.
+    const soldLineItemPromotion = lines
+      .filter((l) => l.direction !== ItemDirection.IN)
+      .reduce((sum, l) => sum + (itemPromotionByLine.get(l.id) ?? 0), 0);
 
     return {
       code: invoice.code,
@@ -143,15 +241,7 @@ export class GetInvoiceDetailHandler
         // Unsigned: a rate, not an amount — returning goods does not make them
         // cost a negative price per unit.
         const unitPrice = Number(l.unitPrice ?? 0);
-        // A returned line carries the promotion the original sale gave on it:
-        // money the customer never paid, so it is not refunded either. Taking it
-        // off here is what makes the lines add up to "Tiền hàng" below, which is
-        // the exchange net the customer actually settled.
-        const discount =
-          Number(l.lineDiscount ?? 0) +
-          (l.direction === ItemDirection.IN
-            ? Number(l.promotionDiscount ?? 0)
-            : 0);
+        const discount = lineOwnDiscount(l);
         return {
           sku: l.itemCode,
           name: l.itemName,
@@ -164,28 +254,41 @@ export class GetInvoiceDetailHandler
           // added back to a refund. Signing it here would make the row read
           // -750.000 minus -150.000, which nobody does in their head.
           discount: signed(1, discount),
+          // `lineTotal` already has the manual discount off.
           lineTotal: signed(
             sign,
-            Number(l.lineTotal ?? 0) -
-              (l.direction === ItemDirection.IN
-                ? Number(l.promotionDiscount ?? 0)
-                : 0),
+            Number(l.lineTotal ?? 0) - (discount - Number(l.lineDiscount ?? 0)),
           ),
           note: l.note ?? null,
         };
       }),
       // Σ of the signed line totals above: −subtotal for a RETURN, and the
       // exchange net (new − returned) for an EXCHANGE.
-      subtotal: signed(1, signedGoods(invoice)),
+      subtotal: signed(
+        1,
+        lines.length
+          ? lines.reduce(
+              (sum, l) =>
+                sum +
+                (l.direction === ItemDirection.IN ? -1 : 1) *
+                  (Number(l.lineTotal ?? 0) -
+                    (lineOwnDiscount(l) - Number(l.lineDiscount ?? 0))),
+              0,
+            )
+          : signedGoods(invoice),
+      ),
+      discountAmount: signed(
+        headerSign,
+        Number(invoice.discountAmount ?? 0) - soldLineItemPromotion,
+      ),
+      shippingFee: signed(headerSign, invoice.shippingFeeAmount),
       totalAmount,
+      pointsAmount: signed(headerSign, invoice.pointsDiscountAmount),
+      depositAmount: signed(headerSign, invoice.depositAmount),
       totalPaid,
       debt: signed(1, totalAmount - totalPaid),
-      payments: payments.map((p) => ({
-        method: p.paymentMethod,
-        // Signed with the header: a refund is money leaving the drawer, and the
-        // tender breakdown has to add up to the "Khách trả" above it.
-        amount: signed(headerSign, p.amount),
-      })),
+      debtCollected,
+      payments: tenders,
     };
   }
 }

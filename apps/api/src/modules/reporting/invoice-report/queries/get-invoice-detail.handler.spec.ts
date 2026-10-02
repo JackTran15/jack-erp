@@ -23,6 +23,7 @@ function makeHandler(opts: {
   invoice?: any;
   lines?: any[];
   payments?: any[];
+  applied?: any[];
 }) {
   const one = (row: any) => ({ findOne: jest.fn(async () => row ?? null) });
   const many = (rows?: any[]) => ({ find: jest.fn(async () => rows ?? []) });
@@ -30,6 +31,7 @@ function makeHandler(opts: {
     one(opts.invoice) as any,
     many(opts.lines) as any,
     many(opts.payments) as any,
+    many(opts.applied) as any,
     one(null) as any,
     one(null) as any,
     one(null) as any,
@@ -81,6 +83,7 @@ describe('GetInvoiceDetailHandler', () => {
         invoices as any,
         { find: jest.fn(async () => []) } as any,
         { find: jest.fn(async () => []) } as any,
+        { find: jest.fn(async () => []) } as any,
         { findOne: jest.fn(async () => null) } as any,
         { findOne: jest.fn(async () => null) } as any,
         { findOne: jest.fn(async () => null) } as any,
@@ -119,6 +122,100 @@ describe('GetInvoiceDetailHandler', () => {
     expect(detail.lines[0]).toMatchObject({ quantity: 1, lineTotal: 750000 });
     expect(detail.subtotal).toBe(750000);
     expect(detail.totalAmount).toBe(750000);
+  });
+
+  // Prod 2608270006: 485.000 of goods, 65.000 of points, 420.000 in cash. The
+  // dialog read "Tổng thanh toán 420.000" under lines worth 485.000.
+  it('lists redeemed points as a tender instead of hiding them in the total', async () => {
+    const handler = makeHandler({
+      invoice: invoice({
+        subtotal: 485000,
+        pointsDiscountAmount: 65000,
+        amountDue: 420000,
+        totalPaid: 420000,
+      }),
+      lines: [line({ unitPrice: 485000, lineTotal: 485000 })],
+      payments: [{ paymentMethod: 'cash', amount: 420000 }],
+    });
+    const detail = await handler.execute({ code: 'INV-001', actor } as any);
+
+    expect(detail.subtotal).toBe(485000);
+    expect(detail.totalAmount).toBe(485000);
+    expect(detail.pointsAmount).toBe(65000);
+    expect(detail.totalPaid).toBe(485000);
+    expect(detail.payments).toEqual([{ method: 'cash', amount: 420000 }]);
+    expect(detail.debt).toBe(0);
+  });
+
+  // KHO SG 2609210007: "Giảm giá 30%" is an INVOICE_DISCOUNT. The engine spreads
+  // it over the lines, but it is a discount on the bill, so it stays there.
+  it('keeps a bill-level programme on the invoice, not on the line', async () => {
+    const handler = makeHandler({
+      invoice: invoice({
+        subtotal: 750000,
+        discountAmount: 225000,
+        pointsDiscountAmount: 10000,
+        amountDue: 515000,
+        totalPaid: 515000,
+      }),
+      lines: [line({ id: 'l1', unitPrice: 750000, lineTotal: 750000, promotionDiscount: 225000 })],
+      payments: [{ paymentMethod: 'cash', amount: 515000 }],
+      applied: [
+        { type: 'INVOICE_DISCOUNT', lineDiscounts: [{ lineId: 'l1', discountAmount: 225000 }] },
+      ],
+    });
+    const detail = await handler.execute({ code: 'INV-001', actor } as any);
+
+    expect(detail.lines[0]).toMatchObject({ discount: 0, lineTotal: 750000 });
+    expect(detail.subtotal).toBe(750000);
+    expect(detail.discountAmount).toBe(225000);
+    expect(detail.totalAmount).toBe(525000);
+    expect(detail.pointsAmount).toBe(10000);
+    expect(detail.totalPaid).toBe(525000);
+    expect(detail.debt).toBe(0);
+  });
+
+  it('shows an item-level programme on the line it discounts', async () => {
+    const handler = makeHandler({
+      invoice: invoice({ subtotal: 1000000, discountAmount: 100000, amountDue: 900000, totalPaid: 900000 }),
+      lines: [
+        line({ id: 'l1', unitPrice: 600000, lineTotal: 600000, promotionDiscount: 100000 }),
+        line({ id: 'l2', unitPrice: 400000, lineTotal: 400000 }),
+      ],
+      payments: [{ paymentMethod: 'cash', amount: 900000 }],
+      applied: [
+        { type: 'ITEM_DISCOUNT', lineDiscounts: [{ lineId: 'l1', discountAmount: 100000 }] },
+      ],
+    });
+    const detail = await handler.execute({ code: 'INV-001', actor } as any);
+
+    expect(detail.lines[0]).toMatchObject({ discount: 100000, lineTotal: 500000 });
+    expect(detail.lines[1]).toMatchObject({ discount: 0, lineTotal: 400000 });
+    expect(detail.subtotal).toBe(900000);
+    expect(detail.discountAmount).toBe(0);
+    expect(detail.totalAmount).toBe(900000);
+  });
+
+  it('shows the header promotion and keeps an unpaid balance as debt', async () => {
+    const handler = makeHandler({
+      invoice: invoice({
+        subtotal: 1000000,
+        discountAmount: 200000,
+        depositAmount: 100000,
+        amountDue: 700000,
+        totalPaid: 500000,
+      }),
+      lines: [line({ unitPrice: 1000000, lineTotal: 1000000 })],
+      payments: [{ paymentMethod: 'cash', amount: 500000 }],
+    });
+    const detail = await handler.execute({ code: 'INV-001', actor } as any);
+
+    // 1.000.000 − 200.000 = 800.000; settled by 100.000 deposit + 500.000 cash.
+    expect(detail.discountAmount).toBe(200000);
+    expect(detail.totalAmount).toBe(800000);
+    expect(detail.depositAmount).toBe(100000);
+    expect(detail.totalPaid).toBe(600000);
+    expect(detail.debt).toBe(200000);
   });
 
   // The reported case: on an exchange both legs sit on one invoice, and without
