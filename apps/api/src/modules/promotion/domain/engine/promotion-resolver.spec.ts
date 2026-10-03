@@ -732,4 +732,108 @@ describe('PromotionResolver', () => {
       expect(evaluation.appliedPrograms[0].programId).toBe(program.id);
     });
   });
+
+  describe('branch wins (2026100301 ADR-05)', () => {
+    const HCM = 'branch-hcm';
+    const itemDiscount = (percent: number, priority: number, owner?: string) =>
+      aProgram()
+        .ofType(PromotionProgramType.ITEM_DISCOUNT)
+        .withPriority(priority)
+        .with({
+          discountMode: undefined,
+          discountValue: undefined,
+          ownerBranchId: owner,
+          branchIds: owner ? [owner] : [],
+        })
+        .withGroups([
+          aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: 'sku-x', discountMode: PromotionDiscountMode.PERCENT, discountValue: percent })] }),
+        ])
+        .build();
+    const invoiceDiscount = (percent: number, priority: number, owner?: string) =>
+      aProgram()
+        .ofType(PromotionProgramType.INVOICE_DISCOUNT)
+        .withPriority(priority)
+        .with({ discountValue: percent, ownerBranchId: owner, branchIds: owner ? [owner] : [] })
+        .build();
+    const cartAt = (branchId: string, selectedProgramIds: string[] = []) =>
+      aCart({ branchId, selectedProgramIds, lines: [aCartLine({ itemId: 'sku-x', unitPrice: 100_000, quantity: 1 })] });
+
+    it('AC-16: an own-branch program beats a better-priority chain program on the same line', () => {
+      const chainA = itemDiscount(10, 1);
+      const branchB = itemDiscount(20, 100, HCM);
+
+      const evaluation = resolver.resolve([chainA, branchB], cartAt(HCM));
+
+      expect(evaluation.appliedPrograms.map((p) => p.programId)).toEqual([branchB.id]);
+      expect(evaluation.promotionDiscount).toBe(20_000);
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: chainA.id, reason: 'RESOURCE_TAKEN', takenBy: branchB.id }),
+      );
+    });
+
+    it('AC-17: at another branch the branch program is out of scope and the chain program applies', () => {
+      const chainA = itemDiscount(10, 1);
+      const branchB = itemDiscount(20, 100, HCM);
+
+      const evaluation = resolver.resolve([chainA, branchB], cartAt('branch-hn'));
+
+      expect(evaluation.appliedPrograms.map((p) => p.programId)).toEqual([chainA.id]);
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: branchB.id, reason: 'BRANCH_SCOPE' }),
+      );
+    });
+
+    it('AC-18: a chain program the cashier selected still wins over the own-branch program', () => {
+      const chainA = itemDiscount(10, 1);
+      const branchB = itemDiscount(20, 100, HCM);
+
+      const evaluation = resolver.resolve([chainA, branchB], cartAt(HCM, [chainA.id!]));
+
+      expect(evaluation.appliedPrograms.map((p) => p.programId)).toEqual([chainA.id]);
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: branchB.id, reason: 'RESOURCE_TAKEN', takenBy: chainA.id }),
+      );
+    });
+
+    it('AC-19: the invoice slot goes to the own-branch INVOICE_DISCOUNT', () => {
+      const chainC = invoiceDiscount(10, 1);
+      const branchD = invoiceDiscount(5, 100, HCM);
+
+      const evaluation = resolver.resolve([chainC, branchD], cartAt(HCM));
+
+      expect(evaluation.appliedPrograms.map((p) => p.programId)).toEqual([branchD.id]);
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: chainC.id, reason: 'RESOURCE_TAKEN', takenBy: branchD.id }),
+      );
+    });
+
+    it('the gift slot goes to the own-branch gift program', () => {
+      const cart = aCart({
+        branchId: HCM,
+        lines: [aCartLine({ itemId: 'sku-condition', unitPrice: 100_000, quantity: 1 })],
+        catalog: new Map([
+          ['sku-condition', aCatalogItem({ itemId: 'sku-condition', sellingPrice: 100_000 })],
+          ['gift-chain', aCatalogItem({ itemId: 'gift-chain', sellingPrice: 10_000 })],
+          ['gift-branch', aCatalogItem({ itemId: 'gift-branch', sellingPrice: 10_000 })],
+        ]),
+      });
+      const gift = (giftId: string, priority: number, owner?: string) =>
+        aProgram()
+          .ofType(PromotionProgramType.GIFT_ITEM)
+          .withPriority(priority)
+          .with({ discountMode: undefined, discountValue: undefined, ownerBranchId: owner, branchIds: owner ? [owner] : [] })
+          .withCondition(aCondition({ type: PromotionConditionType.MIN_INVOICE_AMOUNT, minAmount: 50_000, multiplyGift: false }))
+          .withGroups([aGroup({ lines: [aLine({ role: PromotionLineRole.REWARD, targetId: giftId })] })])
+          .build();
+      const chainGift = gift('gift-chain', 1);
+      const branchGift = gift('gift-branch', 100, HCM);
+
+      const evaluation = resolver.resolve([chainGift, branchGift], cart);
+
+      expect(evaluation.appliedPrograms.map((p) => p.programId)).toEqual([branchGift.id]);
+      expect(evaluation.skippedPrograms).toContainEqual(
+        expect.objectContaining({ programId: chainGift.id, reason: 'RESOURCE_TAKEN', takenBy: branchGift.id }),
+      );
+    });
+  });
 });

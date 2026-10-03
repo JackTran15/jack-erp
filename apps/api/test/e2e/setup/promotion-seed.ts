@@ -55,7 +55,9 @@ const ITEMS = [
 ];
 
 /**
- * Grants `promotion.read/write/delete` to the seeded admin role and registers a
+ * Grants `promotion.read/write/delete` and `promotion.chain.manage` to the
+ * seeded admin role — it stands for the company (Quản lý tổng), not a branch
+ * manager (2026100301 ADR-02) — and registers a
  * `PROMOTION` numbering rule, then builds the catalogue described above.
  *
  * Idempotent — safe to call from several suites against the same database.
@@ -73,7 +75,7 @@ export async function seedPromotionFixtures(
     [orgId],
   );
 
-  for (const key of ['promotion.read', 'promotion.write', 'promotion.delete']) {
+  for (const key of ['promotion.read', 'promotion.write', 'promotion.delete', 'promotion.chain.manage']) {
     await ds.query(
       `INSERT INTO permissions (id, key, description, module)
        VALUES (gen_random_uuid(), $1, $1, 'promotion')

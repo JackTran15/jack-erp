@@ -236,6 +236,9 @@ const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
   { key: "promotion.read", module: "promotion" },
   { key: "promotion.write", module: "promotion" },
   { key: "promotion.delete", module: "promotion" },
+  // Company-level CTKM authority: every program in the chain, not only the
+  // active branch's own (ADR-02 of 2026100301-promotion-branch-owned-programs).
+  { key: "promotion.chain.manage", module: "promotion" },
 
   // Registration
   { key: "org.registration.submit", module: "registration" },

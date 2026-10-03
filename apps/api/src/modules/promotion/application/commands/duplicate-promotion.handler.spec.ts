@@ -11,10 +11,18 @@ import { DuplicatePromotionHandler } from './duplicate-promotion.handler';
 import { DuplicatePromotionCommand } from './duplicate-promotion.command';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { PromotionProgram } from '../../domain/model/promotion-program';
+import { PromotionAccess } from '../promotion-access.policy';
+
+/** `forActor` stub: chain manager unless a test swaps in a branch manager. */
+function accessStub(isChainManager = true, activeBranchId: string | null = 'branch-1') {
+  return { forActor: jest.fn(async () => new PromotionAccess(isChainManager, activeBranchId ?? undefined)) };
+}
 
 const actor: ActorContext = { userId: 'user-2', organizationId: 'org-1', branchId: 'branch-1', roles: [] };
 
-function originalProgram(): PromotionProgram {
+function originalProgram(
+  overrides: Partial<Parameters<typeof PromotionProgram.create>[0]> = {},
+): PromotionProgram {
   return PromotionProgram.create({
     id: 'program-1',
     organizationId: 'org-1',
@@ -50,6 +58,7 @@ function originalProgram(): PromotionProgram {
     createdBy: 'user-1',
     createdAt: new Date(2026, 0, 1),
     updatedAt: new Date(2026, 0, 2),
+    ...overrides,
   });
 }
 
@@ -61,7 +70,7 @@ describe('DuplicatePromotionHandler', () => {
   beforeEach(() => {
     repo = { findById: jest.fn(), save: jest.fn(async (program) => program) };
     docNumbering = { generate: jest.fn().mockResolvedValue('KM000002') };
-    handler = new DuplicatePromotionHandler(repo as any, docNumbering as any);
+    handler = new DuplicatePromotionHandler(repo as any, docNumbering as any, accessStub() as any);
   });
 
   it('clones the whole aggregate with a new id/code/status/name, keeping every group/line/tier', async () => {
@@ -99,5 +108,37 @@ describe('DuplicatePromotionHandler', () => {
 
     await expect(handler.execute(new DuplicatePromotionCommand('missing', actor))).rejects.toThrow(NotFoundException);
     expect(docNumbering.generate).not.toHaveBeenCalled();
+  });
+
+  describe('ownership (2026100301 AC-05, AC-07)', () => {
+    const asBranchManager = () =>
+      new DuplicatePromotionHandler(repo as any, docNumbering as any, accessStub(false, 'branch-hcm') as any);
+
+    it('AC-05: a branch manager duplicating a visible chain program gets a copy owned by its branch', async () => {
+      repo.findById.mockResolvedValue(originalProgram({ branchIds: [] }));
+
+      const result = await asBranchManager().execute(new DuplicatePromotionCommand('program-1', actor));
+
+      expect(result.ownerBranchId).toBe('branch-hcm');
+      expect(result.branchIds).toEqual(['branch-hcm']);
+    });
+
+    it('AC-07: a branch manager cannot duplicate another branch\'s program (404, no code burned)', async () => {
+      repo.findById.mockResolvedValue(originalProgram({ ownerBranchId: 'branch-hn', branchIds: ['branch-hn'] }));
+
+      await expect(asBranchManager().execute(new DuplicatePromotionCommand('program-1', actor))).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(docNumbering.generate).not.toHaveBeenCalled();
+    });
+
+    it('A-12: a chain manager duplicating a branch program gets a chain-owned copy', async () => {
+      repo.findById.mockResolvedValue(originalProgram({ ownerBranchId: 'branch-hcm', branchIds: ['branch-hcm'] }));
+
+      const result = await handler.execute(new DuplicatePromotionCommand('program-1', actor));
+
+      expect(result.ownerBranchId).toBeUndefined();
+      expect(result.branchIds).toEqual(['branch-hcm']);
+    });
   });
 });

@@ -291,6 +291,7 @@ export const PERMISSION_LABELS_VI: Record<string, string> = {
   'promotion.read': 'Xem chương trình khuyến mại',
   'promotion.write': 'Thêm/sửa chương trình khuyến mại',
   'promotion.delete': 'Xóa chương trình khuyến mại',
+  'promotion.chain.manage': 'Quản lý CTKM toàn chuỗi',
 
   // Đăng ký
   'org.registration.submit': 'Gửi đăng ký tổ chức',

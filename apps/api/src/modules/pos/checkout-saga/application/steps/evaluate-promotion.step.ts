@@ -66,8 +66,11 @@ export class EvaluatePromotionStep implements CheckoutStep {
       return line;
     });
 
+    // Price by the branch the invoice belongs to, not the session's active
+    // branch (ADR-07 of 2026100301): load-draft scopes the draft by org only,
+    // and a branch-owned program must never reach another branch's invoice.
     const evaluation: EvaluateCartResponse = await this.queryBus.execute(
-      new EvaluateCartQuery(dto, ctx.actor),
+      new EvaluateCartQuery(dto, { ...ctx.actor, branchId: invoice.branchId ?? ctx.actor.branchId }),
     );
 
     ctx.promotion = {

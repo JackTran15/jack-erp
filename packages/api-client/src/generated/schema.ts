@@ -15816,6 +15816,13 @@ export interface components {
             type: "discount_code" | "voucher" | "promotion";
             code: string;
         };
+        PromotionOwnerFilterDto: {
+            /**
+             * @description 'CHAIN' or a branch id
+             * @example CHAIN
+             */
+            value: string;
+        };
         PromotionSearchV2Dto: {
             /** @default 1 */
             page: number;
@@ -15832,6 +15839,8 @@ export interface components {
             applyTo?: components["schemas"]["EnumFilterDto"];
             startDate?: components["schemas"]["DateRangeFilterDto"];
             endDate?: components["schemas"]["DateRangeFilterDto"];
+            /** @description Đơn vị quản lý — honoured for promotion.chain.manage holders only; ignored for branch managers */
+            owner?: components["schemas"]["PromotionOwnerFilterDto"];
         };
         ExportItemDiscountLineDto: {
             /** @enum {string} */

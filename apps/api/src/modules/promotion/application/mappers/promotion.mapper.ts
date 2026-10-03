@@ -155,6 +155,7 @@ export function toDomain(row: PromotionProgramRow): PromotionProgram {
     endTime: TimeWindow.parse(row.program.endTime),
     autoApply: row.program.autoApply,
     branchIds: row.branchIds,
+    ownerBranchId: fromDb(row.program.ownerBranchId),
     invoiceScope: fromDb(row.program.invoiceScope),
     accruePoints: row.program.accruePoints,
     discountMode: fromDb(row.program.discountMode),
@@ -189,7 +190,8 @@ export function toDomain(row: PromotionProgramRow): PromotionProgram {
  * the promotion's applicable scope anyway — that is `promotion_branches` /
  * `aggregate.branchIds`. CTKM are managed centrally, not from a branch
  * context, so `NULL` ("org-wide record", per BaseEntity's own doc comment)
- * is the correct value here, not a placeholder.
+ * is the correct value here, not a placeholder. Which branch *manages* a
+ * program is `owner_branch_id` (ADR-01), never `branch_id`.
  */
 export function toPersistence(aggregate: PromotionProgram): PromotionPersistenceBundle {
   if (!aggregate.id) {
@@ -224,6 +226,7 @@ export function toPersistence(aggregate: PromotionProgram): PromotionPersistence
   program.startTime = formatTimeOfDay(aggregate.startTime);
   program.endTime = formatTimeOfDay(aggregate.endTime);
   program.autoApply = aggregate.autoApply;
+  program.ownerBranchId = nullify(aggregate.ownerBranchId);
   program.invoiceScope = nullify(aggregate.invoiceScope);
   program.accruePoints = aggregate.accruePoints;
   program.discountMode = nullify(aggregate.discountMode);

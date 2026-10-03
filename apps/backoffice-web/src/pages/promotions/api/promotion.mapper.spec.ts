@@ -51,6 +51,8 @@ function baseDetail(
     endTime: "22:00",
     autoApply: true,
     branchIds: [],
+    ownerBranchId: null,
+    ownerBranchName: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
     createdBy: "user-1",

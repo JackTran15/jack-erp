@@ -46561,6 +46561,20 @@
           "code"
         ]
       },
+      "PromotionOwnerFilterDto": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "pattern": "^(CHAIN|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$",
+            "description": "'CHAIN' or a branch id",
+            "example": "CHAIN"
+          }
+        },
+        "required": [
+          "value"
+        ]
+      },
       "PromotionSearchV2Dto": {
         "type": "object",
         "properties": {
@@ -46601,6 +46615,14 @@
           },
           "endDate": {
             "$ref": "#/components/schemas/DateRangeFilterDto"
+          },
+          "owner": {
+            "description": "Đơn vị quản lý — honoured for promotion.chain.manage holders only; ignored for branch managers",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PromotionOwnerFilterDto"
+              }
+            ]
           }
         }
       },

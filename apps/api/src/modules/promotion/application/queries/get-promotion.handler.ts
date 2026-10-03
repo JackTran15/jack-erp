@@ -1,14 +1,15 @@
 import { Inject, NotFoundException } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { PromotionProgramDetail, PromotionTargetType } from '@erp/shared-interfaces';
 import { PROMOTION_REPOSITORY, PromotionRepositoryPort } from '../../domain/ports/promotion-repository.port';
 import { PromotionLine } from '../../domain/model/promotion-line';
 import { ItemEntity } from '../../../inventory/location/item.entity';
 import { ProductEntity } from '../../../inventory/product/product.entity';
 import { ItemCategoryEntity } from '../../../inventory/location/item-category.entity';
-import { ResolvedTarget, toDetail } from '../dto/promotion-program.response.dto';
+import { loadOwnerBranchNames, ResolvedTarget, toDetail } from '../dto/promotion-program.response.dto';
+import { PromotionAccessPolicy } from '../promotion-access.policy';
 import { GetPromotionQuery } from './get-promotion.query';
 
 @QueryHandler(GetPromotionQuery)
@@ -18,6 +19,8 @@ export class GetPromotionHandler implements IQueryHandler<GetPromotionQuery> {
     @InjectRepository(ItemEntity) private readonly itemRepo: Repository<ItemEntity>,
     @InjectRepository(ProductEntity) private readonly productRepo: Repository<ProductEntity>,
     @InjectRepository(ItemCategoryEntity) private readonly categoryRepo: Repository<ItemCategoryEntity>,
+    private readonly access: PromotionAccessPolicy,
+    private readonly dataSource: DataSource,
   ) {}
 
   async execute({ id, actor }: GetPromotionQuery): Promise<PromotionProgramDetail> {
@@ -25,13 +28,14 @@ export class GetPromotionHandler implements IQueryHandler<GetPromotionQuery> {
     if (!program) {
       throw new NotFoundException(`Promotion program "${id}" not found`);
     }
+    (await this.access.forActor(actor)).assertReadable(program);
 
     const allLines = program.groups.flatMap((group) => group.lines);
     const itemIds = allLines.filter((l) => l.targetType === PromotionTargetType.ITEM).map((l) => l.targetId);
     const productIds = allLines.filter((l) => l.targetType === PromotionTargetType.PRODUCT).map((l) => l.targetId);
     const categoryIds = allLines.filter((l) => l.targetType === PromotionTargetType.CATEGORY).map((l) => l.targetId);
 
-    const [items, products, categories] = await Promise.all([
+    const [items, products, categories, ownerBranchNames] = await Promise.all([
       itemIds.length ? this.itemRepo.find({ where: { id: In(itemIds), organizationId: actor.organizationId } }) : [],
       productIds.length
         ? this.productRepo.find({ where: { id: In(productIds), organizationId: actor.organizationId } })
@@ -39,6 +43,7 @@ export class GetPromotionHandler implements IQueryHandler<GetPromotionQuery> {
       categoryIds.length
         ? this.categoryRepo.find({ where: { id: In(categoryIds), organizationId: actor.organizationId } })
         : [],
+      loadOwnerBranchNames(this.dataSource.manager, actor.organizationId, [program.ownerBranchId]),
     ]);
 
     const itemById = new Map(items.map((i) => [i.id, i]));
@@ -61,6 +66,6 @@ export class GetPromotionHandler implements IQueryHandler<GetPromotionQuery> {
       return category ? { targetCode: category.code, targetName: category.name } : {};
     };
 
-    return toDetail(program, resolveTarget);
+    return toDetail(program, resolveTarget, ownerBranchNames);
   }
 }

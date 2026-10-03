@@ -1,0 +1,196 @@
+name: Release
+
+# Manual release: tag vX.Y.Z from main, build the tarball, attach it to a GitHub
+# Release, then deploy to every production VM over SSH (deploy/remote.sh).
+#
+# Setup — Settings > Environments > production:
+#   secrets  DEPLOY_SSH_KEY      private key whose public half is in each VM's authorized_keys
+#            DEPLOY_KNOWN_HOSTS  `ssh-keyscan <ip1> <ip2>` output
+#   vars     DEPLOY_HOSTS        space-separated ssh targets ("deploy@1.2.3.4 ssh://deploy@5.6.7.8:2222");
+#                                the first one runs migrations and Python scripts (shared DB)
+#            DEPLOY_BASE         release dir on the VMs (default /opt/erp)
+# Settings > Variables (repo level, baked into the SPAs at build time):
+#   VITE_API_BASE_URL, VITE_POS_WEB_URL, VITE_BACKOFFICE_WEB_URL, VITE_CHECKOUT_V2
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Phần version tăng so với tag mới nhất
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      redeploy_version:
+        description: Deploy lại một tag đã có (vd v1.4.2) để rollback — bỏ qua build, bỏ qua bump
+        type: string
+        default: ''
+      scripts:
+        description: "Script Python chạy sau migration, ngăn bởi ';' (vd: apps/api/scripts/a.py --apply; apps/api/scripts/b.py)"
+        type: string
+        default: ''
+      rollout:
+        description: "rolling = reload lần lượt từng VM; all_at_once = dừng API cả 2 VM trước migration (migration không backward-compatible)"
+        type: choice
+        options: [rolling, all_at_once]
+        default: rolling
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: inputs.redeploy_version == ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Require main
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Release chỉ chạy từ main (đang ở ${GITHUB_REF})"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Next version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          last="$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1)"
+          IFS=. read -r major minor patch <<< "${last:-v0.0.0}"
+          major="${major#v}"
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          echo "version=v$major.$minor.$patch" >> "$GITHUB_OUTPUT"
+          echo "${last:-none} -> v$major.$minor.$patch"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: pnpm-store-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_POS_WEB_URL: ${{ vars.VITE_POS_WEB_URL }}
+          VITE_BACKOFFICE_WEB_URL: ${{ vars.VITE_BACKOFFICE_WEB_URL }}
+          VITE_CHECKOUT_V2: ${{ vars.VITE_CHECKOUT_V2 }}
+
+      - name: Package
+        run: bash deploy/package.sh "${{ steps.version.outputs.version }}"
+
+      - name: Tag and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" \
+            "release/erp-$VERSION.tar.gz" "release/erp-$VERSION.tar.gz.sha256" \
+            --target "$GITHUB_SHA" --title "$VERSION" --generate-notes
+
+  deploy:
+    needs: release
+    if: ${{ !cancelled() && (needs.release.result == 'success' || inputs.redeploy_version != '') }}
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ inputs.redeploy_version || needs.release.outputs.version }}
+      HOSTS: ${{ vars.DEPLOY_HOSTS }}
+      ERP_BASE: ${{ vars.DEPLOY_BASE || '/opt/erp' }}
+      SCRIPTS: ${{ inputs.scripts }}
+      ROLLOUT: ${{ inputs.rollout }}
+    steps:
+      - name: Checkout deploy scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: deploy
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          [[ -n "$HOSTS" ]] || { echo "::error::vars.DEPLOY_HOSTS is empty"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host *
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+
+      - name: Fetch release on every VM
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          for h in "${hosts[@]}"; do
+            echo "::group::$h"
+            ssh "$h" "mkdir -p '$ERP_BASE' && cat > '$ERP_BASE/deploy.sh' && chmod +x '$ERP_BASE/deploy.sh'" < deploy/remote.sh
+            printf '%s\n' "$GH_TOKEN" | ssh "$h" "'$ERP_BASE/deploy.sh' fetch '$VERSION' '$GITHUB_REPOSITORY'"
+            echo "::endgroup::"
+          done
+
+      - name: Stop API on every VM (all_at_once)
+        if: inputs.rollout == 'all_at_once'
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          for h in "${hosts[@]}"; do ssh "$h" "'$ERP_BASE/deploy.sh' stop-api"; done
+
+      - name: Migrations and Python scripts (first VM only)
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          args=""
+          IFS=';' read -ra entries <<< "$SCRIPTS"
+          for e in "${entries[@]}"; do
+            e="${e#"${e%%[![:space:]]*}"}"
+            e="${e%"${e##*[![:space:]]}"}"
+            [[ -n "$e" ]] && args+=" $(printf '%q' "$e")"
+          done
+          ssh "${hosts[0]}" "'$ERP_BASE/deploy.sh' migrate '$VERSION'$args"
+
+      - name: Activate (one VM at a time, stops at the first failed health check)
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          for h in "${hosts[@]}"; do
+            echo "::group::$h"
+            ssh "$h" "'$ERP_BASE/deploy.sh' activate '$VERSION'"
+            echo "::endgroup::"
+          done

@@ -8,6 +8,7 @@ import {
 } from "../../../../program-form.constants";
 import { StoreScope } from "../../../../program-form.types";
 import type { ProgramFormState } from "../../../../program-form.types";
+import { usePromotionFormMode } from "../../../promotion-form-mode.context";
 
 interface Props {
   form: ProgramFormState;
@@ -17,6 +18,12 @@ interface Props {
 export function StoreScopePromotionSection({ form, onChange }: Props) {
   const { data: branches = [] } = useMyBranches();
   const storeOptions = branches.map((b) => ({ value: b.id, label: b.name }));
+  const { branchLock } = usePromotionFormMode();
+  const lockedBranchName = branchLock
+    ? branchLock.branchName ??
+      branches.find((b) => b.id === branchLock.branchId)?.name ??
+      "Chi nhánh đang chọn"
+    : undefined;
 
   return (
     <section>
@@ -34,23 +41,33 @@ export function StoreScopePromotionSection({ form, onChange }: Props) {
             aria-label="Phạm vi cửa hàng áp dụng chương trình"
           />
         </span>
-        <div className="flex flex-col gap-3">
-          <RadioGroup
-            name="store-scope"
-            value={form.storeScope}
-            options={STORE_SCOPE_OPTIONS}
-            onChange={(v: StoreScope) => onChange({ storeScope: v })}
-          />
-          {form.storeScope === StoreScope.SELECTED ? (
-            <MultiSelectChips
-              options={storeOptions}
-              value={form.storeIds}
-              onValueChange={(ids) => onChange({ storeIds: ids })}
-              placeholder="Chọn cửa hàng…"
-              className="max-w-xl"
+        {lockedBranchName !== undefined ? (
+          // CTKM của chi nhánh chỉ chạy tại chính chi nhánh đó — API cũng ép như vậy (ADR-04).
+          <p className="pt-2 text-sm">
+            {lockedBranchName}
+            <span className="ml-2 text-muted-foreground">
+              (chương trình của chi nhánh)
+            </span>
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <RadioGroup
+              name="store-scope"
+              value={form.storeScope}
+              options={STORE_SCOPE_OPTIONS}
+              onChange={(v: StoreScope) => onChange({ storeScope: v })}
             />
-          ) : null}
-        </div>
+            {form.storeScope === StoreScope.SELECTED ? (
+              <MultiSelectChips
+                options={storeOptions}
+                value={form.storeIds}
+                onValueChange={(ids) => onChange({ storeIds: ids })}
+                placeholder="Chọn cửa hàng…"
+                className="max-w-xl"
+              />
+            ) : null}
+          </div>
+        )}
       </div>
     </section>
   );

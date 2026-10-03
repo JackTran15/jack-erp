@@ -6,6 +6,7 @@ import {
   PromotionTierDto,
   PromotionConditionDto,
 } from '@erp/shared-interfaces';
+import { EntityManager } from 'typeorm';
 import { PromotionProgramEntity } from '../../infrastructure/entities';
 import { PromotionProgram } from '../../domain/model/promotion-program';
 import { PromotionLine } from '../../domain/model/promotion-line';
@@ -20,7 +21,7 @@ function formatWireTime(value?: TimeOfDay): string | undefined {
 }
 
 /** One row of POST /v2/promotions/search — no groups/lines/tiers, this is the list view. */
-export function toSummary(entity: PromotionProgramEntity): PromotionProgramSummary {
+export function toSummary(entity: PromotionProgramEntity, ownerBranchNames: OwnerBranchNames): PromotionProgramSummary {
   return {
     id: entity.id,
     code: entity.code,
@@ -32,9 +33,31 @@ export function toSummary(entity: PromotionProgramEntity): PromotionProgramSumma
     applyTo: entity.applyTo,
     startDate: toIsoDate(entity.startDate),
     endDate: toIsoDate(entity.endDate),
+    ownerBranchId: entity.ownerBranchId ?? null,
+    ownerBranchName: entity.ownerBranchId ? ownerBranchNames.get(entity.ownerBranchId) ?? null : null,
     createdAt: entity.createdAt.toISOString(),
     updatedAt: entity.updatedAt.toISOString(),
   };
+}
+
+export type OwnerBranchNames = ReadonlyMap<string, string>;
+
+/**
+ * Names of the owning branches, for the "Đơn vị quản lý" column. One query for
+ * the whole page; scoped by organization so a foreign branch id never resolves.
+ */
+export async function loadOwnerBranchNames(
+  manager: EntityManager,
+  organizationId: string,
+  ownerBranchIds: (string | null | undefined)[],
+): Promise<OwnerBranchNames> {
+  const ids = [...new Set(ownerBranchIds.filter((id): id is string => !!id))];
+  if (ids.length === 0) return new Map();
+  const rows: { id: string; name: string }[] = await manager.query(
+    `SELECT id, name FROM branches WHERE organization_id = $1 AND id = ANY($2::uuid[])`,
+    [organizationId, ids],
+  );
+  return new Map(rows.map((row) => [row.id, row.name]));
 }
 
 export interface ResolvedTarget {
@@ -99,7 +122,11 @@ function toConditionDto(condition: PromotionProgram['condition']): PromotionCond
 }
 
 /** The full aggregate for GET /v2/promotions/:id — enough for the form to round-trip without another call. */
-export function toDetail(program: PromotionProgram, resolveTarget: TargetResolver): PromotionProgramDetail {
+export function toDetail(
+  program: PromotionProgram,
+  resolveTarget: TargetResolver,
+  ownerBranchNames: OwnerBranchNames = new Map(),
+): PromotionProgramDetail {
   return {
     id: program.id!,
     code: program.code,
@@ -121,6 +148,8 @@ export function toDetail(program: PromotionProgram, resolveTarget: TargetResolve
     endTime: formatWireTime(program.endTime),
     autoApply: program.autoApply,
     branchIds: program.branchIds,
+    ownerBranchId: program.ownerBranchId ?? null,
+    ownerBranchName: program.ownerBranchId ? ownerBranchNames.get(program.ownerBranchId) ?? null : null,
     invoiceScope: program.invoiceScope,
     accruePoints: program.accruePoints,
     discountMode: program.discountMode,

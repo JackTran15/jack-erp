@@ -1,7 +1,10 @@
 import { useMemo } from "react";
 import { Badge } from "@erp/ui";
 import { BaseDataTable } from "../../../../components/table/BaseDataTable";
-import type { TableColumn } from "../../../../components/table/BaseDataTable";
+import type {
+  ColumnFilterSelectOption,
+  TableColumn,
+} from "../../../../components/table/BaseDataTable";
 import type {
   ColumnFilter,
   ColumnFilterMode,
@@ -16,6 +19,7 @@ import {
   PROMOTION_TYPE_FILTER_OPTIONS,
   PROMOTION_TYPE_LABELS_VI,
 } from "../programs.constants";
+import { ownerLabel } from "../program-ownership";
 
 interface Props {
   rows: PromotionProgramSummary[];
@@ -28,6 +32,8 @@ interface Props {
   columnFilters: Record<string, ColumnFilter>;
   onFilterModeChange: (key: string, mode: ColumnFilterMode) => void;
   onFilterValueChange: (key: string, value: string) => void;
+  /** Có = người dùng quản lý toàn chuỗi: cột "Đơn vị quản lý" lọc được (AC-13). */
+  ownerFilterOptions?: ColumnFilterSelectOption[];
   /**
    * Sắp xếp theo cột: API `POST /v2/promotions/search` **không** nhận tham số
    * sort — nó luôn trả `priority ASC, createdAt DESC`, vì `priority` chính là
@@ -82,6 +88,7 @@ export function ProgramsTable({
   columnFilters,
   onFilterModeChange,
   onFilterValueChange,
+  ownerFilterOptions,
   sortBy,
   sortOrder,
   onSort,
@@ -142,6 +149,15 @@ export function ProgramsTable({
         render: (row) => PROMOTION_TYPE_LABELS_VI[row.type],
       },
       {
+        key: "owner",
+        label: "Đơn vị quản lý",
+        width: 170,
+        // Branch managers see only their own scope, so there is nothing to filter (AC-13).
+        filterKind: ownerFilterOptions ? "select" : "none",
+        filterOptions: ownerFilterOptions,
+        render: (row) => ownerLabel(row),
+      },
+      {
         key: "description",
         label: "Mô tả",
         width: 240,
@@ -161,7 +177,7 @@ export function ProgramsTable({
         ),
       },
     ],
-    [onOpenProgram, today],
+    [onOpenProgram, today, ownerFilterOptions],
   );
 
   return (

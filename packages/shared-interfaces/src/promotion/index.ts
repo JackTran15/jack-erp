@@ -97,6 +97,9 @@ export interface PromotionProgramSummary {
   applyTo: PromotionApplyTo;
   startDate?: string;
   endDate?: string;
+  /** Branch that manages the program; null = chain-owned (company). */
+  ownerBranchId: string | null;
+  ownerBranchName: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -166,6 +169,9 @@ export interface PromotionProgramDetail {
   autoApply: boolean;
   /** promotion_branches — empty = whole chain (BR-005). */
   branchIds: string[];
+  /** Branch that manages the program; null = chain-owned (company). Fixed at create. */
+  ownerBranchId: string | null;
+  ownerBranchName: string | null;
   invoiceScope?: PromotionInvoiceScope;
   /** INVOICE_DISCOUNT only — whether this program lets the invoice it applies to earn loyalty points. */
   accruePoints?: boolean;

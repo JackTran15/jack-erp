@@ -49,7 +49,8 @@ describe('EvaluatePromotionStep', () => {
       { lineId: 'line-1', itemId: 'item-1', quantity: 2, unitPrice: 100000, manualLineDiscount: undefined },
       { lineId: 'line-2', itemId: 'item-2', quantity: 1, unitPrice: 50000, manualLineDiscount: 5000 },
     ]);
-    expect(query.actor).toBe(c.actor); // the same actor reference, passed through
+    // Same actor, priced at the invoice's branch (ADR-07 of 2026100301); this draft has none → the session's.
+    expect(query.actor).toEqual({ ...c.actor, branchId: 'b1' });
   });
 
   it("uses invoice_items.id as lineId, not anything the client sent — the request has no per-item id at all", async () => {
@@ -139,5 +140,34 @@ describe('EvaluatePromotionStep', () => {
     const boom = new Error('UNKNOWN_CUSTOMER');
     const queryBus = { execute: jest.fn().mockRejectedValue(boom) };
     await expect(new EvaluatePromotionStep(queryBus as any).execute(ctx())).rejects.toBe(boom);
+  });
+
+  describe("branch the promotions are priced at (2026100301 AC-20)", () => {
+    it("uses the invoice's branch, not the session's active branch", async () => {
+      const queryBus = { execute: jest.fn().mockResolvedValue(emptyEvaluation) };
+      const c = ctx({
+        actor: { userId: 'u1', organizationId: 'o1', branchId: 'branch-hcm', roles: [] },
+        invoice: { id: 'inv-1', customerId: 'cust-1', branchId: 'branch-hn' } as any,
+      });
+
+      await new EvaluatePromotionStep(queryBus as any).execute(c);
+
+      const query = queryBus.execute.mock.calls[0][0];
+      expect(query.actor.branchId).toBe('branch-hn');
+      expect(query.actor.userId).toBe('u1');
+      expect(c.actor.branchId).toBe('branch-hcm'); // the saga's actor is not mutated
+    });
+
+    it("falls back to the session's branch when the invoice has none", async () => {
+      const queryBus = { execute: jest.fn().mockResolvedValue(emptyEvaluation) };
+      const c = ctx({
+        actor: { userId: 'u1', organizationId: 'o1', branchId: 'branch-hcm', roles: [] },
+        invoice: { id: 'inv-1', customerId: 'cust-1', branchId: undefined } as any,
+      });
+
+      await new EvaluatePromotionStep(queryBus as any).execute(c);
+
+      expect(queryBus.execute.mock.calls[0][0].actor.branchId).toBe('branch-hcm');
+    });
   });
 });

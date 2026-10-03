@@ -42,6 +42,11 @@ export interface PromotionProgramProps {
   autoApply: boolean;
   /** promotion_branches — empty = whole chain (BR-005). */
   branchIds: string[];
+  /**
+   * Branch that owns (manages) this program; undefined = chain-owned (ADR-01).
+   * Fixed at create, never changed. Not the applicable scope — that is `branchIds`.
+   */
+  ownerBranchId?: string;
   invoiceScope?: PromotionInvoiceScope;
   accruePoints: boolean;
   discountMode?: PromotionDiscountMode;
@@ -210,6 +215,18 @@ function validate(props: PromotionProgramProps): DomainValidationIssue[] {
     }
   }
 
+  // ADR-04: a branch-owned program runs only at its owning branch (A-01).
+  if (
+    props.ownerBranchId !== undefined &&
+    (props.branchIds.length !== 1 || props.branchIds[0] !== props.ownerBranchId)
+  ) {
+    issues.push({
+      field: 'branchIds',
+      code: 'OWNER_SCOPE_MISMATCH',
+      message: 'A branch-owned program must apply to exactly its owning branch',
+    });
+  }
+
   if (props.type === PromotionProgramType.BUY_M_GET_N && props.buyGetPolicy === PromotionBuyGetPolicy.CHEAPEST) {
     if (!props.buyQuantity || props.buyQuantity <= 0) {
       issues.push({
@@ -257,6 +274,7 @@ export class PromotionProgram {
   readonly endTime?: TimeOfDay;
   readonly autoApply: boolean;
   readonly branchIds: string[];
+  readonly ownerBranchId?: string;
   readonly invoiceScope?: PromotionInvoiceScope;
   readonly accruePoints: boolean;
   readonly discountMode?: PromotionDiscountMode;
@@ -297,6 +315,7 @@ export class PromotionProgram {
     this.endTime = props.endTime;
     this.autoApply = props.autoApply;
     this.branchIds = props.branchIds;
+    this.ownerBranchId = props.ownerBranchId;
     this.invoiceScope = props.invoiceScope;
     this.accruePoints = props.accruePoints;
     this.discountMode = props.discountMode;
@@ -352,6 +371,7 @@ export class PromotionProgram {
       endTime: this.endTime,
       autoApply: this.autoApply,
       branchIds: this.branchIds,
+      ownerBranchId: this.ownerBranchId,
       invoiceScope: this.invoiceScope,
       accruePoints: this.accruePoints,
       discountMode: this.discountMode,

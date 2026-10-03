@@ -1,0 +1,282 @@
+# Managed by scripts/aidlc.py — do not edit by hand.
+# Editing this file to skip a gate defeats the point of having one.
+feature: promotion-branch-owned-programs
+slug: 2026100301-promotion-branch-owned-programs
+profile: none
+created: 2026-10-03T20:36:30
+ruleset: 7
+current_gate: G3
+history:
+  - gate: G0
+    action: passed
+    at: 2026-10-03T20:52:41
+    by: Akenzy
+    evidence: architecture map verified by Akenzy     # signed 2026-08-03 when approving the AI-DLC regeneration plan; 00-intent.md complete
+  - gate: G1
+    action: passed
+    at: 2026-10-03T21:19:49
+    by: Akenzy
+    evidence: 17 assumptions, none blocking-and-pending; 19 acceptance criteria defined
+  - gate: G2
+    action: passed
+    at: 2026-10-03T21:21:17
+    by: Akenzy
+    evidence: 6 ADR(s) recorded
+  - gate: G3
+    action: passed
+    at: 2026-10-03T21:26:40
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 13 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:34:02
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-10-03T21:39:52
+    by: claude
+    ticket: T-01-01
+  - gate: G4
+    action: scope
+    at: 2026-10-03T21:39:57
+    by: claude
+    reason: pre-existing untracked user files present before this feature started (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts) — not touched by T-01-01
+    ticket: T-01-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T21:39:57
+    by: claude
+    reason: pre-existing untracked user files present before this feature started (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts) — not touched by T-01-01
+    ticket: T-01-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:39:57
+    by: claude
+    ticket: T-01-02
+  - gate: G4
+    action: scope
+    at: 2026-10-03T21:44:42
+    by: claude
+    reason: uncommitted files of done ticket T-01-01 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T21:44:42
+    by: claude
+    reason: uncommitted files of done ticket T-01-01 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:44:42
+    by: claude
+    ticket: T-01-03
+  - gate: G4
+    action: scope
+    at: 2026-10-03T21:47:47
+    by: claude
+    reason: uncommitted files of done tickets T-01-01, T-01-02 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T21:47:47
+    by: claude
+    reason: uncommitted files of done tickets T-01-01, T-01-02 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:47:48
+    by: claude
+    ticket: T-01-04
+  - gate: G4
+    action: scope
+    at: 2026-10-03T21:48:29
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-03 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T21:48:29
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-03 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-04
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:48:29
+    by: claude
+    ticket: T-01-05
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:52:38
+    by: claude
+    ticket: T-03-01
+  - gate: G4
+    action: scope
+    at: 2026-10-03T21:53:40
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-04 and in-progress T-01-05 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-03-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T21:53:40
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-04 and in-progress T-01-05 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-03-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T21:53:40
+    by: claude
+    ticket: T-03-02
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:21:42
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-04, T-03-01 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-05
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:21:42
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-04, T-03-01 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-01-05
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:21:42
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-04, T-03-01 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts); T-01-05; plus apps/api/test/e2e/setup/promotion-seed.ts — undeclared but required - the seeded e2e admin stands for the company and must hold promotion.chain.manage or it becomes a branch manager in 19 suites
+    ticket: T-03-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:21:42
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-04, T-03-01 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts); T-01-05; plus apps/api/test/e2e/setup/promotion-seed.ts — undeclared but required - the seeded e2e admin stands for the company and must hold promotion.chain.manage or it becomes a branch manager in 19 suites
+    ticket: T-03-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:21:50
+    by: claude
+    ticket: T-01-06
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:21:50
+    by: claude
+    reason: no work of its own (deferred to pre-merge); drift is uncommitted files of done tickets T-01-01..T-01-05, T-03-01, T-03-02 + pre-existing untracked user files
+    ticket: T-01-06
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:21:50
+    by: claude
+    reason: no work of its own (deferred to pre-merge); drift is uncommitted files of done tickets T-01-01..T-01-05, T-03-01, T-03-02 + pre-existing untracked user files
+    ticket: T-01-06
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:21:50
+    by: claude
+    ticket: T-02-01
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:23:22
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-05, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:23:22
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-05, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files (.github/workflows/release.yml, deploy/, table-contrast-coverage.test.ts)
+    ticket: T-02-01
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:23:22
+    by: claude
+    ticket: T-02-02
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:23:22
+    by: claude
+    reason: no work of its own (deferred to pre-merge); drift is uncommitted files of done tickets + T-02-01 + pre-existing untracked user files
+    ticket: T-02-02
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:23:22
+    by: claude
+    reason: no work of its own (deferred to pre-merge); drift is uncommitted files of done tickets + T-02-01 + pre-existing untracked user files
+    ticket: T-02-02
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:24:16
+    by: claude
+    ticket: T-01-07
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:32:33
+    by: claude
+    reason: undeclared but required for AC-04 - the 5 PromotionVariant/*/Promotion*.tsx render StoreScopePromotionSection only in 'Toàn chuỗi' view, so each now also renders it when branch-locked (one condition + context import each). Rest is uncommitted files of done tickets T-01-01..T-01-06, T-02-01, T-02-02, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files
+    ticket: T-01-07
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:32:33
+    by: claude
+    reason: undeclared but required for AC-04 - the 5 PromotionVariant/*/Promotion*.tsx render StoreScopePromotionSection only in 'Toàn chuỗi' view, so each now also renders it when branch-locked (one condition + context import each). Rest is uncommitted files of done tickets T-01-01..T-01-06, T-02-01, T-02-02, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files
+    ticket: T-01-07
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:32:42
+    by: claude
+    ticket: T-02-03
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:34:12
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-07, T-02-01, T-02-02, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files
+    ticket: T-02-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:34:12
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-07, T-02-01, T-02-02, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files
+    ticket: T-02-03
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:34:13
+    by: claude
+    ticket: T-02-04
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:36:55
+    by: claude
+    reason: undeclared but required for AC-09 - the 5 PromotionVariant/*/Promotion*.tsx wrap their content in <fieldset disabled={readOnly}> (tabs must stay clickable, so the page cannot wrap the whole variant). Rest is uncommitted files of done tickets T-01-01..T-01-07, T-02-01..T-02-03, T-03-01, T-03-02 + pre-existing untracked user files
+    ticket: T-02-04
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:36:55
+    by: claude
+    reason: undeclared but required for AC-09 - the 5 PromotionVariant/*/Promotion*.tsx wrap their content in <fieldset disabled={readOnly}> (tabs must stay clickable, so the page cannot wrap the whole variant). Rest is uncommitted files of done tickets T-01-01..T-01-07, T-02-01..T-02-03, T-03-01, T-03-02 + pre-existing untracked user files
+    ticket: T-02-04
+  - gate: G3
+    action: reopened
+    at: 2026-10-03T22:51:37
+    by: Akenzy
+    reason: Add T-03-03 / AC-20 - checkout saga and exchange evaluate promotions by the caller's active branch, not the invoice's; with branch-owned programs a draft from HN checked out under HCM would get HCM's programs. Requested by Akenzy 2026-10-03 - 'fix theo hóa đơn fallback actor'
+  - gate: G3
+    action: passed
+    at: 2026-10-03T22:52:18
+    by: Akenzy
+    evidence: graph valid - 3 UoW, 14 tickets, no cycles
+  - gate: G4
+    action: ticket in_progress
+    at: 2026-10-03T22:52:18
+    by: claude
+    ticket: T-03-03
+  - gate: G4
+    action: scope
+    at: 2026-10-03T22:53:57
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-07, T-02-01..T-02-04, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files
+    ticket: T-03-03
+  - gate: G4
+    action: ticket done (review bypassed)
+    at: 2026-10-03T22:53:57
+    by: claude
+    reason: uncommitted files of done tickets T-01-01..T-01-07, T-02-01..T-02-04, T-03-01, T-03-02 (agent commits are hook-blocked) + pre-existing untracked user files
+    ticket: T-03-03
