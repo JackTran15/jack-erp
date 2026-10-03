@@ -506,11 +506,10 @@ describe('permission catalogue coverage', () => {
     'reporting.profit.consolidated.read',
     'reporting.debts.consolidated.read',
     'reporting.cash.consolidated.read',
-    // Back-office promotion catalogue: POS prices a cart with
-    // pos.promotion.evaluate instead.
-    'promotion.read',
-    'promotion.write',
-    'promotion.delete',
+    // CTKM toàn chuỗi. promotion.read/write/delete went to BRANCH_MANAGER with
+    // branch-owned programs (2026100301, ADR-02); managing every branch's
+    // programs stays with the company.
+    'promotion.chain.manage',
     // Onboarding an organization or a branch.
     'org.registration.submit',
     'org.registration.approve',
@@ -614,6 +613,32 @@ describe('member points permission seeds (2026100101 T-01-01)', () => {
   it('keeps both keys off SALES, CASHIER and WAREHOUSE (A-06)', () => {
     for (const keys of [SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS, WAREHOUSE_PERMISSION_KEYS]) {
       for (const key of POINT_KEYS) expect(keys).not.toContain(key);
+    }
+  });
+});
+
+describe('branch-owned promotion programs (2026100301 AC-14)', () => {
+  const PROGRAM_KEYS = ['promotion.read', 'promotion.write', 'promotion.delete'];
+  const CHAIN_KEY = 'promotion.chain.manage';
+
+  it('registers promotion.chain.manage with a Vietnamese label', () => {
+    expect(PERMISSION_SEEDS.map((seed) => seed.key)).toContain(CHAIN_KEY);
+    expect(PERMISSION_LABELS_VI[CHAIN_KEY]).toBe('Quản lý CTKM toàn chuỗi');
+  });
+
+  it('lets BRANCH_MANAGER manage programs but not the whole chain', () => {
+    for (const key of PROGRAM_KEYS) expect(BRANCH_MANAGER_PERMISSION_KEYS).toContain(key);
+    expect(BRANCH_MANAGER_PERMISSION_KEYS).not.toContain(CHAIN_KEY);
+  });
+
+  it('keeps the chain-wide key for User Root and General Manager', () => {
+    expect(SYSTEM_ADMIN_PERMISSION_KEYS).toContain(CHAIN_KEY);
+    expect(GENERAL_MANAGER_PERMISSION_KEYS).toContain(CHAIN_KEY);
+  });
+
+  it('gives staff roles none of the promotion keys', () => {
+    for (const keys of [SALES_PERMISSION_KEYS, CASHIER_PERMISSION_KEYS, WAREHOUSE_PERMISSION_KEYS]) {
+      for (const key of [...PROGRAM_KEYS, CHAIN_KEY]) expect(keys).not.toContain(key);
     }
   });
 });

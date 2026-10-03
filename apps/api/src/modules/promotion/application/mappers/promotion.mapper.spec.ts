@@ -176,6 +176,24 @@ describe('promotion.mapper round-trip', () => {
     expect(roundTrip(original)).toEqual(original);
   });
 
+  it('a branch-owned program round-trips its owner through owner_branch_id (ADR-01)', () => {
+    const original = aProgram()
+      .ofType(PromotionProgramType.INVOICE_DISCOUNT)
+      .with({ ownerBranchId: 'branch-hcm', branchIds: ['branch-hcm'], discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 })
+      .build();
+
+    const bundle = toPersistence(original);
+    expect(bundle.program.ownerBranchId).toBe('branch-hcm');
+    expect(roundTrip(original).ownerBranchId).toBe('branch-hcm');
+  });
+
+  it('a chain-owned program persists owner_branch_id as NULL and reads back undefined', () => {
+    const original = aProgram().ofType(PromotionProgramType.INVOICE_DISCOUNT).with({ discountMode: PromotionDiscountMode.PERCENT, discountValue: 10 }).build();
+
+    expect(toPersistence(original).program.ownerBranchId).toBeNull();
+    expect(roundTrip(original).ownerBranchId).toBeUndefined();
+  });
+
   it('a program with no branches/customer groups/condition round-trips with empty arrays and undefined condition', () => {
     const original = aProgram().build();
 

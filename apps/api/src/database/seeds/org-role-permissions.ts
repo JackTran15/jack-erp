@@ -81,6 +81,10 @@ const ROOT_AND_GENERAL_MANAGER_ONLY_KEYS: ReadonlySet<string> = new Set([
   'accounting.bank_payment.delete',
   'accounting.cash_voucher_category.delete',
   'pos.invoice.cancel',
+  // CTKM toàn chuỗi (ADR-02, 2026100301): without it a holder of `promotion.*`
+  // manages only the programs owned by their active branch. Must NOT reach
+  // BRANCH_MANAGER through the `promotion.` prefix below.
+  'promotion.chain.manage',
   // Điều phối đơn web (A-08, ADR-07). Both keys are org-level by construction
   // and must NOT fall to BRANCH_MANAGER through the `pos.` prefix below:
   //   - `dispatch` hands an order to ANY branch in the chain, so a branch
@@ -125,6 +129,8 @@ export const BRANCH_MANAGER_PERMISSION_KEYS: string[] = ALL_PERMISSION_KEYS.filt
       key.startsWith('inventory.') ||
       key.startsWith('product.') ||
       key.startsWith('pos.') ||
+      // CTKM của chính chi nhánh (2026100301); the chain-wide key is excluded above.
+      key.startsWith('promotion.') ||
       key.startsWith('goods_receipt.') ||
       key.startsWith('accounting.') ||
       key.startsWith('reporting.dashboard.branch.') ||

@@ -64,12 +64,18 @@ export class PromotionResolver {
     // ADR-03: `selectedProgramIds` carries a second meaning here — a program the
     // cashier explicitly picked wins any contested resource ahead of `priority`,
     // not just "is allowed to run" (that's the `runnable` filter above). Same
-    // selection-tier ⇒ priority as before; still tied ⇒ programId, so the result
-    // never depends on the input array's order (`programs` has no defined order).
+    // selection-tier ⇒ a program owned by the cart's own branch beats a chain
+    // program ("branch wins", ADR-05 of 2026100301) ⇒ priority as before; still
+    // tied ⇒ programId, so the result never depends on the input array's order
+    // (`programs` has no defined order). One sort feeds all three phases below,
+    // so line, gift and invoice contests all follow it.
     const sorted = [...runnable].sort((a, b) => {
       const aSelected = cart.selectedProgramIds.includes(a.id!);
       const bSelected = cart.selectedProgramIds.includes(b.id!);
       if (aSelected !== bSelected) return aSelected ? -1 : 1;
+      const aOwnBranch = a.ownerBranchId === cart.branchId;
+      const bOwnBranch = b.ownerBranchId === cart.branchId;
+      if (aOwnBranch !== bOwnBranch) return aOwnBranch ? -1 : 1;
       if (a.priority !== b.priority) return a.priority - b.priority;
       const createdDelta = (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0);
       if (createdDelta !== 0) return createdDelta;

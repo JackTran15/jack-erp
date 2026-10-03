@@ -686,7 +686,10 @@ export class CheckoutReturnService {
       line.manualLineDiscount = Number(item.lineDiscount) || undefined;
       return line;
     });
-    return this.queryBus.execute(new EvaluateCartQuery(dto, actor));
+    // Same rule as the sale (ADR-07 of 2026100301): the invoice's branch, then the session's.
+    return this.queryBus.execute(
+      new EvaluateCartQuery(dto, { ...actor, branchId: invoice.branchId ?? actor.branchId }),
+    );
   }
 
   /**

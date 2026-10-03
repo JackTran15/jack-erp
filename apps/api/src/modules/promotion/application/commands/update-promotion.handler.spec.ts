@@ -5,6 +5,12 @@ import { UpdatePromotionCommand } from './update-promotion.command';
 import { UpdatePromotionV2Dto } from '../dto/update-promotion.dto';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { PromotionProgram } from '../../domain/model/promotion-program';
+import { PromotionAccess } from '../promotion-access.policy';
+
+/** `forActor` stub: chain manager unless a test swaps in a branch manager. */
+function accessStub(isChainManager = true, activeBranchId: string | null = 'branch-1') {
+  return { forActor: jest.fn(async () => new PromotionAccess(isChainManager, activeBranchId ?? undefined)) };
+}
 
 const actor: ActorContext = { userId: 'user-1', organizationId: 'org-1', branchId: 'branch-1', roles: [] };
 
@@ -49,7 +55,7 @@ describe('UpdatePromotionHandler', () => {
 
   beforeEach(() => {
     repo = { findById: jest.fn(), save: jest.fn(async (program) => program) };
-    handler = new UpdatePromotionHandler(repo as any);
+    handler = new UpdatePromotionHandler(repo as any, accessStub() as any);
   });
 
   it('updates fields while preserving id/code/status/createdBy', async () => {
@@ -106,5 +112,49 @@ describe('UpdatePromotionHandler', () => {
     const result = await handler.execute(new UpdatePromotionCommand('program-1', baseDto(), actor));
 
     expect(result.groups[0].id).not.toBe('group-1');
+  });
+
+  describe('ownership (2026100301 AC-02, AC-06, AC-07, AC-11)', () => {
+    const asBranchManager = () => new UpdatePromotionHandler(repo as any, accessStub(false, 'branch-hcm') as any);
+
+    it('AC-02: a branch manager edits its own program; owner and pinned scope survive', async () => {
+      repo.findById.mockResolvedValue(existingProgram({ ownerBranchId: 'branch-hcm', branchIds: ['branch-hcm'] }));
+
+      const result = await asBranchManager().execute(
+        new UpdatePromotionCommand('program-1', baseDto({ branchIds: [] }), actor),
+      );
+
+      expect(result.name).toBe('Updated name');
+      expect(result.ownerBranchId).toBe('branch-hcm');
+      expect(result.branchIds).toEqual(['branch-hcm']);
+    });
+
+    it('AC-06: a branch manager editing a visible chain program gets 403', async () => {
+      repo.findById.mockResolvedValue(existingProgram({ branchIds: [] }));
+
+      await expect(
+        asBranchManager().execute(new UpdatePromotionCommand('program-1', baseDto(), actor)),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('AC-07: a branch manager editing another branch\'s program gets 404', async () => {
+      repo.findById.mockResolvedValue(existingProgram({ ownerBranchId: 'branch-hn', branchIds: ['branch-hn'] }));
+
+      await expect(
+        asBranchManager().execute(new UpdatePromotionCommand('program-1', baseDto(), actor)),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('AC-11: a chain manager edits a branch program without changing its owner or scope', async () => {
+      repo.findById.mockResolvedValue(existingProgram({ ownerBranchId: 'branch-hcm', branchIds: ['branch-hcm'] }));
+
+      const result = await handler.execute(
+        new UpdatePromotionCommand('program-1', baseDto({ branchIds: ['branch-hn'] }), actor),
+      );
+
+      expect(result.ownerBranchId).toBe('branch-hcm');
+      expect(result.branchIds).toEqual(['branch-hcm']);
+    });
   });
 });

@@ -5,7 +5,9 @@ import { PromotionProgramSummary } from '@erp/shared-interfaces';
 import { FilterBuilder } from '../../../../common/filters/filter.builder';
 import { DateRangeFilterDto } from '../../../../common/filters/filter.dto';
 import { PromotionProgramEntity } from '../../infrastructure/entities';
-import { toSummary } from '../dto/promotion-program.response.dto';
+import { loadOwnerBranchNames, toSummary } from '../dto/promotion-program.response.dto';
+import { PROMOTION_OWNER_CHAIN } from '../dto/promotion-search-v2.dto';
+import { PromotionAccessPolicy } from '../promotion-access.policy';
 import { SearchPromotionsV2Query } from './search-promotions-v2.query';
 
 export interface SearchPromotionsV2Result {
@@ -48,11 +50,13 @@ export class SearchPromotionsV2Handler implements IQueryHandler<SearchPromotions
   constructor(
     @InjectRepository(PromotionProgramEntity)
     private readonly repo: Repository<PromotionProgramEntity>,
+    private readonly access: PromotionAccessPolicy,
   ) {}
 
   async execute({ dto, actor }: SearchPromotionsV2Query): Promise<SearchPromotionsV2Result> {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 50;
+    const scope = (await this.access.forActor(actor)).searchScope();
 
     const qb = this.repo
       .createQueryBuilder('p')
@@ -61,14 +65,28 @@ export class SearchPromotionsV2Handler implements IQueryHandler<SearchPromotions
 
     // promotion_programs.branch_id is the creator's branch, not the promotion's
     // applicable scope — that scope lives in promotion_branches (empty = whole chain).
-    if (actor.branchId) {
+    // A branch manager sees its branch's own programs plus chain programs that
+    // apply to it (AC-08); other branches' programs never appear.
+    if (scope.kind === 'branch') {
       qb.andWhere(
         `(
-          NOT EXISTS (SELECT 1 FROM promotion_branches pb WHERE pb.program_id = p.id)
-          OR EXISTS (SELECT 1 FROM promotion_branches pb WHERE pb.program_id = p.id AND pb.branch_id = :branchId)
+          p.ownerBranchId = :branchId
+          OR (
+            p.ownerBranchId IS NULL
+            AND (
+              NOT EXISTS (SELECT 1 FROM promotion_branches pb WHERE pb.program_id = p.id)
+              OR EXISTS (SELECT 1 FROM promotion_branches pb WHERE pb.program_id = p.id AND pb.branch_id = :branchId)
+            )
+          )
         )`,
-        { branchId: actor.branchId },
+        { branchId: scope.branchId },
       );
+    } else if (dto.owner?.value === PROMOTION_OWNER_CHAIN) {
+      // Chain managers see the whole organization whatever their active branch
+      // (A-08); the "Đơn vị quản lý" filter narrows it on request (AC-10).
+      qb.andWhere('p.ownerBranchId IS NULL');
+    } else if (dto.owner) {
+      qb.andWhere('p.ownerBranchId = :ownerBranchId', { ownerBranchId: dto.owner.value });
     }
 
     // No default status filter here — the "Tracking only" default (FR-004) is
@@ -98,6 +116,12 @@ export class SearchPromotionsV2Handler implements IQueryHandler<SearchPromotions
 
     const [data, total] = await qb.getManyAndCount();
 
-    return { data: data.map(toSummary), total, page, limit };
+    const ownerBranchNames = await loadOwnerBranchNames(
+      this.repo.manager,
+      actor.organizationId,
+      data.map((row) => row.ownerBranchId),
+    );
+
+    return { data: data.map((row) => toSummary(row, ownerBranchNames)), total, page, limit };
   }
 }

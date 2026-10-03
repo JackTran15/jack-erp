@@ -13,6 +13,12 @@ import { CreatePromotionHandler } from './create-promotion.handler';
 import { CreatePromotionCommand } from './create-promotion.command';
 import { CreatePromotionV2Dto } from '../dto/create-promotion.dto';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
+import { PromotionAccess } from '../promotion-access.policy';
+
+/** `forActor` stub: chain manager unless a test swaps in a branch manager. */
+function accessStub(isChainManager = true, activeBranchId: string | null = 'branch-1') {
+  return { forActor: jest.fn(async () => new PromotionAccess(isChainManager, activeBranchId ?? undefined)) };
+}
 
 const actor: ActorContext = {
   userId: 'user-1',
@@ -41,7 +47,7 @@ describe('CreatePromotionHandler', () => {
   beforeEach(() => {
     repo = { save: jest.fn(async (program) => program) };
     docNumbering = { generate: jest.fn().mockResolvedValue('KM000001') };
-    handler = new CreatePromotionHandler(repo as any, docNumbering as any);
+    handler = new CreatePromotionHandler(repo as any, docNumbering as any, accessStub() as any);
   });
 
   it('generates a code via DocumentNumberingService and creates INVOICE_DISCOUNT', async () => {
@@ -169,5 +175,33 @@ describe('CreatePromotionHandler', () => {
     expect(first.id).not.toBe(second.id);
     expect(first.groups[0].id).not.toBe(second.groups[0].id);
     expect(first.groups[0].lines[0].id).not.toBe(second.groups[0].lines[0].id);
+  });
+
+  describe('ownership (2026100301 AC-01, AC-03, AC-12)', () => {
+    it('AC-01: a branch manager creates a program owned by the active branch, scope forced to it', async () => {
+      handler = new CreatePromotionHandler(repo as any, docNumbering as any, accessStub(false, 'branch-hcm') as any);
+
+      const result = await handler.execute(new CreatePromotionCommand(baseDto({ branchIds: ['branch-hn'] }), actor));
+
+      expect(result.ownerBranchId).toBe('branch-hcm');
+      expect(result.branchIds).toEqual(['branch-hcm']);
+    });
+
+    it('AC-03: a branch manager without an active branch gets 403 and no code is burned', async () => {
+      handler = new CreatePromotionHandler(repo as any, docNumbering as any, accessStub(false, null) as any);
+
+      await expect(handler.execute(new CreatePromotionCommand(baseDto(), actor))).rejects.toMatchObject({
+        status: 403,
+      });
+      expect(docNumbering.generate).not.toHaveBeenCalled();
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it('AC-12: a chain manager creates a chain-owned program with the submitted scope', async () => {
+      const result = await handler.execute(new CreatePromotionCommand(baseDto({ branchIds: ['branch-hn'] }), actor));
+
+      expect(result.ownerBranchId).toBeUndefined();
+      expect(result.branchIds).toEqual(['branch-hn']);
+    });
   });
 });

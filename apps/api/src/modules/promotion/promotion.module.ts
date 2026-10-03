@@ -46,6 +46,7 @@ import { EvaluateCartHandler } from './application/queries/evaluate-cart.handler
 import { SearchVouchersV2Handler } from './application/queries/search-vouchers-v2.handler';
 import { ExportItemDiscountLinesHandler } from './application/queries/export-item-discount-lines.handler';
 import { ImportItemDiscountLinesHandler } from './application/queries/import-item-discount-lines.handler';
+import { PromotionAccessPolicy } from './application/promotion-access.policy';
 import { PromotionResolver } from './domain/engine/promotion-resolver';
 
 const COMMAND_HANDLERS = [
@@ -103,6 +104,7 @@ const QUERY_HANDLERS = [
     { provide: CATALOG_READER, useClass: TypeormCatalogReader },
     { provide: CUSTOMER_READER, useClass: TypeormCustomerReader },
     PromotionResolver,
+    PromotionAccessPolicy,
     ...COMMAND_HANDLERS,
     ...QUERY_HANDLERS,
   ],

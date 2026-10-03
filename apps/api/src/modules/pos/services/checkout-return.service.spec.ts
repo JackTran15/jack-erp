@@ -2377,7 +2377,32 @@ describe('CheckoutReturnService — debt offset routing', () => {
       expect(query.dto.lines).toEqual([
         expect.objectContaining({ lineId: 'exc-out', itemId: 'item-new', quantity: 2, unitPrice: 100000 }),
       ]);
-      expect(query.actor).toBe(actor);
+      // Same actor, priced at the exchange invoice's branch (ADR-07 of 2026100301).
+      expect(query.actor).toEqual({ ...actor, branchId: 'branch-1' });
+    });
+
+    describe("branch the new lines are priced at (2026100301 AC-20)", () => {
+      it("uses the invoice's branch, not the session's active branch", async () => {
+        invoiceRepo.findOne.mockImplementation(({ where }) =>
+          Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub({ branchId: 'branch-hn' }) : null),
+        );
+
+        await service.checkout('exc-1', cashDto() as never, { ...actor, branchId: 'branch-hcm' });
+
+        const [query] = queryBus.execute.mock.calls[0];
+        expect(query.actor.branchId).toBe('branch-hn');
+        expect(query.actor.userId).toBe(actor.userId);
+      });
+
+      it("falls back to the session's branch when the invoice has none", async () => {
+        invoiceRepo.findOne.mockImplementation(({ where }) =>
+          Promise.resolve(where.id === 'exc-1' ? exchangeDraftStub({ branchId: undefined }) : null),
+        );
+
+        await service.checkout('exc-1', cashDto() as never, { ...actor, branchId: 'branch-hcm' });
+
+        expect(queryBus.execute.mock.calls[0][0].actor.branchId).toBe('branch-hcm');
+      });
     });
 
     it('settles on newNet: 200.000 − 60.000 − 685.000 ⇒ netAmount −545.000, refundedAmount 545.000 (AC-10 shape)', async () => {

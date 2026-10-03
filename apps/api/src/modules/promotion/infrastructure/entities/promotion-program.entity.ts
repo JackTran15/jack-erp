@@ -18,6 +18,7 @@ import { BaseEntity } from '../../../../database/entities/base.entity';
 @Index('uq_promotion_program_org_code', ['organizationId', 'code'], { unique: true })
 @Index('IDX_promotion_programs_org_status_dates', ['organizationId', 'status', 'startDate', 'endDate'])
 @Index('IDX_promotion_programs_org_priority', ['organizationId', 'priority'])
+@Index('IDX_promotion_programs_org_owner', ['organizationId', 'ownerBranchId'])
 export class PromotionProgramEntity extends BaseEntity {
   @DeleteDateColumn({ name: 'deleted_at' })
   deletedAt?: Date;
@@ -44,6 +45,14 @@ export class PromotionProgramEntity extends BaseEntity {
 
   @Column({ type: 'int', default: 100 })
   priority: number;
+
+  /**
+   * Branch that manages this program; NULL = chain-owned (ADR-01). Not the
+   * inherited `branch_id` (creator's branch) and not the applicable scope
+   * (`promotion_branches`).
+   */
+  @Column({ name: 'owner_branch_id', type: 'uuid', nullable: true })
+  ownerBranchId?: string | null;
 
   @Column({
     name: 'apply_to',

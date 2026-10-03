@@ -66,6 +66,7 @@ export function buildPromotionFilters(
       to: period.to,
     },
     endDate: dateRange(columnFilters.endDate),
+    owner: columnFilters.owner?.value ? { value: columnFilters.owner.value } : undefined,
   };
 }
 
@@ -82,6 +83,7 @@ const COLUMN_CHIP_LABELS: Record<string, string> = {
   status: "Trạng thái",
   startDate: "Ngày bắt đầu",
   endDate: "Ngày kết thúc",
+  owner: "Đơn vị quản lý",
 };
 
 const ENUM_CHIP_VALUE_LABELS: Record<string, Record<string, string>> = {
@@ -94,6 +96,8 @@ const ENUM_CHIP_VALUE_LABELS: Record<string, Record<string, string>> = {
 export function buildFilterChips(
   columnFilters: Record<string, ColumnFilter>,
   trackingOnly: boolean,
+  /** Nhãn của bộ lọc "Đơn vị quản lý" (`CHAIN` / id chi nhánh → tên). */
+  ownerLabels: Record<string, string> = {},
 ): FilterChip[] {
   const chips: FilterChip[] = [];
 
@@ -106,7 +110,7 @@ export function buildFilterChips(
     if (!shown) continue;
     const column = COLUMN_CHIP_LABELS[key] ?? key;
     const value = filter.value
-      ? (ENUM_CHIP_VALUE_LABELS[key]?.[filter.value] ?? filter.value)
+      ? ((key === "owner" ? ownerLabels : ENUM_CHIP_VALUE_LABELS[key])?.[filter.value] ?? filter.value)
       : [filter.from, filter.to].filter(Boolean).join(" → ");
     chips.push({ id: key, label: `${column}: ${value}` });
   }

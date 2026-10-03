@@ -32,6 +32,8 @@ export interface PromotionSearchFilters {
   applyTo?: EnumFilter;
   startDate?: DateRangeFilter;
   endDate?: DateRangeFilter;
+  /** "Đơn vị quản lý": `CHAIN` or a branch id; the API honours it for chain managers only. */
+  owner?: { value: string };
 }
 
 export interface PromotionSearchResponse {

@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { Button } from "@erp/ui";
+import { ArrowLeft } from "lucide-react";
 import { AdminPageShell } from "../../../../components/layout/AdminPageShell";
 import { PageHeader } from "../../../../components/layout/PageHeader";
 import { ConfirmActionModal } from "../../../../components/table/ConfirmActionModal";
@@ -12,6 +14,9 @@ import {
 import { PromotionIssuesProvider } from "./promotion-issues.context";
 import { PromotionFormModeProvider } from "./promotion-form-mode.context";
 import { buildInitialFormState } from "../program-form.constants";
+import { branchLockFor, canManageProgram, PROMOTION_CHAIN_MANAGE } from "../program-ownership";
+import { usePermissionCheck } from "../../../../hooks/usePermissionCheck";
+import { getActiveBranch } from "../../../../lib/auth-storage";
 import { PromotionForm, PROMOTION_FORM_LABELS, PromotionApplyTo } from "../programs.constants";
 import type { ProgramFormState } from "../program-form.types";
 import type { PromotionProgramDetail } from "@erp/shared-interfaces";
@@ -122,6 +127,22 @@ export function ProgramFormPage() {
   const sourceId = id ?? duplicateFromId;
 
   const { data: source, isLoading: isLoadingSource } = usePromotionQuery(sourceId);
+
+  const { has } = usePermissionCheck([PROMOTION_CHAIN_MANAGE]);
+  const isChainManager = has(PROMOTION_CHAIN_MANAGE);
+  // Nhân bản là Thêm mới: bản sao thuộc về người tạo, không thuộc về CTKM nguồn (A-12).
+  const editing = isEdit ? source : undefined;
+  const branchLock = useMemo(
+    () =>
+      branchLockFor({
+        editing: editing && { ownerBranchId: editing.ownerBranchId, ownerBranchName: editing.ownerBranchName },
+        activeBranchId: getActiveBranch(),
+        isChainManager,
+      }),
+    [editing, isChainManager],
+  );
+  // Mở được nhưng không quản lý được (CTKM công ty với quản lý chi nhánh): chỉ xem (AC-09).
+  const readOnly = editing ? !canManageProgram(editing, getActiveBranch(), isChainManager) : false;
 
   const [form, setForm] = useState<ProgramFormState>(() => buildInitialFormState());
   const [formNonce, setFormNonce] = useState(0);
@@ -312,13 +333,30 @@ export function ProgramFormPage() {
   return (
     <AdminPageShell>
       <PageHeader title={pageTitle} />
-      <FormActionBar
-        position="top"
-        onSave={handleSave}
-        onSaveAndNew={handleSaveAndNew}
-        onCancel={handleCancel}
-        saveDisabled={isSaving}
-      />
+      {readOnly ? (
+        <>
+          <div className="flex shrink-0 items-center gap-2 border-b bg-background px-2 py-3">
+            <Button type="button" variant="outline" onClick={handleCancel}>
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Quay lại
+            </Button>
+          </div>
+          <div
+            role="status"
+            className="mx-4 mt-3 rounded-md border border-border bg-muted p-3 text-sm text-muted-foreground"
+          >
+            Chương trình do công ty quản lý — chỉ xem
+          </div>
+        </>
+      ) : (
+        <FormActionBar
+          position="top"
+          onSave={handleSave}
+          onSaveAndNew={handleSaveAndNew}
+          onCancel={handleCancel}
+          saveDisabled={isSaving}
+        />
+      )}
 
       {unboundIssues.length > 0 ? (
         <div
@@ -336,19 +374,26 @@ export function ProgramFormPage() {
         </div>
       ) : null}
 
-      <PromotionFormModeProvider isEdit={isEdit} promotionForm={promotionForm}>
+      <PromotionFormModeProvider
+        isEdit={isEdit}
+        promotionForm={promotionForm}
+        branchLock={branchLock}
+        readOnly={readOnly}
+      >
         <PromotionIssuesProvider issues={issues}>
           <Variant key={formNonce} form={form} onChange={onChange} />
         </PromotionIssuesProvider>
       </PromotionFormModeProvider>
 
-      <FormActionBar
-        position="bottom"
-        onSave={handleSave}
-        onSaveAndNew={handleSaveAndNew}
-        onCancel={handleCancel}
-        saveDisabled={isSaving}
-      />
+      {readOnly ? null : (
+        <FormActionBar
+          position="bottom"
+          onSave={handleSave}
+          onSaveAndNew={handleSaveAndNew}
+          onCancel={handleCancel}
+          saveDisabled={isSaving}
+        />
+      )}
 
       {pendingAfterSave ? (
         <ConfirmActionModal

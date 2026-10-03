@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { PROMOTION_REPOSITORY, PromotionRepositoryPort } from '../../domain/ports/promotion-repository.port';
 import { InvoicePromotionEntity } from '../../invoice-promotion.entity';
 import { DeletePromotionCommand } from './delete-promotion.command';
+import { PromotionAccessPolicy } from '../promotion-access.policy';
 
 @CommandHandler(DeletePromotionCommand)
 export class DeletePromotionHandler implements ICommandHandler<DeletePromotionCommand> {
@@ -12,6 +13,7 @@ export class DeletePromotionHandler implements ICommandHandler<DeletePromotionCo
     @Inject(PROMOTION_REPOSITORY) private readonly repo: PromotionRepositoryPort,
     @InjectRepository(InvoicePromotionEntity)
     private readonly invoicePromotionRepo: Repository<InvoicePromotionEntity>,
+    private readonly access: PromotionAccessPolicy,
   ) {}
 
   async execute({ id, actor }: DeletePromotionCommand): Promise<void> {
@@ -19,6 +21,8 @@ export class DeletePromotionHandler implements ICommandHandler<DeletePromotionCo
     if (!existing) {
       throw new NotFoundException(`Promotion program "${id}" not found`);
     }
+    // Before the invoice check, so its answer never leaks another branch's program.
+    (await this.access.forActor(actor)).assertManageable(existing);
 
     await this.assertNotReferenced(id);
     await this.repo.softDelete(actor.organizationId, id);

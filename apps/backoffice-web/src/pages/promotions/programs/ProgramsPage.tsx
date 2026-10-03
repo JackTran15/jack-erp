@@ -25,6 +25,10 @@ import { useDebouncedValue } from "../../../lib/use-debounced-value";
 import { ProgramsTable } from "./ProgramsTable/ProgramsTable";
 import { ADD_NEW_TYPE_OPTIONS } from "./programs.constants";
 import { buildFilterChips, buildPromotionFilters } from "./programs-filter";
+import { allManageable, CHAIN_OWNER_LABEL, PROMOTION_CHAIN_MANAGE } from "./program-ownership";
+import { getActiveBranch } from "../../../lib/auth-storage";
+import { usePermissionCheck } from "../../../hooks/usePermissionCheck";
+import { useMyBranches } from "../../../hooks/iam/useBranches";
 import { useDeletePromotion, usePromotionsQuery } from "../api/use-promotions";
 
 export function ProgramsPage() {
@@ -67,9 +71,28 @@ export function ProgramsPage() {
 
   const rows = data?.data ?? [];
   const total = data?.total ?? 0;
+  // "Đơn vị quản lý" chỉ lọc được với người quản lý toàn chuỗi (AC-13).
+  const { has } = usePermissionCheck([PROMOTION_CHAIN_MANAGE]);
+  const isChainManager = has(PROMOTION_CHAIN_MANAGE);
+  const { data: branches = [] } = useMyBranches(isChainManager);
+  const ownerFilterOptions = useMemo(
+    () =>
+      isChainManager
+        ? [
+            { value: "CHAIN", label: CHAIN_OWNER_LABEL },
+            ...branches.map((b) => ({ value: b.id, label: b.name })),
+          ]
+        : undefined,
+    [isChainManager, branches],
+  );
+  const ownerLabels = useMemo(
+    () => Object.fromEntries((ownerFilterOptions ?? []).map((o) => [o.value, o.label])),
+    [ownerFilterOptions],
+  );
+
   const chips = useMemo(
-    () => buildFilterChips(columnFilters, trackingOnly),
-    [columnFilters, trackingOnly],
+    () => buildFilterChips(columnFilters, trackingOnly, ownerLabels),
+    [columnFilters, trackingOnly, ownerLabels],
   );
 
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
@@ -169,6 +192,17 @@ export function ProgramsPage() {
     [navigate],
   );
 
+  // AC-09: Sửa/Xóa chỉ bật khi mọi dòng đang chọn đều quản lý được; Nhân bản vẫn bật (A-12).
+  const selectionManageable = useMemo(
+    () =>
+      allManageable(
+        rows.filter((row) => selectedIds.has(row.id)),
+        getActiveBranch(),
+        isChainManager,
+      ),
+    [rows, selectedIds, isChainManager],
+  );
+
   const toolbarItems = useMemo<ToolbarItem[]>(
     () => [
       {
@@ -192,7 +226,7 @@ export function ProgramsPage() {
       },
       {
         ...TOOLBAR_REGISTRY.edit,
-        disabled: selectedCount !== 1,
+        disabled: selectedCount !== 1 || !selectionManageable,
         onClick: () => {
           const id = [...selectedIds][0];
           if (id) navigate(`/promotions/programs/${id}/edit`);
@@ -200,13 +234,13 @@ export function ProgramsPage() {
       },
       {
         ...TOOLBAR_REGISTRY.delete,
-        disabled: selectedCount === 0,
+        disabled: selectedCount === 0 || !selectionManageable,
         onClick: () => setDeleteConfirmOpen(true),
       },
       { id: "sep-2", type: "separator" },
       { ...TOOLBAR_REGISTRY.refresh, onClick: handleRefresh },
     ],
-    [selectedCount, selectedIds, handleRefresh, navigate],
+    [selectedCount, selectedIds, selectionManageable, handleRefresh, navigate],
   );
 
   return (
@@ -292,6 +326,7 @@ export function ProgramsPage() {
           columnFilters={columnFilters}
           onFilterModeChange={handleFilterModeChange}
           onFilterValueChange={handleFilterValueChange}
+          ownerFilterOptions={ownerFilterOptions}
         />
       </div>
     </DocumentListShell>

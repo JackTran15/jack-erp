@@ -10,10 +10,20 @@ import { GetPromotionHandler } from './get-promotion.handler';
 import { GetPromotionQuery } from './get-promotion.query';
 import { ActorContext } from '../../../../common/decorators/actor-context.decorator';
 import { PromotionProgram } from '../../domain/model/promotion-program';
+import { PromotionAccess } from '../promotion-access.policy';
+
+/** `forActor` stub: chain manager (today's behaviour) unless a test swaps in a branch manager. */
+function accessStub(isChainManager = true) {
+  return {
+    forActor: jest.fn(async (a: ActorContext) => new PromotionAccess(isChainManager, a.branchId)),
+  };
+}
 
 const actor: ActorContext = { userId: 'user-1', organizationId: 'org-1', branchId: 'branch-1', roles: [] };
 
-function programWithLines(): PromotionProgram {
+function programWithLines(
+  overrides: Partial<Parameters<typeof PromotionProgram.create>[0]> = {},
+): PromotionProgram {
   return PromotionProgram.create({
     id: 'program-1',
     organizationId: 'org-1',
@@ -44,6 +54,7 @@ function programWithLines(): PromotionProgram {
     createdBy: 'user-1',
     createdAt: new Date(2026, 0, 1),
     updatedAt: new Date(2026, 0, 2),
+    ...overrides,
   });
 }
 
@@ -53,13 +64,24 @@ describe('GetPromotionHandler', () => {
   let productRepo: { find: jest.Mock };
   let categoryRepo: { find: jest.Mock };
   let handler: GetPromotionHandler;
+  let dataSource: { manager: { query: jest.Mock } };
+  const build = (isChainManager: boolean) =>
+    new GetPromotionHandler(
+      promotionRepo as any,
+      itemRepo as any,
+      productRepo as any,
+      categoryRepo as any,
+      accessStub(isChainManager) as any,
+      dataSource as any,
+    );
 
   beforeEach(() => {
     promotionRepo = { findById: jest.fn() };
     itemRepo = { find: jest.fn().mockResolvedValue([{ id: 'item-1', code: 'SKU-1', name: 'Item 1', unit: 'cai', sellingPrice: '100000' }]) };
     productRepo = { find: jest.fn().mockResolvedValue([{ id: 'product-1', code: 'PRD-1', name: 'Product 1' }]) };
     categoryRepo = { find: jest.fn().mockResolvedValue([{ id: 'category-1', code: 'CAT-1', name: 'Category 1' }]) };
-    handler = new GetPromotionHandler(promotionRepo as any, itemRepo as any, productRepo as any, categoryRepo as any);
+    dataSource = { manager: { query: jest.fn().mockResolvedValue([{ id: 'branch-hcm', name: 'Hồ Chí Minh' }]) } };
+    handler = build(true);
   });
 
   it('resolves target references inline for ITEM/PRODUCT/CATEGORY lines', async () => {
@@ -126,5 +148,39 @@ describe('GetPromotionHandler', () => {
     promotionRepo.findById.mockResolvedValue(null);
 
     await expect(handler.execute(new GetPromotionQuery('missing', actor))).rejects.toThrow(NotFoundException);
+  });
+
+  describe('ownership (2026100301 AC-06, AC-07)', () => {
+    const hcmManager: ActorContext = { ...actor, branchId: 'branch-hcm' };
+    const get = (isChainManager: boolean) => build(isChainManager).execute(new GetPromotionQuery('program-1', hcmManager));
+
+    it('own program: 200 with ownerBranchId and the branch name', async () => {
+      promotionRepo.findById.mockResolvedValue(programWithLines({ ownerBranchId: 'branch-hcm', branchIds: ['branch-hcm'] }));
+      const detail = await get(false);
+      expect(detail.ownerBranchId).toBe('branch-hcm');
+      expect(detail.ownerBranchName).toBe('Hồ Chí Minh');
+      expect(dataSource.manager.query.mock.calls[0][1]).toEqual(['org-1', ['branch-hcm']]);
+    });
+
+    it('AC-06: visible chain program: 200 with ownerBranchId null', async () => {
+      promotionRepo.findById.mockResolvedValue(programWithLines({ branchIds: [] }));
+      const detail = await get(false);
+      expect(detail.ownerBranchId).toBeNull();
+      expect(detail.ownerBranchName).toBeNull();
+      expect(dataSource.manager.query).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['another branch\'s program', { ownerBranchId: 'branch-hn', branchIds: ['branch-hn'] }],
+      ['a chain program scoped elsewhere', { branchIds: ['branch-hn'] }],
+    ])('AC-07: %s is 404', async (_label, overrides) => {
+      promotionRepo.findById.mockResolvedValue(programWithLines(overrides));
+      await expect(get(false)).rejects.toThrow(NotFoundException);
+    });
+
+    it('a chain manager reads any program', async () => {
+      promotionRepo.findById.mockResolvedValue(programWithLines({ ownerBranchId: 'branch-hn', branchIds: ['branch-hn'] }));
+      expect((await get(true)).ownerBranchId).toBe('branch-hn');
+    });
   });
 });

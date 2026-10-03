@@ -7,6 +7,7 @@ import { PROMOTION_REPOSITORY, PromotionRepositoryPort } from '../../domain/port
 import { PromotionProgram } from '../../domain/model/promotion-program';
 import { PromotionGroup } from '../../domain/model/promotion-group';
 import { rethrowDomainError } from '../rethrow-domain-error';
+import { PromotionAccessPolicy, scopeForOwner } from '../promotion-access.policy';
 import { DuplicatePromotionCommand } from './duplicate-promotion.command';
 
 function cloneGroups(groups: PromotionGroup[]): PromotionGroup[] {
@@ -24,6 +25,7 @@ export class DuplicatePromotionHandler implements ICommandHandler<DuplicatePromo
   constructor(
     @Inject(PROMOTION_REPOSITORY) private readonly repo: PromotionRepositoryPort,
     private readonly docNumbering: DocumentNumberingService,
+    private readonly access: PromotionAccessPolicy,
   ) {}
 
   async execute({ id, actor }: DuplicatePromotionCommand): Promise<PromotionProgram> {
@@ -31,6 +33,10 @@ export class DuplicatePromotionHandler implements ICommandHandler<DuplicatePromo
     if (!original) {
       throw new NotFoundException(`Promotion program "${id}" not found`);
     }
+    const access = await this.access.forActor(actor);
+    access.assertReadable(original);
+    // The copy is a new program of whoever duplicates it (A-12), not of the source's owner.
+    const ownerBranchId = access.ownerForNew();
 
     const code = await this.docNumbering.generate(DocumentType.PROMOTION, actor.branchId, actor);
 
@@ -42,6 +48,8 @@ export class DuplicatePromotionHandler implements ICommandHandler<DuplicatePromo
         name: `${original.name} (sao chép)`,
         status: PromotionStatus.TRACKING,
         groups: cloneGroups(original.groups),
+        ownerBranchId,
+        branchIds: scopeForOwner(ownerBranchId, original.branchIds),
         createdBy: actor.userId,
         createdAt: undefined,
         updatedAt: undefined,

@@ -430,6 +430,31 @@ describe('PromotionProgram.create', () => {
     });
   });
 
+  describe('owner branch scope (ADR-04)', () => {
+    it('accepts a branch-owned program scoped to exactly its owner', () => {
+      const program = PromotionProgram.create(baseProps({ ownerBranchId: 'branch-hcm', branchIds: ['branch-hcm'] }));
+      expect(program.ownerBranchId).toBe('branch-hcm');
+      expect(program.toProps().ownerBranchId).toBe('branch-hcm');
+    });
+
+    it.each([
+      ['whole chain', []],
+      ['another branch', ['branch-hn']],
+      ['owner plus another branch', ['branch-hcm', 'branch-hn']],
+    ])('rejects a branch-owned program scoped to %s with OWNER_SCOPE_MISMATCH', (_label, branchIds) => {
+      const codes = issueCodes(() =>
+        PromotionProgram.create(baseProps({ ownerBranchId: 'branch-hcm', branchIds: branchIds as string[] })),
+      );
+      expect(codes).toEqual(['OWNER_SCOPE_MISMATCH']);
+    });
+
+    it('keeps any scope legal for a chain-owned program', () => {
+      expect(issueCodes(() => PromotionProgram.create(baseProps({ branchIds: [] })))).toEqual([]);
+      expect(issueCodes(() => PromotionProgram.create(baseProps({ branchIds: ['branch-hn'] })))).toEqual([]);
+      expect(PromotionProgram.create(baseProps()).ownerBranchId).toBeUndefined();
+    });
+  });
+
   it('reports every violated invariant at once, not just the first', () => {
     const codes = issueCodes(() =>
       PromotionProgram.create(
